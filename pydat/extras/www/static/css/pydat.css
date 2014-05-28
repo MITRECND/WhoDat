@@ -1,0 +1,158 @@
+#page{
+    width: 98%;
+    display: block;
+    margin: 0 auto;
+}
+
+#forms{
+	width: 700px;
+	display: block;
+	margin: 0 auto;
+}
+
+#forms table {
+    margin: 0 auto;
+}
+
+
+.clear{
+	clear:both;
+}
+
+.ui-tabs .ui-tabs-panel {
+    padding: 2px 3px 3px 2px;
+}
+
+#header{
+	width: 98%;
+	margin: 0 auto;
+	margin-bottom: 5px;
+}
+
+#topline{
+    display: table;
+    width: 100%;
+}
+
+#toprow{
+    display: table-row;
+    width: 100%;
+}
+
+#tagline{
+    display:table-cell;
+	padding-bottom: 2px;
+    width: 100px;
+}
+
+#title{
+	font-family: Gadget, "Arial Black", sans-serif;
+	font-size: 16px;
+	padding-left: 2px;
+	text-align: left;
+    float: left;
+    cursor: pointer;
+}
+
+#searchIcon{
+    float: left;
+    cursor: pointer;
+}
+
+#slogan{
+    display:table-cell;
+	font-family: Gadget, "Arial Black", sans-serif;
+	/*font-family: Impact, Charcoal, sans-serif;*/
+	/*font-family: "Lucida Console", Monaco, monospace;*/
+	font-size: 16px;
+	/*width: 50%;*/
+	/*margin-left: auto;*/
+	/*margin-right: auto;*/
+	/*margin-top: 20px;*/
+	/*margin-bottom: 15px;*/
+	text-align: center;
+    width: 50%;
+}
+
+#aboutlink {
+    display:table-cell;
+    width: 100px;
+}
+
+#aboutlink span{
+    float: right;
+	font-family: Gadget, "Arial Black", sans-serif;
+	font-size: 16px;
+    cursor:pointer;
+    text-align: right;
+}
+
+.link{
+	cursor:pointer;
+    color:blue;
+    text-decoration:underline;
+}
+
+.novis{
+    visibility:hidden;
+}
+
+#errors{
+    width: 50%;
+    margin: 0 auto;
+    font-size: 20px;
+    color: red;
+    text-align: center;
+}
+
+.errors{
+    width: 98%;
+    margin 0 auto;
+    font-size: 18px;
+}
+
+.errors .error{
+    display:block;
+}
+
+.error{
+    color: red;
+}
+
+/***domain.html***/
+.detailTable{
+    display: table;
+    width: 95%;
+    margin: 0 auto;
+}
+
+.detailTable .title{
+    font-size: 16px;
+}
+
+.detailTable .domain_details{
+    display: table-cell;
+    text-align: left;
+}
+
+.detailTable .active_resolution{
+    display: table-cell;
+    width: 125px;
+    text-align: right;
+}
+
+.domain_quick .qdtable{
+    display:inline-block;
+    vertical-align: top;
+    margin-right: 5px;
+}
+
+.domain_quick .qdtable table{
+    text-align: left;
+}
+
+
+/***pdns.html***/
+#noresults{
+    text-align: center;
+}
