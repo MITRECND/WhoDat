@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Domain Search{% endblock %}
+
+{% block js_constants %}
+    <script type="text/javascript">
+      var domain_url = "{% url 'ajax_domain' %}";
+      var domains_url = "{% url 'ajax_domains' %}";
+	  var active_window = 0;
+      var key = "{{ key }}";
+      var value = "{{ value }}";
+    </script>
+{% endblock %}
+
+{% block js %}
+    <script type="text/javascript" src="/static/js/domain.js"></script>
+{%endblock %}
+
+
+{% block page%}
+    <table class = "dnsres">
+      <thead>
+        <tr>
+          <th>&nbsp;</th>
+          <th>Name</th>
+          <th>Registrant</th>
+          <th>Email</th>
+          <th>Created</th>
+          <th>Telephone</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+	<div id="dialog">
+		<span id="dtext"></span>
+	</div>
+
+{% endblock %}
+
+

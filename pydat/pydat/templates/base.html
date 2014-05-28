@@ -1,0 +1,322 @@
+<html>
+  <head>
+    <title>pyDat: {% block title %}WHOIS exploration{% endblock %}</title>
+		<link rel="stylesheet" type="text/css" href="/static/css/jquery-ui-1.10.4.css">
+		<!-- <link rel="stylesheet" type="text/css" href="/static/css/demo_table_jui.css"> -->
+		<link rel="stylesheet" type="text/css" href="/static/css/jquery.dataTables.css">
+		<link rel="stylesheet" type="text/css" href="/static/css/pydat.css">
+	{% block css %}
+	{% endblock %}
+		<script type="text/javascript" src="/static/js/jquery-1.11.0.min.js"></script>
+		<script type="text/javascript" src="/static/js/jquery-ui-1.10.4.js"></script>
+        <script type="text/javascript" src="/static/js/jquery.dataTables.js"></script>
+        <script type="text/javascript">
+          var resolve_url = "{% url 'ajax_resolve' %}";
+          var csrf_token = '{{ csrf_token }}';
+        </script>
+    {% block js_constants %}
+    {% endblock %}
+		<script type="text/javascript" src="/static/js/pydat.js"></script>
+    {% block js %}
+    {% endblock %}
+  </head>
+  <body>
+	<div id="header">
+        <div id = "topline">
+        <div id = "toprow">
+            <div id="tagline">
+                <div id="title">
+                    pyDat
+                </div>
+                <div id="searchIcon">
+                    <span id="button" class="ui-icon ui-icon-minus"></span>
+                </div>
+            </div>
+            <div id="slogan">
+                <span>
+                    What... is your quest?
+                </span>
+            </div>
+            <div id="aboutlink">
+                <span>
+                    About
+                </span>
+            </div>
+        </div>
+        </div>
+
+		<div class='clear'>
+		</div>
+
+		<div id="forms" style="text-align:center">
+			<ul>
+				<li title="Search Domains"><a href="#domain">Domain Search</a></li>
+				<li title="Search PDNS for records that are pointed to by the given query"><a href="#pdnsf">PDNS Search</a></li>
+				<li title="Search PDNS for records that point to the given query"><a href="#pdnsr">PDNS Inverse</a></li>
+			</ul>
+
+			<div id="domain" class='search_form'>
+			{% if domain_form %}
+			<form action="{% url 'domains' %}" method="POST">
+			  {% csrf_token %}
+                {{ domain_form.non_field_errors }}
+                <table id="domain_form">
+                    <tbody>
+                        <tr>
+                            <td>
+                                <label for="id_key">Key:</label>
+                            </td>
+                            <td>
+                                {{ domain_form.key }}
+                            </td>
+                            <td>
+                                <label for="id_value">Value:</label>
+                            </td>
+                            <td>
+                                {{ domain_form.value }}
+
+                            </td>
+                            <td>
+                                <label for="id_fmt">Format:</label>
+                            </td>
+                            <td>
+                                {{ domain_form.fmt }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class='form_filter novis'>
+                                    <label for="id_filt">Filter:</label>
+                                </div>
+                            </td>
+                            <td>
+                                <div class='form_filter novis'>
+                                    {{ domain_form.filt }}
+                                </div>
+                            </td>
+                            <td>
+                                <div class='form_limit novis'>
+                                    <label for="id_limit">Limit:</label>
+                                </div>
+                            </td>
+                            <td>
+                                <div class='form_limit novis'>
+                                    {{ domain_form.limit }}
+                                </div>
+                            </td>
+                            <td>
+                                &nbsp;
+                            </td>
+                            <td>
+                                  <input type="submit" value="Search"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>    
+			</form>
+                <div class='errors'>
+                    {% for field in domain_form %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                            <span class='error'>
+                                {{ error }}
+                            </span>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+			{% endif %}
+			</div>
+
+			<div id="pdnsf" class='search_form'>
+			{% if pdns_form %}
+			<form action="{% url 'pdns' %}" method="POST">
+                {% csrf_token %}
+                {{ pdns_form.pretty.as_hidden }}
+                {{ pdns_form.non_field_errors }} 
+                <table id = "pdns_form">
+                    <tbody>
+                        <tr>
+                            <td>
+                                <label for="id_domain">Domain:</label>
+                            </td>
+                            <td>
+                                {{ pdns_form.domain }}
+                            </td>
+                            <td>
+                                <label for="id_absolute" title="Excludes subdomains when checked">Absolute:</label>
+                            </td>
+                            <td>
+                                {{ pdns_form.absolute}}
+                            </td>
+                            <td>
+                                <label for="id_rrtypes">RRTypes:</label>
+                            </td>
+                            <td rowspan=2>
+                                {{ pdns_form.rrtypes }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <label for="id_fmt">Format:</label>
+                            </td>
+                            <td>
+                                {{ pdns_form.fmt}}
+                            </td>
+                            <td>
+                                <label for="id_limit">Limit:</label>
+                            </td>
+                            <td>
+                                {{ pdns_form.limit}}
+                            </td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                        </tr>
+                            <td>
+                                <div class='form_filter novis'>
+                                    <label for="id_filter">Filter:</label>
+                                </div>
+                            </td>
+                            <td>
+                                <div class='form_filter novis'>
+                                {{ pdns_form.filt }}
+                                </div>
+                            </td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>
+                                <input type="submit" value="Search"/>
+                            </td>
+                        <tr>
+                        </tr>
+                    </tbody>
+                </table> 
+			</form>
+                <div class='errors'>
+                    {% for field in pdns_form %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                            <span class='error'>
+                                {{ error }}
+                            </span>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+			{% endif %}
+			</div>
+
+			<div id ="pdnsr" class='search_form'>
+			{% if pdns_r_form %}
+			<form action="{% url 'pdns_r' %}" method="POST">
+			  {% csrf_token %}
+              {{ pdns_r_form.pretty.as_hidden }}
+			  {{ pdns_r_form.non_field_errors }}
+                <table id = "pdnsr_form">
+                    <tbody>
+                        <tr>
+                            <td>
+                                <label for="id_key">Type:</label>
+                            </td>
+                            <td>
+                                {{ pdns_r_form.key}}
+                            </td>
+                            <td>
+                                <label for="id_value">Query:</label>
+                            </td>
+                            <td>
+                                {{ pdns_r_form.value}}
+                            </td>
+                            <td>
+                                <div class='form_rrtypes novis'>
+                                    <label for="id_rrtypes">RRTypes:</label>
+                                </div>
+                            </td>
+                            <td rowspan=2>
+                                <div class='form_rrtypes novis'>
+                                    {{ pdns_r_form.rrtypes }}
+                                </div>
+                            </td>
+                            <td>
+                                 {# <label for="id_absolute" title="Exclude subdomains when checked">Absolute:</label>#}
+                                 &nbsp;
+                            </td>
+                            <td>
+                                {# {{ pdns_r_form.absolute }} #}
+                                &nbsp;
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <label for="id_fmt">Format:</label>
+                            </td>
+                            <td>
+                                {{ pdns_r_form.fmt}}
+                            </td>
+                            <td>
+                                <label for="id_limit">Limit:</label>
+                            </td>
+                            <td>
+                                {{ pdns_r_form.limit}}
+                            </td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class='form_filter novis'>
+                                    <label for="id_filter">Filter:</label>
+                                </div>
+                            </td>
+                            <td>   
+                                <div class='form_filter novis'>
+                                    {{ pdns_r_form.filt }}
+                                </div>
+                            </td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>
+                                <input type="submit" value="Search"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table> 
+			</form>
+                <div class='errors'>
+                    {% for field in pdns_r_form %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                            <span class='error'>
+                                {{ error }}
+                            </span>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+			{% endif %}
+			</div>
+
+		</div>
+	</div>
+
+	<div class='clear'>
+	</div>
+
+    <div id = 'page'>
+	{% block page %}
+	{% endblock %}
+    </div>
+
+
+    <div id="about" title="About">
+		<a href="https://github.com/Xen0ph0n/WhoDat/">Original</a> by: <a href="mailto:chris@xenosec.org">Chris Clark</a><br>
+		This one by: <a href="mailto:wshields@mitre.org">Wesley Shields</a> and <a href="mailto:mkhan@mitre.org">Murad Khan</a>
+    </div>
+
+  </body>
+</html>

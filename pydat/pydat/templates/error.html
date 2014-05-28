@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}Error{% endblock %}
+
+{% block js_constants %}
+    <script type="text/javascript">
+	  var active_window = {{ active }};
+    </script>
+{% endblock %}
+
+{% block page %}
+    <div id = 'errors'>
+    {{ error }}
+    </div>
+{% endblock %}
