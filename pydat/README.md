@@ -39,8 +39,8 @@ a cron job. For more information please see the [PHP implementation](../master/w
 TODO
 ====
 
-Move Chris' update script to a common directory and test it out.
-Find a way to implement historical searches.
+- Move Chris' update script to a common directory and test it out.
+- Find a way to implement historical searches.
 
 Legal Stuff
 ===========
