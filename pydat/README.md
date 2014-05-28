@@ -34,7 +34,7 @@ Untested Stuff
 
 Chris has an update.py script which I haven't used yet, so all bets are off,
 but it should allow you to get regular updates on specific watched fields via
-a cron job. For more information please see the [PHP implementation](../master/blob/whodat).
+a cron job. For more information please see the [PHP implementation](../master/whodat).
 
 TODO
 ====

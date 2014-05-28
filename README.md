@@ -9,16 +9,16 @@ in JSON or list format.
 
 WhoDat was originally written by [Chris Clark](https://github.com/Xen0ph0n).
 The original implementation is in PHP and availble in this repository under
-the [whodat](../blob/master/whodat) directory. The code was re-written from
+the [whodat](../master/whodat) directory. The code was re-written from
 scratch by [Wesley Shields](https://github.com/wxsBSD) and
 [Murad Khan](https://github.com/mraoul) in Python, and is available under the
-[pydat](../blob/master/pydat) directory.
+[pydat](../master/pydat) directory.
 
 The PHP version is left for those who want to run it, but it is not as full
 featured or extensible as the Python implementation, and is not supported.
 
-For more information on the PHP implementation please see the [readme](../blob/master/whodat/README.md). For more information on the Python impementation
-please see the [readme](../blob/master/pydat/README.md).
+For more information on the PHP implementation please see the [readme](../master/whodat/README.md). For more information on the Python impementation
+please see the [readme](../master/pydat/README.md).
 
 License stuff: 
 
