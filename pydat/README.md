@@ -21,7 +21,7 @@ Populating Mongo with whoisxmlapi data
 - Extract the csv files.
 - Import them (adjust for your needs):
 ```
-for file in */*.csv; do echo $file && mongoimport --db whois --collection whois --file $file --type csv --headerline --upsert --upsertFields domainName; done"
+for file in */*.csv; do echo $file && mongoimport --db whois --collection whois --file $file --type csv --headerline --upsert --upsertFields domainName; done
 ```
 - Create indexes on domainName, registrant_name, contactEmail and registrant_telephone.
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
