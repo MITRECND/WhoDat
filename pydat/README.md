@@ -13,10 +13,10 @@ data in a MongoDB. Beyond the data in a MongoDB you will need
 [Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/),
 and [requests](https://pypi.python.org/pypi/requests) (at least 2.2.1).
 
-Populating Mongo with whoisxmlapi data
+Populating Mongo with whoisxmlapi data (Ubuntu)
 ======================================
 
-
+- Install [MongoDB](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-ubuntu/)
 - Download latest trimmed (smallest possible) whoisxmlapi quarterly DB dump.
 - Extract the csv files.
 - Import them (adjust for your needs):
@@ -24,11 +24,32 @@ Populating Mongo with whoisxmlapi data
 for file in */*.csv; do echo $file && mongoimport --db whois --collection whois --file $file --type csv --headerline --upsert --upsertFields domainName; done
 ```
 - Create indexes on domainName, registrant_name, contactEmail and registrant_telephone.
+```
+db.whois.ensureIndex( {registrant_name: 1})
+....
+```
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
 - Edit pydat/custom_settings.py to suit your needs.
+  - Change DEBUG - True
   - Include your DNSDB key if you have one!
 - Configure Apache to use the provided wsgi interface to pydat.
+```
+sudo apt-get install libapache2-mod-wsgi
+sudo nano sudo nano /etc/apache2/sites-available/whois
 
+<VirtualHost *:80>
+        ServerName whois
+        ServerAlias whois
+        WSGIScriptAlias / /var/www/pydat/wsgi.py
+        Alias /static/ /var/www/pydat/pydat/static/
+        <Location "/static/">
+            Options -Indexes
+        </Location>
+
+</VirtualHost>
+
+
+```
 Untested Stuff
 =============
 
