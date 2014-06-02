@@ -40,11 +40,11 @@ db.whois.ensureIndex( {registrant_telephone: 1})
 ```
 
 - Fill in relevant environmental and alerting data in the update.py script as well as your user/pass to download daily updates
-- 
+
 - Enter known bad registrants you wish to track in a file and specify its location in update.py variable registrantpath
-- 
+
 - Create a cronjob to run the update script at 0430 or so EST 30 "4 * * * /usr/bin/python /YOURUPDATEWORKINGDIR/update.py >/dev/null 2>&1"
-- 
+
 - Place index.php in your webroot of choice
 
 Usage from the API .. again not a complete guide ;) 
