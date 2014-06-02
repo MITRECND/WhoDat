@@ -18,7 +18,7 @@ data in a MongoDB. Beyond the data in a MongoDB you will need
 [Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/),
 and [requests](https://pypi.python.org/pypi/requests) (at least 2.2.1).
 
-Populating Mongo with whoisxmlapi data (Ubuntu)
+Populating Mongo with whoisxmlapi data (Ubuntu 12.04.4 LTS)
 ======================================
 
 - Install [MongoDB](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-ubuntu/)
@@ -30,8 +30,11 @@ for file in */*.csv; do echo $file && mongoimport --db whois --collection whois 
 ```
 - Create indexes on domainName, registrant_name, contactEmail and registrant_telephone.
 ```
+db.whois.ensureIndex( {domainName: 1})
+db.whois.ensureIndex( {contactEmail: 1})
 db.whois.ensureIndex( {registrant_name: 1})
-....
+db.whois.ensureIndex( {registrant_telephone: 1})
+
 ```
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
 - Edit pydat/custom_settings.py to suit your needs.
@@ -40,7 +43,7 @@ db.whois.ensureIndex( {registrant_name: 1})
 - Configure Apache to use the provided wsgi interface to pydat.
 ```
 sudo apt-get install libapache2-mod-wsgi
-sudo nano sudo nano /etc/apache2/sites-available/whois
+sudo nano /etc/apache2/sites-available/whois
 
 <VirtualHost *:80>
         ServerName whois
