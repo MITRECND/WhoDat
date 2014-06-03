@@ -10,6 +10,10 @@
 # Set this to True if you want to see full debug output in your browser.
 DEBUG = False
 
+# If DEBUG is set to False this must be set to the hosts that are allowed
+# to access the application
+ALLOWED_HOSTS = ['*']
+
 MONGO_HOST = 'localhost'
 MONGO_PORT = 27017
 MONGO_DATABASE = 'whois'
