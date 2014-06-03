@@ -36,6 +36,7 @@ db.whois.ensureIndex( {registrant_name: 1})
 db.whois.ensureIndex( {registrant_telephone: 1})
 
 ```
+- Copy pydat to /var/www/ (or prefered location)
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
 - Edit pydat/custom_settings.py to suit your needs.
   - Change DEBUG - True
@@ -48,6 +49,7 @@ sudo nano /etc/apache2/sites-available/whois
 <VirtualHost *:80>
         ServerName whois
         ServerAlias whois
+        # Install Location
         WSGIScriptAlias / /var/www/pydat/wsgi.py
         Alias /static/ /var/www/pydat/pydat/static/
         <Location "/static/">
