@@ -39,7 +39,6 @@ db.whois.ensureIndex( {registrant_telephone: 1})
 - Copy pydat to /var/www/ (or prefered location)
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
 - Edit pydat/custom_settings.py to suit your needs.
-  - Change DEBUG - True
   - Include your DNSDB key if you have one!
 - Configure Apache to use the provided wsgi interface to pydat.
 ```
