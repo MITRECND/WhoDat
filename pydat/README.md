@@ -43,11 +43,8 @@ db.whois.ensureIndex( {registrant_telephone: 1})
 - Configure Apache to use the provided wsgi interface to pydat.
 ```
 sudo apt-get install libapache2-mod-wsgi
-
-Configure Apache:
 sudo vi /etc/apache2/sites-available/whois
 
-```
 <VirtualHost *:80>
         ServerName whois
         ServerAlias whois
