@@ -59,3 +59,13 @@ Screenshots:
 ![Image2](https://raw.github.com/MITRECND/WhoDat/master/whodat/screenshots/ss2.png)
 ![Image3](https://raw.github.com/MITRECND/WhoDat/master/whodat/screenshots/ss3.png)
 ![Image4](https://raw.github.com/MITRECND/WhoDat/master/whodat/screenshots/ss4.png)
+
+License:
+
+WhoDat is copyrighted by Chris Clark 2013. Contact him at Chris@xenosys.org.
+
+WhoDat is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+WhoDat is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with WhoDat. If not, see http://www.gnu.org/licenses/.
