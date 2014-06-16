@@ -55,10 +55,10 @@ Hidden values are "&nodl=yes" == print CSV to standard out vs download and "&lim
 ```
 Screenshots: 
 
-![Image1](https://raw.github.com/MITRECND/WhoDat/master/whodat/screenshots/ss1.png)
-![Image2](https://raw.github.com/MITRECND/WhoDat/master/whodat/screenshots/ss2.png)
-![Image3](https://raw.github.com/MITRECND/WhoDat/master/whodat/screenshots/ss3.png)
-![Image4](https://raw.github.com/MITRECND/WhoDat/master/whodat/screenshots/ss4.png)
+![Image1](https://raw.github.com/MITRECND/WhoDat/master/legacy_whodat/screenshots/ss1.png)
+![Image2](https://raw.github.com/MITRECND/WhoDat/master/legacy_whodat/screenshots/ss2.png)
+![Image3](https://raw.github.com/MITRECND/WhoDat/master/legacy_whodat/screenshots/ss3.png)
+![Image4](https://raw.github.com/MITRECND/WhoDat/master/legacy_whodat/screenshots/ss4.png)
 
 License:
 
