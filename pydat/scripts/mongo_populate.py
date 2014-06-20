@@ -160,10 +160,10 @@ def main():
     optparser.add_option("-e", "--extension", action="store", dest="extension",
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
     optparser.add_option("-i", "--identifier", action="store", dest="identifier", type="int",
-        default=None, help="Identifier to use in update to signify version (e.g., 'v8' or 'whois v8')")
+        default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
     optparser.add_option("-m", "--mongo-host", action="store", dest="mongo_host",
         default='localhost', help="Location of mongo db/cluster")
-    optparser.add_option("-p", "--mongo-port", action="store", dest="mongo_port",
+    optparser.add_option("-p", "--mongo-port", action="store", dest="mongo_port", type="int",
         default=27017, help="Location of mongo db/cluster")
     optparser.add_option("-b", "--database", action="store", dest="database",
         default='whois', help="Name of database to use (default: 'whois')")
@@ -208,6 +208,16 @@ def main():
     if options.exclude != "":
         options.exclude = options.exclude.split(',')
 
+    # Setup indexes
+    collection.ensure_index('domainName', background=True)
+    collection.ensure_index('latest.contactEmail', background=True)
+    collection.ensure_index('latest.registrant_name', background=True)
+    collection.ensure_index('latest.registrant_telephone', background=True)
+
+    collection.ensure_index('history.contactEmail', background=True, sparse=True)
+    collection.ensure_index('history.registrant_name', background=True, sparse=True)
+    collection.ensure_index('history.registrant_telephone', background=True, sparse=True)
+
     if options.directory:
         scan_directory(collection, options.directory, options)
     elif options.file:
@@ -227,16 +237,6 @@ def main():
               'comment' : options.comment
             }
     meta.update({'_id': meta_id}, {'$push' : {'versionStats' : stats}})
-
-    #After parsing setup indexes
-    collection.ensure_index('domainName', background=True)
-    collection.ensure_index('latest.contactEmail', background=True)
-    collection.ensure_index('latest.registrant_name', background=True)
-    collection.ensure_index('latest.registrant_telephone', background=True)
-
-    collection.ensure_index('history.contactEmail', background=True, sparse=True)
-    collection.ensure_index('history.registrant_name', background=True, sparse=True)
-    collection.ensure_index('history.registrant_telephone', background=True, sparse=True)
 
     if options.stats:
         print "Stats: "
