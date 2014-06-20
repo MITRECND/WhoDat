@@ -28,7 +28,7 @@ def scan_directory(collection, directory, options):
             parse_csv(collection, full_path, options)
 
 def parse_csv(collection, filename, options):
-    if options.verbose:
+    if options.verbose or options.vverbose:
         print "Processing file: %s" % filename
 
     csvfile = open(filename, 'rb')
@@ -55,7 +55,7 @@ def process_entry(collection, header, input_entry, options):
     details = {}
     for i,item in enumerate(input_entry):
         if header[i] == 'domainName':
-            if options.verbose:
+            if options.vverbose:
                 print "Processing domain: %s" % item
             domainName = item
         else:
@@ -81,7 +81,7 @@ def process_entry(collection, header, input_entry, options):
             # I don't forsee keys just being wholesale removed, so this shouldn't be a problem
 
         if diff:
-            if options.verbose:
+            if options.vverbose:
                 print "Updating existing entry for %s" % domainName
         
             latest_diff = dict_diff(latest, details, options)
@@ -92,7 +92,7 @@ def process_entry(collection, header, input_entry, options):
             NUM_UPDATED += 1
         else:
             NUM_UNCHANGED += 1
-            if options.verbose:
+            if options.vverbose:
                 print "Unchanged entry for %s" % domainName
 
         # Regardless of if there was a diff, update 'latest' entry with new info
@@ -102,7 +102,7 @@ def process_entry(collection, header, input_entry, options):
         collection.update({'_id': current_entry['_id']}, { '$set': {'latest':  details}})
     else:
         NUM_NEW += 1
-        if options.verbose:
+        if options.vverbose:
             print "Creating new entry for %s" % domainName
 
         details[VERSION_KEY] = options.identifier
@@ -171,6 +171,8 @@ def main():
         default='whois', help="Name of collection to use (default: 'whois')")
     optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
+    optparser.add_option("--vverbose", action="store_true", dest="vverbose",
+        default=False, help="Be very verbose (Prints status of every domain parsed)")
     optparser.add_option("-s", "--stats", action="store_true", dest="stats",
         default=False, help="Print out Stats after running")
     optparser.add_option("-x", "--exclude", action="store", dest="exclude",
@@ -221,11 +223,16 @@ def main():
     if options.directory:
         scan_directory(collection, options.directory, options)
     elif options.file:
+        if options.verbose:
+            print "Processing file: %s" % options.file
         parse_csv(collection, options.file, options)
     else:
         print "File or Directory required"
         sys.exit(1) 
 
+
+    if options.vverbose:
+        print "Updating Metadata"
 
     # Now that it's been processed, update the metadata
     meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
