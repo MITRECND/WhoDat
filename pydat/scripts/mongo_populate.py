@@ -3,6 +3,7 @@
 import sys
 import os
 import csv
+import hashlib
 from optparse import OptionParser
 import pymongo
 from pymongo import MongoClient
@@ -12,6 +13,10 @@ NUM_NEW = 0
 NUM_UPDATED = 0
 NUM_UNCHANGED = 0
 VERSION_KEY = 'dataVersion'
+UNIQUE_KEY = 'dataUniqueID'
+FIRST_SEEN = 'dataFirstSeen'
+
+CHANGEDCT = {}
 
 def scan_directory(collection, directory, options):
     for root, subdirs, filenames in os.walk(directory):
@@ -51,97 +56,78 @@ def process_entry(collection, header, input_entry, options):
         return
 
     current_entry = None
-    domainName = ''
     details = {}
+    domainName = ''
     for i,item in enumerate(input_entry):
         if header[i] == 'domainName':
             if options.vverbose:
                 print "Processing domain: %s" % item
             domainName = item
-        else:
-            details[header[i]] = item
+            continue
+        details[header[i]] = item
+
+    entry = {
+                VERSION_KEY: options.identifier,
+                FIRST_SEEN: options.identifier,
+                UNIQUE_KEY: generate_id(domainName, options.identifier),
+                'details': details,
+                'domainName': domainName,
+            }
 
     current_entry = find_entry(collection, domainName)
 
+    global CHANGEDCT
     if current_entry:
-        latest = current_entry['latest']
-
         if options.exclude != "":
             details_copy = details.copy()
             for exclude in options.exclude:
                 del details_copy[exclude]
 
-            diff = len(set(details_copy.items()) - set(latest.items())) > 0
+
+            changed = set(details_copy.items()) - set(current_entry['details'].items()) 
+            diff = len(set(details_copy.items()) - set(current_entry['details'].items())) > 0
+            
         else:
-            diff = len(set(details.items()) - set(latest.items())) > 0
+            changed = set(details.items()) - set(current_entry['details'].items()) 
+            diff = len(set(details.items()) - set(current_entry['details'].items())) > 0
 
             # The above diff doesn't consider keys that are only in the latest in mongo
             # So if a key is just removed, this diff will indicate there is no difference
             # even though a key had been removed.
             # I don't forsee keys just being wholesale removed, so this shouldn't be a problem
+        for ch in changed:
+            if ch[0] not in CHANGEDCT:
+                CHANGEDCT[ch[0]] = 0
+            CHANGEDCT[ch[0]] += 1
 
         if diff:
             if options.vverbose:
-                print "Updating existing entry for %s" % domainName
+                print "Creating entry for updated domain %s" % domainName
         
-            latest_diff = dict_diff(latest, details, options)
-
-            collection.update(  {'_id': current_entry['_id']}, 
-                            { '$push': { 'history':  latest_diff}}
-                         )
+            entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
+            collection.insert(entry)
             NUM_UPDATED += 1
         else:
             NUM_UNCHANGED += 1
             if options.vverbose:
                 print "Unchanged entry for %s" % domainName
-
-        # Regardless of if there was a diff, update 'latest' entry with new info
-        # For the majority of cases this will only update the VERSION_KEY
-        # Need to check and see if this is horribly inefficient or not
-        details[VERSION_KEY] = options.identifier
-        collection.update({'_id': current_entry['_id']}, { '$set': {'latest':  details}})
+            collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {'details': details}})
+            collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {VERSION_KEY: options.identifier}})
     else:
         NUM_NEW += 1
         if options.vverbose:
             print "Creating new entry for %s" % domainName
-
-        details[VERSION_KEY] = options.identifier
-        entry = { 'domainName': domainName, 
-                  'latest' : details, 
-                  'history': [],
-                  'firstVersion': options.identifier
-                }
         collection.insert(entry)
 
-
-def dict_diff(old, new, options): 
-    output = {}
-     
-    diffset = set(old.items()) - set(new.items())
-    diffkeys = set(new.keys()) - set(old.keys())
-
-    if len(diffset) == 0 and len(diffkeys) == 0:
-        return None
-
-    # Keep track of keys that have been removed/added
-    # This allows us to easily roll backwards
-    for key in diffkeys:
-        if key in options.exclude:
-            continue
-        output['-' + key] = new[key]
-
-    # Key/value pairs that have changed
-    for (key,value) in diffset:
-        if key in options.exclude:
-            continue
-        output[key] = value
-         
-    return output
+def generate_id(domainName, identifier):
+    dhash = hashlib.md5(domainName).hexdigest() + str(identifier)
+    return dhash
+    
 
 def find_entry(collection, domainName):
-    entry = collection.find_one({"domainName": domainName})
+    entry = collection.find_one({"domainName": domainName}, sort=[('version', pymongo.DESCENDING)])
     if entry:
-       return entry 
+       return entry
     else:
         return None
 
@@ -151,6 +137,7 @@ def main():
     global NUM_NEW
     global NUM_UPDATED
     global NUM_UNCHANGED
+    global VERSION_KEY
 
     optparser = OptionParser(usage='usage: %prog [options]')
     optparser.add_option("-f", "--file", action="store", dest="file",
@@ -192,14 +179,24 @@ def main():
         print "Identifier required"
         sys.exit(1)
 
-    metadata = meta.find_one()
+    metadata = meta.find_one({'metadata':'pydat'})
     meta_id = None
     if metadata is None: #Doesn't exist
-        md = {'firstVersion': options.identifier,
+        md = {
+              'metadata': 'pydat',
+              'firstVersion': options.identifier,
               'lastVersion' : options.identifier,
-              'versionStats': [],
              }
         meta_id = meta.insert(md)
+        metadata = meta.find_one({'_id': meta_id})
+
+        # Setup indexes
+        collection.ensure_index(VERSION_KEY, background=True)
+        collection.ensure_index('domainName', background=True)
+        collection.ensure_index('details.contactEmail', background=True)
+        collection.ensure_index('details.registrant_name', background=True)
+        collection.ensure_index('details.registrant_telephone', background=True)
+
     else:
         if metadata['lastVersion'] >= options.identifier:
             print "Identifier must be 'greater than' previous idnetifier"
@@ -210,40 +207,35 @@ def main():
     if options.exclude != "":
         options.exclude = options.exclude.split(',')
 
-    # Setup indexes
-    collection.ensure_index('domainName', background=True)
-    collection.ensure_index('latest.contactEmail', background=True)
-    collection.ensure_index('latest.registrant_name', background=True)
-    collection.ensure_index('latest.registrant_telephone', background=True)
-
-    collection.ensure_index('history.contactEmail', background=True, sparse=True)
-    collection.ensure_index('history.registrant_name', background=True, sparse=True)
-    collection.ensure_index('history.registrant_telephone', background=True, sparse=True)
 
     if options.directory:
         scan_directory(collection, options.directory, options)
     elif options.file:
-        if options.verbose:
-            print "Processing file: %s" % options.file
         parse_csv(collection, options.file, options)
     else:
         print "File or Directory required"
         sys.exit(1) 
 
 
+    #global CHANGEDCT
+    #import operator
+    #sorted_x = sorted(CHANGEDCT.iteritems(), key=operator.itemgetter(1), reverse=True)
+    #for (name,count) in sorted_x:
+    #    print name, count
+
     if options.vverbose:
         print "Updating Metadata"
 
     # Now that it's been processed, update the metadata
+    meta.insert({ 
+                    'metadata': options.identifier,
+                    'total' : NUM_ENTRIES,
+                    'new' : NUM_NEW,
+                    'updated' : NUM_UPDATED,
+                    'unchanged' : NUM_UNCHANGED,
+                    'comment' : options.comment
+            })
     meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
-    stats = { 'version': options.identifier,
-              'total' : NUM_ENTRIES,
-              'new' : NUM_NEW,
-              'updated' : NUM_UPDATED,
-              'unchanged' : NUM_UNCHANGED,
-              'comment' : options.comment
-            }
-    meta.update({'_id': meta_id}, {'$push' : {'versionStats' : stats}})
 
     if options.stats:
         print "Stats: "
