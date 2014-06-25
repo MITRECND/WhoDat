@@ -7,6 +7,9 @@ import hashlib
 from optparse import OptionParser
 import pymongo
 from pymongo import MongoClient
+from threading import Thread
+from Queue import Queue
+import multiprocessing #for num cpus
 
 NUM_ENTRIES = 0
 NUM_NEW = 0
@@ -18,7 +21,7 @@ FIRST_SEEN = 'dataFirstSeen'
 
 CHANGEDCT = {}
 
-def scan_directory(collection, directory, options):
+def scan_directory(work_queue, collection, directory, options):
     for root, subdirs, filenames in os.walk(directory):
         if len(subdirs):
             for subdir in subdirs:
@@ -30,9 +33,9 @@ def scan_directory(collection, directory, options):
                     continue
 
             full_path = os.path.join(root, filename)
-            parse_csv(collection, full_path, options)
+            parse_csv(work_queue, collection, full_path, options)
 
-def parse_csv(collection, filename, options):
+def parse_csv(work_queue, collection, filename, options):
     if options.verbose or options.vverbose:
         print "Processing file: %s" % filename
 
@@ -41,8 +44,15 @@ def parse_csv(collection, filename, options):
     header = dnsreader.next()
 
     for row in dnsreader:
-        process_entry(collection, header, row, options)
+        work_queue.put({'header': header, 'row': row})
+        #process_entry(collection, header, row, options)
 
+def process_worker(work_queue, collection, options):
+    while True:
+        work = work_queue.get()
+        process_entry(collection, work['header'], work['row'], options)
+        work_queue.task_done()
+        
 
 def process_entry(collection, header, input_entry, options):
     global VERSION_KEY
@@ -157,6 +167,8 @@ def main():
         default='whois', help="Name of database to use (default: 'whois')")
     optparser.add_option("-c", "--collection", action="store", dest="collection",
         default='whois', help="Name of collection to use (default: 'whois')")
+    optparser.add_option("-t", "--threads", action="store", dest="threads", type="int",
+        default=multiprocessing.cpu_count(), help="Number of worker threads")
     optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     optparser.add_option("--vverbose", action="store_true", dest="vverbose",
@@ -171,6 +183,7 @@ def main():
     (options, args) = optparser.parse_args()
 
 
+    work_queue = Queue()
     client = MongoClient(host=options.mongo_host, port=options.mongo_port)
     whodb = client[options.database]
     collection = whodb[options.collection]
@@ -208,15 +221,25 @@ def main():
     if options.exclude != "":
         options.exclude = options.exclude.split(',')
 
+    #Start worker threads
+    if options.verbose:
+        print "Starting %i worker threads" % options.threads
+
+    for i in range(options.threads):
+         t = Thread(target=process_worker, args=(work_queue, collection, options))
+         t.daemon = True
+         t.start()
 
     if options.directory:
-        scan_directory(collection, options.directory, options)
+        scan_directory(work_queue, collection, options.directory, options)
     elif options.file:
-        parse_csv(collection, options.file, options)
+        parse_csv(work_queue, collection, options.file, options)
     else:
         print "File or Directory required"
         sys.exit(1) 
 
+
+    work_queue.join()
 
     #global CHANGEDCT
     #import operator
