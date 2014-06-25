@@ -69,7 +69,6 @@ def process_entry(collection, header, input_entry, options):
     entry = {
                 VERSION_KEY: options.identifier,
                 FIRST_SEEN: options.identifier,
-                UNIQUE_KEY: generate_id(domainName, options.identifier),
                 'details': details,
                 'domainName': domainName,
             }
@@ -105,6 +104,7 @@ def process_entry(collection, header, input_entry, options):
                 print "Creating entry for updated domain %s" % domainName
         
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
+            entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
             collection.insert(entry)
             NUM_UPDATED += 1
         else:
@@ -117,6 +117,7 @@ def process_entry(collection, header, input_entry, options):
         NUM_NEW += 1
         if options.vverbose:
             print "Creating new entry for %s" % domainName
+        entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
         collection.insert(entry)
 
 def generate_id(domainName, identifier):
