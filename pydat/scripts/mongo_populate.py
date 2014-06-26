@@ -121,8 +121,7 @@ def process_entry(collection, header, input_entry, options):
             NUM_UNCHANGED += 1
             if options.vverbose:
                 print "Unchanged entry for %s" % domainName
-            collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {'details': details}})
-            collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {VERSION_KEY: options.identifier}})
+            collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {'details': details, VERSION_KEY: options.identifier}})
     else:
         NUM_NEW += 1
         if options.vverbose:
