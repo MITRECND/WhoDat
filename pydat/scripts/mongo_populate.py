@@ -7,9 +7,11 @@ import hashlib
 from optparse import OptionParser
 import pymongo
 from pymongo import MongoClient
+import threading
 from threading import Thread
 from Queue import Queue
 import multiprocessing #for num cpus
+from multiprocessing import Process, Queue as mpQueue
 
 NUM_ENTRIES = 0
 NUM_NEW = 0
@@ -47,14 +49,47 @@ def parse_csv(work_queue, collection, filename, options):
         work_queue.put({'header': header, 'row': row})
         #process_entry(collection, header, row, options)
 
-def process_worker(work_queue, collection, options):
+def mongo_worker(insert_queue, options):
+    bulk_counter = 0
+    client = MongoClient(host=options.mongo_host, port=options.mongo_port)
+    whodb = client[options.database]
+    collection = whodb[options.collection]
+    finishup = False
+    bulk = collection.initialize_unordered_bulk_op() 
+
+    while not finishup:
+        request = insert_queue.get()
+        if not isinstance(request, basestring):
+            if request['type'] == 'insert':
+                bulk.insert(request['insert'])
+                bulk_counter += 1
+            elif request['type'] == 'update':
+                bulk.find(request['find']).update(request['update'])
+                bulk_counter += 1
+            else:
+                print "Unrecognized"
+        else:
+            finishup = True 
+
+        if (bulk_counter >= options.bulk_size) or finishup:
+            finished_bulk = bulk
+            bulk = collection.initialize_unordered_bulk_op() 
+            bulk_counter = 0
+
+            try:
+                finished_bulk.execute()
+            except pymongo.bulk.BulkWriteError as bwe:
+                print "BULK ERROR"
+
+
+def process_worker(work_queue, insert_queue, collection, options):
     while True:
         work = work_queue.get()
-        process_entry(collection, work['header'], work['row'], options)
+        process_entry(insert_queue, collection, work['header'], work['row'], options)
         work_queue.task_done()
         
 
-def process_entry(collection, header, input_entry, options):
+def process_entry(insert_queue, collection, header, input_entry, options):
     global VERSION_KEY
     global NUM_ENTRIES
     global NUM_NEW
@@ -115,19 +150,21 @@ def process_entry(collection, header, input_entry, options):
         
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
-            collection.insert(entry)
+            insert_queue.put({'type': 'insert', 'insert':entry})
             NUM_UPDATED += 1
         else:
             NUM_UNCHANGED += 1
             if options.vverbose:
                 print "Unchanged entry for %s" % domainName
+            #Letting the workders do their own updates instead of using the bulk updater seems to be faster
+            #Need to do more testing
             collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {'details': details, VERSION_KEY: options.identifier}})
     else:
         NUM_NEW += 1
         if options.vverbose:
             print "Creating new entry for %s" % domainName
         entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
-        collection.insert(entry)
+        insert_queue.put({'type': 'insert', 'insert':entry})
 
 def generate_id(domainName, identifier):
     dhash = hashlib.md5(domainName).hexdigest() + str(identifier)
@@ -168,6 +205,8 @@ def main():
         default='whois', help="Name of collection to use (default: 'whois')")
     optparser.add_option("-t", "--threads", action="store", dest="threads", type="int",
         default=multiprocessing.cpu_count(), help="Number of worker threads")
+    optparser.add_option("-B", "--bulk-size", action="store", dest="bulk_size", type="int",
+        default=1000, help="Size of Bulk Insert Requests")
     optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     optparser.add_option("--vverbose", action="store_true", dest="vverbose",
@@ -183,6 +222,8 @@ def main():
 
 
     work_queue = Queue()
+    insert_queue = mpQueue()
+
     client = MongoClient(host=options.mongo_host, port=options.mongo_port)
     whodb = client[options.database]
     collection = whodb[options.collection]
@@ -225,9 +266,12 @@ def main():
         print "Starting %i worker threads" % options.threads
 
     for i in range(options.threads):
-         t = Thread(target=process_worker, args=(work_queue, collection, options))
+         t = Thread(target=process_worker, args=(work_queue, insert_queue, collection, options), name='Worker %i' % i)
          t.daemon = True
          t.start()
+
+    mongo_worker_thread = Process(target=mongo_worker, args=(insert_queue, options))
+    mongo_worker_thread.start()
 
     if options.directory:
         scan_directory(work_queue, collection, options.directory, options)
@@ -239,6 +283,8 @@ def main():
 
 
     work_queue.join()
+    insert_queue.put("finished")
+    mongo_worker_thread.join()
 
     #global CHANGEDCT
     #import operator
