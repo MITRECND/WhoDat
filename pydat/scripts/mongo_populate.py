@@ -3,17 +3,27 @@
 import sys
 import os
 import csv
+import hashlib
 from optparse import OptionParser
 import pymongo
 from pymongo import MongoClient
+import threading
+from threading import Thread
+from Queue import Queue
+import multiprocessing #for num cpus
+from multiprocessing import Process, Queue as mpQueue
 
 NUM_ENTRIES = 0
 NUM_NEW = 0
 NUM_UPDATED = 0
 NUM_UNCHANGED = 0
 VERSION_KEY = 'dataVersion'
+UNIQUE_KEY = 'dataUniqueID'
+FIRST_SEEN = 'dataFirstSeen'
 
-def scan_directory(collection, directory, options):
+CHANGEDCT = {}
+
+def scan_directory(work_queue, collection, directory, options):
     for root, subdirs, filenames in os.walk(directory):
         if len(subdirs):
             for subdir in subdirs:
@@ -25,9 +35,9 @@ def scan_directory(collection, directory, options):
                     continue
 
             full_path = os.path.join(root, filename)
-            parse_csv(collection, full_path, options)
+            parse_csv(work_queue, collection, full_path, options)
 
-def parse_csv(collection, filename, options):
+def parse_csv(work_queue, collection, filename, options):
     if options.verbose or options.vverbose:
         print "Processing file: %s" % filename
 
@@ -36,10 +46,50 @@ def parse_csv(collection, filename, options):
     header = dnsreader.next()
 
     for row in dnsreader:
-        process_entry(collection, header, row, options)
+        work_queue.put({'header': header, 'row': row})
+        #process_entry(collection, header, row, options)
+
+def mongo_worker(insert_queue, options):
+    bulk_counter = 0
+    client = MongoClient(host=options.mongo_host, port=options.mongo_port)
+    whodb = client[options.database]
+    collection = whodb[options.collection]
+    finishup = False
+    bulk = collection.initialize_unordered_bulk_op() 
+
+    while not finishup:
+        request = insert_queue.get()
+        if not isinstance(request, basestring):
+            if request['type'] == 'insert':
+                bulk.insert(request['insert'])
+                bulk_counter += 1
+            elif request['type'] == 'update':
+                bulk.find(request['find']).update(request['update'])
+                bulk_counter += 1
+            else:
+                print "Unrecognized"
+        else:
+            finishup = True 
+
+        if (bulk_counter >= options.bulk_size) or finishup:
+            finished_bulk = bulk
+            bulk = collection.initialize_unordered_bulk_op() 
+            bulk_counter = 0
+
+            try:
+                finished_bulk.execute()
+            except pymongo.bulk.BulkWriteError as bwe:
+                print "BULK ERROR"
 
 
-def process_entry(collection, header, input_entry, options):
+def process_worker(work_queue, insert_queue, collection, options):
+    while True:
+        work = work_queue.get()
+        process_entry(insert_queue, collection, work['header'], work['row'], options)
+        work_queue.task_done()
+        
+
+def process_entry(insert_queue, collection, header, input_entry, options):
     global VERSION_KEY
     global NUM_ENTRIES
     global NUM_NEW
@@ -51,97 +101,80 @@ def process_entry(collection, header, input_entry, options):
         return
 
     current_entry = None
-    domainName = ''
     details = {}
+    domainName = ''
     for i,item in enumerate(input_entry):
         if header[i] == 'domainName':
             if options.vverbose:
                 print "Processing domain: %s" % item
             domainName = item
-        else:
-            details[header[i]] = item
+            continue
+        details[header[i]] = item
+
+    entry = {
+                VERSION_KEY: options.identifier,
+                FIRST_SEEN: options.identifier,
+                'details': details,
+                'domainName': domainName,
+            }
 
     current_entry = find_entry(collection, domainName)
 
+    global CHANGEDCT
     if current_entry:
-        latest = current_entry['latest']
-
         if options.exclude != "":
             details_copy = details.copy()
             for exclude in options.exclude:
                 del details_copy[exclude]
 
-            diff = len(set(details_copy.items()) - set(latest.items())) > 0
+
+            changed = set(details_copy.items()) - set(current_entry['details'].items()) 
+            diff = len(set(details_copy.items()) - set(current_entry['details'].items())) > 0
+            
         else:
-            diff = len(set(details.items()) - set(latest.items())) > 0
+            changed = set(details.items()) - set(current_entry['details'].items()) 
+            diff = len(set(details.items()) - set(current_entry['details'].items())) > 0
 
             # The above diff doesn't consider keys that are only in the latest in mongo
             # So if a key is just removed, this diff will indicate there is no difference
             # even though a key had been removed.
             # I don't forsee keys just being wholesale removed, so this shouldn't be a problem
+        for ch in changed:
+            if ch[0] not in CHANGEDCT:
+                CHANGEDCT[ch[0]] = 0
+            CHANGEDCT[ch[0]] += 1
 
         if diff:
             if options.vverbose:
-                print "Updating existing entry for %s" % domainName
+                print "Creating entry for updated domain %s" % domainName
         
-            latest_diff = dict_diff(latest, details, options)
-
-            collection.update(  {'_id': current_entry['_id']}, 
-                            { '$push': { 'history':  latest_diff}}
-                         )
+            entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
+            entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
+            insert_queue.put({'type': 'insert', 'insert':entry})
             NUM_UPDATED += 1
         else:
             NUM_UNCHANGED += 1
             if options.vverbose:
                 print "Unchanged entry for %s" % domainName
-
-        # Regardless of if there was a diff, update 'latest' entry with new info
-        # For the majority of cases this will only update the VERSION_KEY
-        # Need to check and see if this is horribly inefficient or not
-        details[VERSION_KEY] = options.identifier
-        collection.update({'_id': current_entry['_id']}, { '$set': {'latest':  details}})
+            #Letting the workders do their own updates instead of using the bulk updater seems to be faster
+            #Need to do more testing
+            collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {'details': details, VERSION_KEY: options.identifier}})
     else:
         NUM_NEW += 1
         if options.vverbose:
             print "Creating new entry for %s" % domainName
+        entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
+        insert_queue.put({'type': 'insert', 'insert':entry})
 
-        details[VERSION_KEY] = options.identifier
-        entry = { 'domainName': domainName, 
-                  'latest' : details, 
-                  'history': [],
-                  'firstVersion': options.identifier
-                }
-        collection.insert(entry)
-
-
-def dict_diff(old, new, options): 
-    output = {}
-     
-    diffset = set(old.items()) - set(new.items())
-    diffkeys = set(new.keys()) - set(old.keys())
-
-    if len(diffset) == 0 and len(diffkeys) == 0:
-        return None
-
-    # Keep track of keys that have been removed/added
-    # This allows us to easily roll backwards
-    for key in diffkeys:
-        if key in options.exclude:
-            continue
-        output['-' + key] = new[key]
-
-    # Key/value pairs that have changed
-    for (key,value) in diffset:
-        if key in options.exclude:
-            continue
-        output[key] = value
-         
-    return output
+def generate_id(domainName, identifier):
+    dhash = hashlib.md5(domainName).hexdigest() + str(identifier)
+    return dhash
+    
 
 def find_entry(collection, domainName):
-    entry = collection.find_one({"domainName": domainName})
+    entry = collection.find_one({"domainName": domainName}, sort=[('version', pymongo.DESCENDING)])
     if entry:
-       return entry 
+       return entry
     else:
         return None
 
@@ -151,6 +184,7 @@ def main():
     global NUM_NEW
     global NUM_UPDATED
     global NUM_UNCHANGED
+    global VERSION_KEY
 
     optparser = OptionParser(usage='usage: %prog [options]')
     optparser.add_option("-f", "--file", action="store", dest="file",
@@ -169,6 +203,10 @@ def main():
         default='whois', help="Name of database to use (default: 'whois')")
     optparser.add_option("-c", "--collection", action="store", dest="collection",
         default='whois', help="Name of collection to use (default: 'whois')")
+    optparser.add_option("-t", "--threads", action="store", dest="threads", type="int",
+        default=multiprocessing.cpu_count(), help="Number of worker threads")
+    optparser.add_option("-B", "--bulk-size", action="store", dest="bulk_size", type="int",
+        default=1000, help="Size of Bulk Insert Requests")
     optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     optparser.add_option("--vverbose", action="store_true", dest="vverbose",
@@ -183,6 +221,9 @@ def main():
     (options, args) = optparser.parse_args()
 
 
+    work_queue = Queue()
+    insert_queue = mpQueue()
+
     client = MongoClient(host=options.mongo_host, port=options.mongo_port)
     whodb = client[options.database]
     collection = whodb[options.collection]
@@ -192,14 +233,24 @@ def main():
         print "Identifier required"
         sys.exit(1)
 
-    metadata = meta.find_one()
+    metadata = meta.find_one({'metadata':'pydat'})
     meta_id = None
     if metadata is None: #Doesn't exist
-        md = {'firstVersion': options.identifier,
+        md = {
+              'metadata': 'pydat',
+              'firstVersion': options.identifier,
               'lastVersion' : options.identifier,
-              'versionStats': [],
              }
         meta_id = meta.insert(md)
+        metadata = meta.find_one({'_id': meta_id})
+
+        # Setup indexes
+        collection.ensure_index(VERSION_KEY, background=True)
+        collection.ensure_index('domainName', background=True)
+        collection.ensure_index('details.contactEmail', background=True)
+        collection.ensure_index('details.registrant_name', background=True)
+        collection.ensure_index('details.registrant_telephone', background=True)
+
     else:
         if metadata['lastVersion'] >= options.identifier:
             print "Identifier must be 'greater than' previous idnetifier"
@@ -210,40 +261,50 @@ def main():
     if options.exclude != "":
         options.exclude = options.exclude.split(',')
 
-    # Setup indexes
-    collection.ensure_index('domainName', background=True)
-    collection.ensure_index('latest.contactEmail', background=True)
-    collection.ensure_index('latest.registrant_name', background=True)
-    collection.ensure_index('latest.registrant_telephone', background=True)
+    #Start worker threads
+    if options.verbose:
+        print "Starting %i worker threads" % options.threads
 
-    collection.ensure_index('history.contactEmail', background=True, sparse=True)
-    collection.ensure_index('history.registrant_name', background=True, sparse=True)
-    collection.ensure_index('history.registrant_telephone', background=True, sparse=True)
+    for i in range(options.threads):
+         t = Thread(target=process_worker, args=(work_queue, insert_queue, collection, options), name='Worker %i' % i)
+         t.daemon = True
+         t.start()
+
+    mongo_worker_thread = Process(target=mongo_worker, args=(insert_queue, options))
+    mongo_worker_thread.start()
 
     if options.directory:
-        scan_directory(collection, options.directory, options)
+        scan_directory(work_queue, collection, options.directory, options)
     elif options.file:
-        if options.verbose:
-            print "Processing file: %s" % options.file
-        parse_csv(collection, options.file, options)
+        parse_csv(work_queue, collection, options.file, options)
     else:
         print "File or Directory required"
         sys.exit(1) 
 
 
+    work_queue.join()
+    insert_queue.put("finished")
+    mongo_worker_thread.join()
+
+    #global CHANGEDCT
+    #import operator
+    #sorted_x = sorted(CHANGEDCT.iteritems(), key=operator.itemgetter(1), reverse=True)
+    #for (name,count) in sorted_x:
+    #    print name, count
+
     if options.vverbose:
         print "Updating Metadata"
 
     # Now that it's been processed, update the metadata
+    meta.insert({ 
+                    'metadata': options.identifier,
+                    'total' : NUM_ENTRIES,
+                    'new' : NUM_NEW,
+                    'updated' : NUM_UPDATED,
+                    'unchanged' : NUM_UNCHANGED,
+                    'comment' : options.comment
+            })
     meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
-    stats = { 'version': options.identifier,
-              'total' : NUM_ENTRIES,
-              'new' : NUM_NEW,
-              'updated' : NUM_UPDATED,
-              'unchanged' : NUM_UNCHANGED,
-              'comment' : options.comment
-            }
-    meta.update({'_id': meta_id}, {'$push' : {'versionStats' : stats}})
 
     if options.stats:
         print "Stats: "
