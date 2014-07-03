@@ -8,7 +8,7 @@ from django.http import QueryDict
 import urllib
 
 from pydat.forms import domain_form, pdns_form, pdns_r_form, validate_ip, validate_hex
-from pydat.handlers import do_search, do_pdns, do_pdns_r
+from pydat.handlers import do_search, do_pdns, do_pdns_r, latest_version
 
 
 def __renderErrorPage__(request, message, data = None):
@@ -28,6 +28,7 @@ def __createRequestContext__(request, data = None):
     ctx_var = { 'domain_form' : search_f,
                 'pdns_form': pdns_f,
                 'pdns_r_form': pdns_r_f,
+                'latest_version': latest_version()
               } 
 
     if data is not None:
@@ -57,6 +58,7 @@ def domains(request, key=None, value=None):
         search_f.data['fmt'] = request.GET.get('fmt','normal')
         search_f.data['limit'] = request.GET.get('limit', settings.LIMIT)
         search_f.data['filt'] = request.GET.get('filt', settings.SEARCH_KEYS[0][0])
+        search_f.data['latest'] = request.GET.get('latest', False)
 
     else:
         return __renderErrorPage__(request, 'Bad Method.')
@@ -70,6 +72,15 @@ def domains(request, key=None, value=None):
     filt_key = search_f.cleaned_data['filt']
     fmt = search_f.cleaned_data['fmt']
     limit = int(search_f.cleaned_data.get('limit', settings.LIMIT))
+    latest = search_f.cleaned_data['latest']
+
+    if latest:
+        low_version = latest_version()
+        high_version = low_version
+    else:
+        low_version = 'null' 
+        high_version = 'null'
+    
 
     if fmt == 'list': #Only filter if a list was requested
         filt = {filt_key: 1, '_id': False}
@@ -81,6 +92,8 @@ def domains(request, key=None, value=None):
     if fmt == "normal":
         context = __createRequestContext__(request, data = { 'key': urllib.quote(key),
                                                              'value': urllib.quote(value),
+                                                             'low_version': low_version,
+                                                             'high_version': high_version,
                                                              'domain_form': search_f,
                })
         return render_to_response('domain.html', context)
@@ -89,7 +102,7 @@ def domains(request, key=None, value=None):
         if key == "registrant_telephone":
             value = int(value)
 
-        results = do_search(key, value, filt=filt, limit=limit)
+        results = do_search(key, value, filt=filt, limit=limit, low = low_version)
         if results['success'] == False:
             return __renderErrorPage__(request, results['message'])
         if fmt == 'json':

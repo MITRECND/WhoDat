@@ -25,6 +25,17 @@ def mongo_connector(collection, preference=settings.MONGO_READ_PREFERENCE):
     except:
         raise
 
+def latest_version():
+    try:
+        coll = mongo_connector(settings.COLL_WHOIS + "_meta")
+    except MongoError as e:
+        return -1
+
+    metadata = coll.find_one({'metadata': 'pydat'})
+    
+    return metadata['lastVersion']
+    
+
 def sort_lookup(colID, direction):
     sort_key = None
     sort_dir = pymongo.ASCENDING
@@ -47,7 +58,7 @@ def sort_lookup(colID, direction):
     return (sort_key, sort_dir)
     
 
-def ajax_search(key, value, skip, pagesize, sortset, sfilter):
+def ajax_search(key, value, skip, pagesize, sortset, sfilter, low, high):
     results = {'success': False}
     try:
         coll = mongo_connector(settings.COLL_WHOIS)
@@ -55,7 +66,23 @@ def ajax_search(key, value, skip, pagesize, sortset, sfilter):
         results['message'] = str(e)
         return results
 
-    query = {key: value}
+    if key != settings.SEARCH_KEYS[0][0]:
+        query = {'details.' + key: value}
+    else:
+        query = {key: value}
+
+    if low is not None:
+        if low == high or high is None: # single version
+            try:
+                query['dataVersion'] = int(low)
+            except: #TODO XXX
+                pass
+        elif high is not None:
+            try:
+                query['dataVersion'] = {'$gte': int(low), '$lte': int(high)}
+            except: #TODO XXX
+                pass 
+        
 
     if sfilter is not None:
         try:
@@ -71,7 +98,10 @@ def ajax_search(key, value, skip, pagesize, sortset, sfilter):
             for skey in [keys[0] for keys in settings.SEARCH_KEYS]:
                 if skey == key: #Don't bother filtering on the key field
                     continue
-                exp = {skey: {'$regex': regx}}
+                if skey != settings.SEARCH_KEYS[0][0]:
+                    exp = {'details.' + skey: {'$regex': regx}}
+                else:
+                    exp = {skey: {'$regex': regx}}
                 query['$or'].append(exp)
                 
     domains = coll.find(query, skip=skip, limit=pagesize, sort=sortset)
@@ -83,8 +113,9 @@ def ajax_search(key, value, skip, pagesize, sortset, sfilter):
     for domain in domains:
         #First element is placeholder for expansion cell
         #TODO Make this configurable?
-        dom_arr = ["&nbsp;", domain['domainName'], domain['registrant_name'], domain['contactEmail'], 
-                    domain['standardRegCreatedDate'], domain['registrant_telephone']]
+        details = domain['details']
+        dom_arr = ["&nbsp;", domain['domainName'], details['registrant_name'], details['contactEmail'], 
+                    details['standardRegCreatedDate'], details['registrant_telephone'], domain['dataVersion']]
         results['aaData'].append(dom_arr)
 
     #Number of Records after any sort of filtering/searching
@@ -92,7 +123,7 @@ def ajax_search(key, value, skip, pagesize, sortset, sfilter):
     results['success'] = True
     return results
 
-def do_search(key, value, filt={}, limit=settings.LIMIT):
+def do_search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None):
     results = {'success': False}
     try:
         coll = mongo_connector(settings.COLL_WHOIS)
@@ -100,10 +131,25 @@ def do_search(key, value, filt={}, limit=settings.LIMIT):
         results['message'] = str(e)
         return results
 
-    domains = coll.find({key: value}, filt, limit=limit)
+    search_document = {key: value}
+
+    if low != None:
+        if low == high or high is None:
+            search_document['dataVersion'] = int(low)
+        elif high is not None:
+            search_document['dataVersion'] = {'$gte': int(low), '$lte': int(high)}
+
+    domains = coll.find(search_document, filt, limit=limit)
 
     results['total'] = domains.count()
-    results['data'] = [domain for domain in domains]
+    results['data'] = []
+    for domain in domains:
+        dom = domain['details']
+        dom['domainName'] = domain['domainName']
+        dom['Version'] = domain['dataVersion']
+        results['data'].append(dom)
+
+    #results['data'] = [domain for domain in domains]
     results['avail'] = len(results['data'])
     results['success'] = True
     return results

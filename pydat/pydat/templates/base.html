@@ -13,6 +13,7 @@
         <script type="text/javascript">
           var resolve_url = "{% url 'ajax_resolve' %}";
           var csrf_token = '{{ csrf_token }}';
+          var latest_version = '{{ latest_version }}';
         </script>
     {% block js_constants %}
     {% endblock %}
@@ -81,6 +82,20 @@
                             </td>
                             <td>
                                 {{ domain_form.fmt }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <label for="id_latest">Latest:</label>
+                            </td>
+                            <td>
+                                {{ domain_form.latest }}
+                            </td>
+                            <td>
+                                &nbsp;
+                            </td>
+                            <td>
+                                &nbsp;
                             </td>
                         </tr>
                         <tr>

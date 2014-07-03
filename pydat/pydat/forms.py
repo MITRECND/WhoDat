@@ -5,6 +5,7 @@ from django.conf import settings
 class domain_form(forms.Form):
     key = forms.ChoiceField(label="Key")
     value = forms.CharField(label="Value")
+    latest = forms.BooleanField(label="Latest", initial=False, required=False)
     filt = forms.ChoiceField(label="Filter")
     fmt = forms.ChoiceField(label="Format")
     limit = forms.IntegerField(label="Limit", min_value=1,
@@ -25,6 +26,12 @@ class domain_form(forms.Form):
         for field in self.fields.values():
             field.error_messages = {'required':'%s is required' % field.label, 
                                     'invalid_choice': '%s is invalid' % field.label}
+
+    def clean_latest(self):
+        if 'latest' not in self.cleaned_data or self.cleaned_data['latest'] is None:
+            return False
+        else:
+            return self.cleaned_data['latest']
 
     def clean_value(self):
         value = self.cleaned_data['value']
