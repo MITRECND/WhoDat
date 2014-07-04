@@ -169,11 +169,12 @@ def generate_id(domainName, identifier):
     
 
 def find_entry(collection, domainName):
-    entry = collection.find_one({"domainName": domainName}, sort=[('version', pymongo.DESCENDING)])
-    if entry:
-       return entry
-    else:
+    try:
+        entry = collection.find({"domainName": domainName}, sort=[(VERSION_KEY, pymongo.DESCENDING)])[0]
+    except IndexError:
         return None
+
+    return entry
 
 
 def main():
