@@ -5,19 +5,22 @@ $(document).ready(function() {
 
 	$("#dialog").dialog({
             "width" : ($(window).width() * .8),
-			/*"width": 800,*/
 			"height": 640,
-			"autoOpen": false 
+			"autoOpen": false,
+            "modal": true,
+            "open": function(event, ui) {
+                 $(this).parent().css('position', 'fixed');
+            },
 	});
 
     $("#statusDialog").dialog({
             "modal" : true,
-            "height": 200,
-            "width": 300,
+            "height": 100,
+            "width": 400,
             "autoOpen": false,
             "open": function(event, ui) {
-                  $(this).parent().css('position', 'fixed');
-            }
+                 $(this).parent().css('position', 'fixed');
+            },
     });
 
     var ajax_url = domains_url + key + "/" + value + "/" + low_version + "/" + high_version + "/?csrfmiddlewaretoken=" + csrf_token;
@@ -123,7 +126,6 @@ $(document).ready(function() {
 
 });
 
-var statusDialogStack = 0;
 
 
 function fnFormatDetails ( oTable, nTr )
@@ -238,7 +240,6 @@ function full(domain, entry_version) {
 	  } else {
 		$("#dtext").append(response.error);
 	  }
-    $("#dialog").dialog("option", "position", "top")
 	$("#dialog").dialog("open");
 	}
   });
@@ -303,7 +304,6 @@ function diff(domain, v1, v2) {
 	  } else {
 		$("#dtext").append(response.error);
 	  }
-    $("#dialog").dialog("option", "position", "top")
 	$("#dialog").dialog("open");
 	}
   });
@@ -539,9 +539,9 @@ function create_dates_table(raw_data){
     return $(dtab);
 }
 
+var statusDialogStack = 0;
 
 function showStatusDialog(){
-    $("#statusDialog").dialog("option", "position", "top");
 	$("#statusDialog").dialog("open");
     statusDialogStack += 1; 
 }
