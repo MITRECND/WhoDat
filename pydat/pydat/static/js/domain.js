@@ -82,6 +82,8 @@ $(document).ready(function() {
                                                     + encodeURIComponent(telephone) + '>'
                                                     + telephone + '</a>').attr('title', 'Click to search by Telephone').addClass(oldVersion);
 
+                        $('td:eq(6)', nRow).addClass(oldVersion);
+
                     },
                     //Called after table is drawn
 					"fnDrawCallback": function(oSettings) { 
@@ -264,7 +266,7 @@ function diff(domain, v1, v2) {
 
         $(dtab).addClass('diffTable');
         $(text).append(dtab);
-        $(dtab).html("<thead><th>Entry</th><th>Original</th><th>Updated</th></thead><tbody></tbody>");
+        $(dtab).html("<thead><th>Entry</th><th>Version: " + v1 + "</th><th>Version: " + v2 + "</th></thead><tbody></tbody>");
         var dtabb = $(dtab).find("tbody");
 
         //Sort the results in alphabetical order
@@ -290,6 +292,7 @@ function diff(domain, v1, v2) {
             if (sort_arr[i][1] instanceof Array){
                 $(vcell).html(sort_arr[i][1][0]);
                 $(vcell2).html(sort_arr[i][1][1]);
+                $(vcell).addClass('changed')
                 $(vcell2).addClass('changed')
             }else{
                 $(vcell).html(sort_arr[i][1]);
@@ -374,12 +377,16 @@ function get_historical(domain, entry_version, target){
 
                 var hcell = document.createElement('td');
                 $(hcell).addClass(tdclass);
-                $(hcell).html('<span class="link fullDetail" domainName="' + result[i].domainName + '">Click</span>');
+                if(+entry_version == result[i].Version){
+                    $(hcell).html('<span>&nbsp;</span>');
+                }else{
+                    $(hcell).html('<span class="link fullDetail" domainName="' + result[i].domainName + '">Click</span>');
+                }
                 $(hrow).append(hcell);
 
                 var inner = "&nbsp;"
                 if (i != 0){
-                    inner = '<span class="link diff" domainName="' + result[i].domainName + '" version1="' + result[i - 1].Version + '" version2="' + result[i].Version + '">Click</span>';
+                    inner = '<span class="link diff" domainName="' + result[i].domainName + '" version1="' + result[i - 1].Version + '" version2="' + result[i].Version + '">' + result[i - 1].Version + " > " + result[i].Version  + '</span>';
                 }
 
                 var hcell = document.createElement('td');
