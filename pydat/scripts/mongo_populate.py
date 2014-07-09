@@ -47,7 +47,6 @@ def parse_csv(work_queue, collection, filename, options):
 
     for row in dnsreader:
         work_queue.put({'header': header, 'row': row})
-        #process_entry(collection, header, row, options)
 
 def mongo_worker(insert_queue, options):
     bulk_counter = 0
@@ -122,7 +121,7 @@ def process_entry(insert_queue, collection, header, input_entry, options):
 
     global CHANGEDCT
     if current_entry:
-        if options.exclude != "":
+        if len(options.exclude):
             details_copy = details.copy()
             for exclude in options.exclude:
                 del details_copy[exclude]
@@ -156,9 +155,7 @@ def process_entry(insert_queue, collection, header, input_entry, options):
             NUM_UNCHANGED += 1
             if options.vverbose:
                 print "Unchanged entry for %s" % domainName
-            #Letting the workders do their own updates instead of using the bulk updater seems to be faster
-            #Need to do more testing
-            collection.update({UNIQUE_KEY: current_entry[UNIQUE_KEY]}, {'$set': {'details': details, VERSION_KEY: options.identifier}})
+            insert_queue.put({'type': 'update', 'find': {UNIQUE_KEY: current_entry[UNIQUE_KEY]}, 'update': {'$set': {'details': details, VERSION_KEY: options.identifier}}})
     else:
         NUM_NEW += 1
         if options.vverbose:
@@ -233,11 +230,11 @@ def main():
         print "Identifier required"
         sys.exit(1)
 
-    metadata = meta.find_one({'metadata':'pydat'})
+    metadata = meta.find_one({'metadata':0})
     meta_id = None
     if metadata is None: #Doesn't exist
         md = {
-              'metadata': 'pydat',
+              'metadata': 0,
               'firstVersion': options.identifier,
               'lastVersion' : options.identifier,
              }
@@ -245,21 +242,28 @@ def main():
         metadata = meta.find_one({'_id': meta_id})
 
         # Setup indexes
+        collection.ensure_index(UNIQUE_KEY, background=True)
         collection.ensure_index(VERSION_KEY, background=True)
         collection.ensure_index('domainName', background=True)
+        collection.ensure_index([('domainName', pymongo.ASCENDING), (VERSION_KEY, pymongo.ASCENDING)], background=True)
         collection.ensure_index('details.contactEmail', background=True)
         collection.ensure_index('details.registrant_name', background=True)
         collection.ensure_index('details.registrant_telephone', background=True)
 
     else:
+        if options.identifier < 1:
+            print "Identifier must be greater than 0"
+            sys.exit(1)
         if metadata['lastVersion'] >= options.identifier:
-            print "Identifier must be 'greater than' previous idnetifier"
+            print "Identifier must be 'greater than' previous identifier"
             sys.exit(1)
         meta_id = metadata['_id']
 
 
     if options.exclude != "":
         options.exclude = options.exclude.split(',')
+    else:
+        options.exclude = []
 
     #Start worker threads
     if options.verbose:
@@ -286,15 +290,11 @@ def main():
     insert_queue.put("finished")
     mongo_worker_thread.join()
 
-    #global CHANGEDCT
-    #import operator
-    #sorted_x = sorted(CHANGEDCT.iteritems(), key=operator.itemgetter(1), reverse=True)
-    #for (name,count) in sorted_x:
-    #    print name, count
 
     if options.vverbose:
         print "Updating Metadata"
 
+    global CHANGEDCT
     # Now that it's been processed, update the metadata
     meta.insert({ 
                     'metadata': options.identifier,
@@ -302,7 +302,9 @@ def main():
                     'new' : NUM_NEW,
                     'updated' : NUM_UPDATED,
                     'unchanged' : NUM_UNCHANGED,
-                    'comment' : options.comment
+                    'comment' : options.comment,
+                    'excluded_keys': options.exclude,
+                    'changed_stats': CHANGEDCT
             })
     meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
 
