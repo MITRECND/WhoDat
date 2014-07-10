@@ -7,8 +7,7 @@ from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response, HttpResponse
 import urllib
 
-from pydat.handlers import do_search, dataTable_search, sort_lookup, latest_version, db_meta
-
+from pydat.handlers import handler
 
 def __renderErrorJSON__(message):
     context = {'success': False,
@@ -18,7 +17,7 @@ def __renderErrorJSON__(message):
 
 
 def metadata(request, version = None):
-    results = db_meta(version)
+    results = handler.metadata(version)
 
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
@@ -50,10 +49,10 @@ def dataTable(request, key, value, low = None, high = None):
 
         sort = []
         for x in range(sortcols):
-            (sort_key, sort_dir) = sort_lookup(int(request.GET.get("iSortCol_%d" % x)), 
+            sortTuple = handler.formatSort(int(request.GET.get("iSortCol_%d" % x)), 
                                                 request.GET.get("sSortDir_%d" % x))
-            if sort_key is not None:
-                sort.append((sort_key, sort_dir))
+            if sortTuple is not None:
+                sort.append(sortTuple)
 
     else:
         return __renderErrorJSON__('Unsupported Method')
@@ -67,14 +66,14 @@ def dataTable(request, key, value, low = None, high = None):
     if key == "registrant_telephone":
         value = int(value)
 
-    results = dataTable_search(key, value, page, pagesize, sort, sSearch, low, high)
+    results = handler.dataTableSearch(key, value, page, pagesize, sort, sSearch, low, high)
     #Echo back the echo
     results['sEcho'] = sEcho
     
     return HttpResponse(json.dumps(results), content_type='application/json')
 
 def domains_latest(request, key, value):
-    return domains(request, key, value, low = latest_version())
+    return domains(request, key, value, low = handler.lastVersion())
 
 def domains(request, key, value, low = None, high = None):
     #if not request.is_ajax():
@@ -102,14 +101,14 @@ def domains(request, key, value, low = None, high = None):
     if key == "registrant_telephone":
         value = int(value)
 
-    results = do_search(key, value, filt = {'_id': False}, low = low, high = high)
+    results = handler.search(key, value, filt = {'_id': False}, low = low, high = high)
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
 
     return HttpResponse(json.dumps(results), content_type='application/json')
 
 def domain_latest(request, domainName):
-    return domain(request, domainName, low = latest_version());
+    return domain(request, domainName, low = handler.lastVersion());
 
 
 def domain(request, domainName = None, low = None, high = None):
@@ -121,7 +120,7 @@ def domain(request, domainName = None, low = None, high = None):
             return __renderErrorJSON__('Requires Domain Name Argument')
         domainName = urllib.unquote(domainName)
 
-        results = do_search('domainName', domainName, filt={'_id': False}, low = low, high = high)
+        results = handler.search('domainName', domainName, filt={'_id': False}, low = low, high = high)
 
 
         return HttpResponse(json.dumps(results), content_type='application/json')
@@ -141,8 +140,8 @@ def domain_diff(request, domainName = None, v1 = None, v2 = None):
             return __renderErrorJSON__('Required Parameters Missing')
         domainName = urllib.unquote(domainName)
 
-        v1_res = do_search('domainName', domainName, filt={'_id':False}, low = int(v1))
-        v2_res = do_search('domainName', domainName, filt={'_id':False}, low = int(v2))
+        v1_res = handler.search('domainName', domainName, filt={'_id':False}, low = int(v1))
+        v2_res = handler.search('domainName', domainName, filt={'_id':False}, low = int(v2))
 
         try:
             v1_res = v1_res['data'][0]

@@ -6,8 +6,6 @@
 import os
 import sys
 
-from pymongo import ReadPreference
-
 sys.path.insert(0, os.path.dirname(__file__))
 
 DEBUG = False
@@ -16,11 +14,16 @@ TEMPLATE_DEBUG = DEBUG
 
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
-MONGO_HOST = 'localhost'
-MONGO_PORT = 27017
-MONGO_DATABASE = 'whois'
-MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
-COLL_WHOIS = 'whois'
+HANDLER = 'mongo'
+
+if HANDLER == 'mongo':
+    from pymongo import ReadPreference
+
+    MONGO_HOST = 'localhost'
+    MONGO_PORT = 27017
+    MONGO_DATABASE = 'whois'
+    MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
+    COLL_WHOIS = 'whois'
 
 PROXIES = {}
 

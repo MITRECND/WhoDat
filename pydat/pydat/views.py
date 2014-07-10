@@ -8,8 +8,8 @@ from django.http import QueryDict
 import urllib
 
 from pydat.forms import domain_form, pdns_form, pdns_r_form, validate_ip, validate_hex
-from pydat.handlers import do_search, do_pdns, do_pdns_r, latest_version
-
+from pydat.handlers import handler
+from pydat.handlers import passive
 
 def __renderErrorPage__(request, message, data = None):
     d = {'error' : message}
@@ -28,7 +28,7 @@ def __createRequestContext__(request, data = None):
     ctx_var = { 'domain_form' : search_f,
                 'pdns_form': pdns_f,
                 'pdns_r_form': pdns_r_f,
-                'latest_version': latest_version()
+                'latest_version': handler.lastVersion()
               } 
 
     if data is not None:
@@ -75,7 +75,7 @@ def domains(request, key=None, value=None):
     latest = search_f.cleaned_data['latest']
 
     if latest:
-        low_version = latest_version()
+        low_version = handler.lastVersion()
         high_version = low_version
     else:
         low_version = 'null' 
@@ -102,7 +102,7 @@ def domains(request, key=None, value=None):
         if key == "registrant_telephone":
             value = int(value)
 
-        results = do_search(key, value, filt=filt, limit=limit, low = low_version)
+        results = handler.search(key, value, filt=filt, limit=limit, low = low_version)
         if results['success'] == False:
             return __renderErrorPage__(request, results['message'])
         if fmt == 'json':
@@ -148,7 +148,7 @@ def pdns(request, domain = None):
     if absolute is None:
         absolute = False
 
-    results = do_pdns(domain, absolute, rrtypes, limit, pretty)
+    results = passive.request_pdns(domain, absolute, rrtypes, limit, pretty)
     if fmt == 'normal':
         if results['success']:
             context = __createRequestContext__(request, {'results': results,
@@ -204,7 +204,7 @@ def pdns_r(request, key = None, value = None):
     if limit is None:
         limit = settings.DNSDB_PAGE_LIMITS[settings.DNSDB_PAGE_LIMIT_DEFAULT]
 
-    results = do_pdns_r(key, value, rrtypes, limit, pretty)
+    results = passive.request_pdns_reverse(key, value, rrtypes, limit, pretty)
     if fmt == 'normal':
         if results['success']:
             context = __createRequestContext__(request, {'results': results, 'inverse': True, 'pdns_r_form': pdns_r_f})
