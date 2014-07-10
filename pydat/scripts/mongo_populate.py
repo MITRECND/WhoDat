@@ -339,7 +339,6 @@ def main():
                         name='Worker %i' % i)
             t.daemon = True
             t.start()
-            workers.append(t)
 
         #Upate the lastVersion in the metadata
         meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
@@ -369,7 +368,6 @@ def main():
                         name='Worker %i' % i)
             t.daemon = True
             t.start()
-            workers.append(t)
         #No need to update lastVersion or create metadata entry
         
     #Start Processing the entries
