@@ -42,7 +42,7 @@ def parse_csv(work_queue, collection, filename, options):
         print "Processing file: %s" % filename
 
     csvfile = open(filename, 'rb')
-    dnsreader = csv.reader(csvfile)
+    dnsreader = csv.reader(csvfile, strict = True, skipinitialspace = True)
     header = dnsreader.next()
 
     for row in dnsreader:
