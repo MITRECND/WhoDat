@@ -23,7 +23,7 @@ $(document).ready(function() {
             },
     });
 
-    var ajax_url = domains_url + key + "/" + value + "/" + low_version + "/" + high_version + "/?csrfmiddlewaretoken=" + csrf_token;
+    var ajax_url = dataTable_url + key + "/" + value + "/" + low_version + "/" + high_version + "/?csrfmiddlewaretoken=" + csrf_token;
     var dTable = $('.dnsres').dataTable(
 				{
 					"bJQueryUI": true,
@@ -38,6 +38,7 @@ $(document).ready(function() {
                     "sDom" : '<"H"lfirp>t<"F"lfip>',
                     "aoColumnDefs":[
 						  {"sClass": "dtExpand", 'bSortable': false, 'aTargets': [0]},
+						  {'bSortable': false, 'aTargets': [6]},
 						  {"sClass": "dnCell", 'aTargets': [1]},
                     ],
 /*

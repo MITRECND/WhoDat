@@ -7,7 +7,7 @@ from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response, HttpResponse
 import urllib
 
-from pydat.handlers import do_search, ajax_search, sort_lookup, latest_version
+from pydat.handlers import do_search, dataTable_search, sort_lookup, latest_version, db_meta
 
 
 def __renderErrorJSON__(message):
@@ -16,12 +16,19 @@ def __renderErrorJSON__(message):
               }
     return HttpResponse(json.dumps(context), content_type='application/json') 
 
-def domains_latest(request, key, value):
-    return domains(request, key, value, low = latest_version())
 
-def domains(request, key, value, low = None, high = None):
-    #if not request.is_ajax():
-    #    return __renderErrorJSON__('Expected AJAX')
+def metadata(request, version = None):
+    results = db_meta(version)
+
+    if results['success'] == False:
+        return __renderErrorJSON__(results['message'])
+
+    return HttpResponse(json.dumps(results), content_type='application/json')
+
+
+def dataTable(request, key, value, low = None, high = None):
+    if not request.is_ajax():
+        return __renderErrorJSON__('Expected AJAX')
 
     if key is None or value is None:
         return __renderErrorJSON__('Missing Key and/or Value')
@@ -60,10 +67,45 @@ def domains(request, key, value, low = None, high = None):
     if key == "registrant_telephone":
         value = int(value)
 
-    results = ajax_search(key, value, page, pagesize, sort, sSearch, low, high)
+    results = dataTable_search(key, value, page, pagesize, sort, sSearch, low, high)
     #Echo back the echo
     results['sEcho'] = sEcho
     
+    return HttpResponse(json.dumps(results), content_type='application/json')
+
+def domains_latest(request, key, value):
+    return domains(request, key, value, low = latest_version())
+
+def domains(request, key, value, low = None, high = None):
+    #if not request.is_ajax():
+    #    return __renderErrorJSON__('Expected AJAX')
+
+    if key is None or value is None:
+        return __renderErrorJSON__('Missing Key and/or Value')
+
+    if key not in [keys[0] for keys in settings.SEARCH_KEYS]:
+        return __renderErrorJSON__('Invalid Key')
+
+
+    key = urllib.unquote(key)
+    value = urllib.unquote(value)
+    
+    #TODO Support Post -- need to add cooresponding form
+    if request.method == "GET":
+        limit = int(request.GET.get('limit', settings.LIMIT))
+    else:
+        return __renderErrorJSON__('Unsupported Method')
+
+    #XXX For some reason registrant_telephone needs to be treated as an integer
+    #I'm assuming mongo consumed the value as an int since there's only numbers and
+    #no symbols (such as () or -)
+    if key == "registrant_telephone":
+        value = int(value)
+
+    results = do_search(key, value, filt = {'_id': False}, low = low, high = high)
+    if results['success'] == False:
+        return __renderErrorJSON__(results['message'])
+
     return HttpResponse(json.dumps(results), content_type='application/json')
 
 def domain_latest(request, domainName):

@@ -31,9 +31,33 @@ def latest_version():
     except MongoError as e:
         return -1
 
-    metadata = coll.find_one({'metadata': 'pydat'})
+    metadata = coll.find_one({'metadata': 0})
     
     return metadata['lastVersion']
+
+def db_meta(version = None):
+    results = {'success': False}
+    try:
+        coll = mongo_connector(settings.COLL_WHOIS + "_meta")
+    except MongoError as e:
+        results['message'] = str(e)
+        return results
+
+    if version is None:
+        res = coll.find(fields = {'_id': False})
+    else:
+        version = int(version)
+        res = coll.find({'metadata':version}, {'_id':False})
+
+    results['data'] = []
+    for r in res:
+        results['data'].append(r)
+
+    
+    results['success'] = True
+
+    return results
+        
     
 
 def sort_lookup(colID, direction):
@@ -58,7 +82,7 @@ def sort_lookup(colID, direction):
     return (sort_key, sort_dir)
     
 
-def ajax_search(key, value, skip, pagesize, sortset, sfilter, low, high):
+def dataTable_search(key, value, skip, pagesize, sortset, sfilter, low, high):
     results = {'success': False}
     try:
         coll = mongo_connector(settings.COLL_WHOIS)
