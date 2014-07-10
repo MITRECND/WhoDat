@@ -83,7 +83,7 @@ def mongo_worker(insert_queue, options):
         else:
             finishup = True 
 
-        if (bulk_counter >= options.bulk_size) or finishup:
+        if ((bulk_counter >= options.bulk_size) or finishup) and bulk_counter > 0:
             finished_bulk = bulk
             bulk = collection.initialize_unordered_bulk_op() 
             bulk_counter = 0
