@@ -49,6 +49,28 @@ def parse_csv(work_queue, collection, filename, options):
     for row in dnsreader:
         work_queue.put({'header': header, 'row': row})
 
+def update_required(collection, header, input_entry, options):
+    if len(input_entry) == 0:
+        return False
+
+    current_entry = None
+    domainName = ''
+    for i,item in enumerate(input_entry):
+        if header[i] == 'domainName':
+            domainName = item
+            break
+
+    current_entry = find_entry(collection, domainName)
+
+    if current_entry is None:
+        return True
+
+    if current_entry[VERSION_KEY] == options.identifier: #This record already up to date
+        return False 
+    else:
+        return True
+
+
 def mongo_worker(insert_queue, options):
     #Register signal handler for this process
     def signal_handler(signal, frame):
@@ -98,6 +120,13 @@ def process_worker(work_queue, insert_queue, collection, options):
     while True:
         work = work_queue.get()
         process_entry(insert_queue, collection, work['header'], work['row'], options)
+        work_queue.task_done()
+
+def process_reworker(work_queue, insert_queue, collection, options):
+    while True:
+        work = work_queue.get()
+        if update_required(collection, work['header'],work['row'], options):
+            process_entry(insert_queue, collection, work['header'], work['row'], options)
         work_queue.task_done()
         
 
@@ -196,6 +225,7 @@ def main():
     global NUM_UPDATED
     global NUM_UNCHANGED
     global VERSION_KEY
+    global CHANGEDCT
 
     def signal_handler(signal, frame):
         sys.exit(0)
@@ -233,6 +263,8 @@ def main():
         default="", help="Comma separated list of keys to exclude if updating entry")
     optparser.add_option("-o", "--comment", action="store", dest="comment",
         default="", help="Comment to store with metadata")
+    optparser.add_option("-r", "--redo", action="store_true", dest="redo",
+        default=False, help="Attempt to re-import a failed import")
 
     (options, args) = optparser.parse_args()
 
@@ -248,57 +280,99 @@ def main():
     collection = whodb[options.collection]
     meta = whodb[options.collection + '_meta']
 
-    if options.identifier is None:
+    if options.identifier is None and options.redo is False:
         print "Identifier required"
         sys.exit(1)
 
     metadata = meta.find_one({'metadata':0})
     meta_id = None
     if metadata is None: #Doesn't exist
-        md = {
-              'metadata': 0,
-              'firstVersion': options.identifier,
-              'lastVersion' : options.identifier,
-             }
-        meta_id = meta.insert(md)
-        metadata = meta.find_one({'_id': meta_id})
+        if options.redo is False:
+            md = {
+                  'metadata': 0,
+                  'firstVersion': options.identifier,
+                  'lastVersion' : options.identifier,
+                 }
+            meta_id = meta.insert(md)
+            metadata = meta.find_one({'_id': meta_id})
 
-        # Setup indexes
-        collection.ensure_index(UNIQUE_KEY, background=True)
-        collection.ensure_index(VERSION_KEY, background=True)
-        collection.ensure_index('domainName', background=True)
-        collection.ensure_index([('domainName', pymongo.ASCENDING), (VERSION_KEY, pymongo.ASCENDING)], background=True)
-        collection.ensure_index('details.contactEmail', background=True)
-        collection.ensure_index('details.registrant_name', background=True)
-        collection.ensure_index('details.registrant_telephone', background=True)
-
+            # Setup indexes
+            collection.ensure_index(UNIQUE_KEY, background=True, unique=True)
+            collection.ensure_index(VERSION_KEY, background=True)
+            collection.ensure_index('domainName', background=True)
+            collection.ensure_index([('domainName', pymongo.ASCENDING), (VERSION_KEY, pymongo.ASCENDING)], background=True)
+            collection.ensure_index('details.contactEmail', background=True)
+            collection.ensure_index('details.registrant_name', background=True)
+            collection.ensure_index('details.registrant_telephone', background=True)
+        else:
+            print "Cannot redo when no initial import exists"
+            sys.exit(1)
     else:
-        if options.identifier < 1:
-            print "Identifier must be greater than 0"
-            sys.exit(1)
-        if metadata['lastVersion'] >= options.identifier:
-            print "Identifier must be 'greater than' previous identifier"
-            sys.exit(1)
+        if options.redo is False: #Identifier is auto-pulled from db, no need to check
+            if options.identifier < 1:
+                print "Identifier must be greater than 0"
+                sys.exit(1)
+            if metadata['lastVersion'] >= options.identifier:
+                print "Identifier must be 'greater than' previous identifier"
+                sys.exit(1)
         meta_id = metadata['_id']
-
-
-    if options.exclude != "":
-        options.exclude = options.exclude.split(',')
-    else:
-        options.exclude = []
-
-    #Start worker threads
-    if options.verbose:
-        print "Starting %i worker threads" % options.threads
-
-    for i in range(options.threads):
-         t = Thread(target=process_worker, args=(work_queue, insert_queue, collection, options), name='Worker %i' % i)
-         t.daemon = True
-         t.start()
 
     mongo_worker_thread = Process(target=mongo_worker, args=(insert_queue, options))
     mongo_worker_thread.start()
 
+    if options.redo is False:
+        if options.exclude != "":
+            options.exclude = options.exclude.split(',')
+        else:
+            options.exclude = []
+
+        #Start worker threads
+        if options.verbose:
+            print "Starting %i worker threads" % options.threads
+
+        for i in range(options.threads):
+            t = Thread(target=process_worker, 
+                        args=(work_queue, 
+                              insert_queue, 
+                              collection, 
+                              options), 
+                        name='Worker %i' % i)
+            t.daemon = True
+            t.start()
+            workers.append(t)
+
+        #Upate the lastVersion in the metadata
+        meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
+        #Create the entry for this import
+        meta.insert({ 
+                        'metadata': options.identifier,
+                        'comment' : options.comment,
+                        'excluded_keys': options.exclude,
+                })
+    else: #redo is True
+        #Get the record for the attempted import
+        options.identifier = int(metadata['lastVersion'])
+        redo_record = meta.find_one({'metadata': options.identifier})
+        options.exclude = redo_record['excluded_keys']
+        options.comment = redo_record['comment']
+
+        #Start the reworker threads
+        if options.verbose:
+            print "Starting %i reworker threads" % options.threads
+
+        for i in range(options.threads):
+            t = Thread(target=process_reworker, 
+                        args=(work_queue, 
+                              insert_queue, 
+                              collection, 
+                              options), 
+                        name='Worker %i' % i)
+            t.daemon = True
+            t.start()
+            workers.append(t)
+        #No need to update lastVersion or create metadata entry
+        
+    #Start Processing the entries
     if options.directory:
         scan_directory(work_queue, collection, options.directory, options)
     elif options.file:
@@ -311,24 +385,18 @@ def main():
     work_queue.join()
     insert_queue.put("finished")
     mongo_worker_thread.join()
+    
+    #Update the stats for this import
+    #TODO this will be inaccurate in a re-do event, need to track better
+    meta.update({'metadata': options.identifier}, {'$set' : {
+                                                'total' : NUM_ENTRIES,
+                                                'new' : NUM_NEW,
+                                                'updated' : NUM_UPDATED,
+                                                'unchanged' : NUM_UNCHANGED,
+                                                'changed_stats': CHANGEDCT
+                                            }
+                                    });
 
-
-    if options.vverbose:
-        print "Updating Metadata"
-
-    global CHANGEDCT
-    # Now that it's been processed, update the metadata
-    meta.insert({ 
-                    'metadata': options.identifier,
-                    'total' : NUM_ENTRIES,
-                    'new' : NUM_NEW,
-                    'updated' : NUM_UPDATED,
-                    'unchanged' : NUM_UNCHANGED,
-                    'comment' : options.comment,
-                    'excluded_keys': options.exclude,
-                    'changed_stats': CHANGEDCT
-            })
-    meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
 
     if options.stats:
         print "Stats: "
