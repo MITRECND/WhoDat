@@ -39,7 +39,7 @@ def scan_directory(work_queue, collection, directory, options):
             parse_csv(work_queue, collection, full_path, options)
 
 def parse_csv(work_queue, collection, filename, options):
-    if options.verbose or options.vverbose:
+    if options.verbose:
         print "Processing file: %s" % filename
 
     csvfile = open(filename, 'rb')
@@ -235,6 +235,9 @@ def main():
         default="", help="Comment to store with metadata")
 
     (options, args) = optparser.parse_args()
+
+    if options.vverbose:
+        options.verbose = True
 
 
     work_queue = Queue()
