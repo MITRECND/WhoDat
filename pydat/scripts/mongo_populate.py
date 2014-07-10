@@ -4,6 +4,7 @@ import sys
 import os
 import csv
 import hashlib
+import signal
 from optparse import OptionParser
 import pymongo
 from pymongo import MongoClient
@@ -49,6 +50,18 @@ def parse_csv(work_queue, collection, filename, options):
         work_queue.put({'header': header, 'row': row})
 
 def mongo_worker(insert_queue, options):
+    #Register signal handler for this process
+    def signal_handler(signal, frame):
+        try:
+            if bulk_counter > 0:
+                print "Flushing Processed Data to Mongo ... Please Wait"
+                bulk.execute() 
+        except:
+            pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     bulk_counter = 0
     client = MongoClient(host=options.mongo_host, port=options.mongo_port)
     whodb = client[options.database]
@@ -183,6 +196,11 @@ def main():
     global NUM_UPDATED
     global NUM_UNCHANGED
     global VERSION_KEY
+
+    def signal_handler(signal, frame):
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
 
     optparser = OptionParser(usage='usage: %prog [options]')
     optparser.add_option("-f", "--file", action="store", dest="file",
