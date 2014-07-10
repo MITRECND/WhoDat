@@ -1,3 +1,14 @@
+html, body{
+    margin: 0;
+    overflow: hidden;
+    height: 100%;
+}
+
+#bodywrapper{
+    overflow-y: scroll;
+    height: 100%;
+}
+
 #page{
     width: 98%;
     display: block;
@@ -119,14 +130,30 @@
     color: red;
 }
 
+.bold{
+    font-weight: bold;
+}
+
 /***domain.html***/
 .detailTable{
+}
+
+.detailTable .historyTable{
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.detailTable .historyTable table{
+    width: 100%;
+}
+
+.detailTable .current_details{
     display: table;
-    width: 95%;
+    width: 100%;
     margin: 0 auto;
 }
 
-.detailTable .title{
+.detailTable .current_details .title{
     font-size: 16px;
 }
 
@@ -149,6 +176,18 @@
 
 .domain_quick .qdtable table{
     text-align: left;
+}
+
+.changed{
+    color: red;
+}
+
+#statusDialog{
+    display: none;
+}
+
+tr td.oldVersion {
+    background-color: #fece2f !important;
 }
 
 
