@@ -240,8 +240,8 @@ def main():
         options.verbose = True
 
 
-    work_queue = Queue()
-    insert_queue = mpQueue()
+    work_queue = Queue(maxsize=options.bulk_size)
+    insert_queue = mpQueue(maxsize=options.bulk_size)
 
     client = MongoClient(host=options.mongo_host, port=options.mongo_port)
     whodb = client[options.database]
