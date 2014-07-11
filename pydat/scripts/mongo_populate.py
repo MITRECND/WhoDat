@@ -114,8 +114,13 @@ def mongo_worker(insert_queue, options):
             try:
                 finished_bulk.execute()
             except pymongo.bulk.BulkWriteError as bwe:
-                print "BULK ERROR: %s\nDetails:" % str(bwe)
-                pprint(bwe.details)
+                details = bwe.details
+                if options.vverbose:
+                    pprint(bwe.details)
+                elif options.verbose:
+                    for error in details['writeErrors']:
+                        print "Error inserting/updating %s\n\tmessage: %s" % (error['op']['domainName'], error['errmsg'])
+                #else pass
 
 
 def process_worker(work_queue, insert_queue, collection, options):
@@ -165,6 +170,9 @@ def process_entry(insert_queue, collection, header, input_entry, options):
 
     global CHANGEDCT
     if current_entry:
+        if current_entry[VERSION_KEY] == options.identifier: # duplicate entry in source csv's?
+            return
+
         if len(options.exclude):
             details_copy = details.copy()
             for exclude in options.exclude:
