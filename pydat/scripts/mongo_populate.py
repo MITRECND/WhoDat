@@ -13,6 +13,7 @@ from threading import Thread
 from Queue import Queue
 import multiprocessing #for num cpus
 from multiprocessing import Process, Queue as mpQueue
+from pprint import pprint
 
 NUM_ENTRIES = 0
 NUM_NEW = 0
@@ -28,7 +29,7 @@ def scan_directory(work_queue, collection, directory, options):
     for root, subdirs, filenames in os.walk(directory):
         if len(subdirs):
             for subdir in subdirs:
-                scan_directory(collection, subdir, options)
+                scan_directory(work, collection, subdir, options)
         for filename in filenames:
             if options.extension != '':
                 fn, ext = os.path.splitext(filename)
@@ -113,7 +114,8 @@ def mongo_worker(insert_queue, options):
             try:
                 finished_bulk.execute()
             except pymongo.bulk.BulkWriteError as bwe:
-                print "BULK ERROR"
+                print "BULK ERROR: %s\nDetails:" % str(bwe)
+                pprint(bwe.details)
 
 
 def process_worker(work_queue, insert_queue, collection, options):
