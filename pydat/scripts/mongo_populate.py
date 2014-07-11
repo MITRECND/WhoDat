@@ -29,7 +29,7 @@ def scan_directory(work_queue, collection, directory, options):
     for root, subdirs, filenames in os.walk(directory):
         if len(subdirs):
             for subdir in subdirs:
-                scan_directory(work, collection, subdir, options)
+                scan_directory(work_queue, collection, subdir, options)
         for filename in filenames:
             if options.extension != '':
                 fn, ext = os.path.splitext(filename)
