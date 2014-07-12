@@ -5,6 +5,7 @@ import os
 import csv
 import hashlib
 import signal
+import time
 from optparse import OptionParser
 import pymongo
 from pymongo import MongoClient
@@ -21,7 +22,6 @@ STATS = {'total': 0,
          'unchanged': 0,
          'duplicates': 0
         }
-
 STATS_LOCK = Lock()
 
 VERSION_KEY = 'dataVersion'
@@ -32,14 +32,14 @@ CHANGEDCT = {}
 
 shutdown_event = threading.Event()
 
-def update_stats(stat):
-    global STATS_LOCK
-    global STATS
-    STATS_LOCK.acquire()
-    try:
-        STATS[stat] += 1 
-    finally:
-        STATS_LOCK.release()
+######## READER THREAD ######
+def reader_worker(work_queue, collection, options):
+    if options.directory:
+        scan_directory(work_queue, collection, options.directory, options)
+    elif options.file:
+        parse_csv(work_queue, collection, options.file, options)
+    else:
+        print "File or Directory required"
 
 def scan_directory(work_queue, collection, directory, options):
     for root, subdirs, filenames in os.walk(directory):
@@ -69,27 +69,8 @@ def parse_csv(work_queue, collection, filename, options):
     except csv.Error, e:
         sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
 
-def update_required(collection, header, input_entry, options):
-    if len(input_entry) == 0:
-        return False
 
-    current_entry = None
-    domainName = ''
-    for i,item in enumerate(input_entry):
-        if header[i] == 'domainName':
-            domainName = item
-            break
-
-    current_entry = find_entry(collection, domainName)
-
-    if current_entry is None:
-        return True
-
-    if current_entry[VERSION_KEY] == options.identifier: #This record already up to date
-        return False 
-    else:
-        return True
-
+###### MONGO PROCESS ######
 
 def mongo_worker(insert_queue, options):
     #Ignore signals that are sent to parent process
@@ -132,6 +113,39 @@ def mongo_worker(insert_queue, options):
                     for error in details['writeErrors']:
                         print "Error inserting/updating %s\n\tmessage: %s" % (error['op']['domainName'], error['errmsg'])
                 #else pass
+
+
+######## WORKER THREADS #########
+
+def update_required(collection, header, input_entry, options):
+    if len(input_entry) == 0:
+        return False
+
+    current_entry = None
+    domainName = ''
+    for i,item in enumerate(input_entry):
+        if header[i] == 'domainName':
+            domainName = item
+            break
+
+    current_entry = find_entry(collection, domainName)
+
+    if current_entry is None:
+        return True
+
+    if current_entry[VERSION_KEY] == options.identifier: #This record already up to date
+        return False 
+    else:
+        return True
+
+def update_stats(stat):
+    global STATS_LOCK
+    global STATS
+    STATS_LOCK.acquire()
+    try:
+        STATS[stat] += 1 
+    finally:
+        STATS_LOCK.release()
 
 
 def process_worker(work_queue, insert_queue, collection, options):
@@ -240,6 +254,8 @@ def find_entry(collection, domainName):
     return entry
 
 
+###### MAIN ######
+
 def main():
     global STATS
     global VERSION_KEY
@@ -248,13 +264,13 @@ def main():
 
     def signal_handler(signum, frame):
         signal.signal(signal.SIGINT, SIGINT_ORIG)
-        sys.stdout.write("Cleaning Up ... Please Wait ...\n")
+        sys.stdout.write("\rCleaning Up ... Please Wait ...\n")
         shutdown_event.set()
 
         #Let the current workload finish
         sys.stdout.write("\tStopping Workers\n")
         for t in threads:
-            t.join()
+            t.join(1)
 
 
         insert_queue.put("finished")
@@ -440,16 +456,20 @@ def main():
     #Set up signal handler before we go into the real work
     SIGINT_ORIG = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, signal_handler)
-        
-    #Start Processing the entries
-    if options.directory:
-        scan_directory(work_queue, collection, options.directory, options)
-    elif options.file:
-        parse_csv(work_queue, collection, options.file, options)
-    else:
-        print "File or Directory required"
-        sys.exit(1) 
 
+    #Start up Reader Thread
+    reader_thread = Thread(target=reader_worker, args=(work_queue, collection, options), name='Reader')
+    reader_thread.daemon = True
+    reader_thread.start()
+
+    while reader_thread.join(.1):
+        if not reader_thread.isAlive():
+            break
+
+    time.sleep(.1)
+
+    while not work_queue.empty():
+        time.sleep(.01)
 
     work_queue.join()
     insert_queue.put("finished")
