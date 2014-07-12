@@ -45,10 +45,13 @@ def parse_csv(work_queue, collection, filename, options):
 
     csvfile = open(filename, 'rb')
     dnsreader = csv.reader(csvfile, strict = True, skipinitialspace = True)
-    header = dnsreader.next()
+    try:
+        header = dnsreader.next()
 
-    for row in dnsreader:
-        work_queue.put({'header': header, 'row': row})
+        for row in dnsreader:
+            work_queue.put({'header': header, 'row': row})
+    except csv.Error, e:
+        sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
 
 def update_required(collection, header, input_entry, options):
     if len(input_entry) == 0:
