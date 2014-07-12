@@ -9,21 +9,37 @@ from optparse import OptionParser
 import pymongo
 from pymongo import MongoClient
 import threading
-from threading import Thread
-from Queue import Queue
+from threading import Thread, Lock
+import Queue
 import multiprocessing #for num cpus
 from multiprocessing import Process, Queue as mpQueue
 from pprint import pprint
 
-NUM_ENTRIES = 0
-NUM_NEW = 0
-NUM_UPDATED = 0
-NUM_UNCHANGED = 0
+STATS = {'total': 0,
+         'new': 0,
+         'updated': 0,
+         'unchanged': 0,
+         'duplicates': 0
+        }
+
+STATS_LOCK = Lock()
+
 VERSION_KEY = 'dataVersion'
 UNIQUE_KEY = 'dataUniqueID'
 FIRST_SEEN = 'dataFirstSeen'
 
 CHANGEDCT = {}
+
+shutdown_event = threading.Event()
+
+def update_stats(stat):
+    global STATS_LOCK
+    global STATS
+    STATS_LOCK.acquire()
+    try:
+        STATS[stat] += 1 
+    finally:
+        STATS_LOCK.release()
 
 def scan_directory(work_queue, collection, directory, options):
     for root, subdirs, filenames in os.walk(directory):
@@ -76,17 +92,9 @@ def update_required(collection, header, input_entry, options):
 
 
 def mongo_worker(insert_queue, options):
-    #Register signal handler for this process
-    def signal_handler(signal, frame):
-        try:
-            if bulk_counter > 0:
-                print "Flushing Processed Data to Mongo ... Please Wait"
-                bulk.execute() 
-        except:
-            pass
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, signal_handler)
+    #Ignore signals that are sent to parent process
+    #The parent should properly shut this down
+    os.setpgrp()
 
     bulk_counter = 0
     client = MongoClient(host=options.mongo_host, port=options.mongo_port)
@@ -127,13 +135,15 @@ def mongo_worker(insert_queue, options):
 
 
 def process_worker(work_queue, insert_queue, collection, options):
-    while True:
+    global shutdown_event
+    while not shutdown_event.isSet():
         work = work_queue.get()
         process_entry(insert_queue, collection, work['header'], work['row'], options)
         work_queue.task_done()
 
 def process_reworker(work_queue, insert_queue, collection, options):
-    while True:
+    global shutdown_event
+    while not shutdown_event.isSet():
         work = work_queue.get()
         if update_required(collection, work['header'],work['row'], options):
             process_entry(insert_queue, collection, work['header'], work['row'], options)
@@ -142,12 +152,9 @@ def process_reworker(work_queue, insert_queue, collection, options):
 
 def process_entry(insert_queue, collection, header, input_entry, options):
     global VERSION_KEY
-    global NUM_ENTRIES
-    global NUM_NEW
-    global NUM_UPDATED
-    global NUM_UNCHANGED
+    global STATS
 
-    NUM_ENTRIES += 1
+    update_stats('total')
     if len(input_entry) == 0:
         return
 
@@ -174,6 +181,7 @@ def process_entry(insert_queue, collection, header, input_entry, options):
     global CHANGEDCT
     if current_entry:
         if current_entry[VERSION_KEY] == options.identifier: # duplicate entry in source csv's?
+            update_stats('duplicates')
             return
 
         if len(options.exclude):
@@ -199,20 +207,20 @@ def process_entry(insert_queue, collection, header, input_entry, options):
             CHANGEDCT[ch[0]] += 1
 
         if diff:
+            update_stats('updated')
             if options.vverbose:
                 print "Creating entry for updated domain %s" % domainName
         
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
             insert_queue.put({'type': 'insert', 'insert':entry})
-            NUM_UPDATED += 1
         else:
-            NUM_UNCHANGED += 1
+            update_stats('unchanged')
             if options.vverbose:
                 print "Unchanged entry for %s" % domainName
             insert_queue.put({'type': 'update', 'find': {UNIQUE_KEY: current_entry[UNIQUE_KEY]}, 'update': {'$set': {'details': details, VERSION_KEY: options.identifier}}})
     else:
-        NUM_NEW += 1
+        update_stats('new')
         if options.vverbose:
             print "Creating new entry for %s" % domainName
         entry[UNIQUE_KEY] = generate_id(domainName, options.identifier)
@@ -233,17 +241,43 @@ def find_entry(collection, domainName):
 
 
 def main():
-    global NUM_ENTRIES
-    global NUM_NEW
-    global NUM_UPDATED
-    global NUM_UNCHANGED
+    global STATS
     global VERSION_KEY
     global CHANGEDCT
+    global shutdown_event
 
-    def signal_handler(signal, frame):
+    def signal_handler(signum, frame):
+        signal.signal(signal.SIGINT, SIGINT_ORIG)
+        sys.stdout.write("Cleaning Up ... Please Wait ...\n")
+        shutdown_event.set()
+
+        #Let the current workload finish
+        sys.stdout.write("\tStopping Workers\n")
+        for t in threads:
+            t.join()
+
+
+        insert_queue.put("finished")
+        mongo_worker_thread.join()
+
+        #Attempt to update the stats
+        try:
+            meta.update({'metadata': options.identifier}, {'$set' : {
+                                                        'total' : STATS['total'],
+                                                        'new' : STATS['new'],
+                                                        'updated' : STATS['updated'],
+                                                        'unchanged' : STATS['unchanged'],
+                                                        'duplicates': STATS['duplicates'],
+                                                        'changed_stats': CHANGEDCT
+                                                    }
+                                            });
+        except:
+            pass
+
+        sys.stdout.write("... Done\n")
+
         sys.exit(0)
 
-    signal.signal(signal.SIGINT, signal_handler)
 
     optparser = OptionParser(usage='usage: %prog [options]')
     optparser.add_option("-f", "--file", action="store", dest="file",
@@ -285,7 +319,8 @@ def main():
         options.verbose = True
 
 
-    work_queue = Queue(maxsize=options.bulk_size)
+    threads = []
+    work_queue = Queue.Queue(maxsize=options.bulk_size)
     insert_queue = mpQueue(maxsize=options.bulk_size)
 
     client = MongoClient(host=options.mongo_host, port=options.mongo_port)
@@ -330,9 +365,6 @@ def main():
                 sys.exit(1)
         meta_id = metadata['_id']
 
-    mongo_worker_thread = Process(target=mongo_worker, args=(insert_queue, options))
-    mongo_worker_thread.start()
-
     if options.redo is False:
         if options.exclude != "":
             options.exclude = options.exclude.split(',')
@@ -352,6 +384,7 @@ def main():
                         name='Worker %i' % i)
             t.daemon = True
             t.start()
+            threads.append(t)
 
         #Upate the lastVersion in the metadata
         meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
@@ -360,6 +393,12 @@ def main():
                         'metadata': options.identifier,
                         'comment' : options.comment,
                         'excluded_keys': options.exclude,
+                        'total' : 0,
+                        'new' : 0,
+                        'updated' : 0,
+                        'unchanged' : 0,
+                        'duplicates': 0,
+                        'changed_stats': {} 
                 })
     else: #redo is True
         #Get the record for the attempted import
@@ -367,6 +406,15 @@ def main():
         redo_record = meta.find_one({'metadata': options.identifier})
         options.exclude = redo_record['excluded_keys']
         options.comment = redo_record['comment']
+        STATS['total'] = int(redo_record['total'])
+        STATS['new'] = int(redo_record['new'],)
+        STATS['updated'] = int(redo_record['updated'])
+        STATS['unchanged'] = int(redo_record['unchanged'])
+        STATS['duplicates'] = int(redo_record['duplicates'])
+        CHANGEDCT = redo_record['changed_stats']
+
+        for ch in CHANGEDCT.keys():
+            CHANGEDCT[ch] = int(CHANGEDCT[ch])
 
         #Start the reworker threads
         if options.verbose:
@@ -381,7 +429,17 @@ def main():
                         name='Worker %i' % i)
             t.daemon = True
             t.start()
+            threads.append(t)
         #No need to update lastVersion or create metadata entry
+
+    #Start up the Mongo Bulk Processor
+    mongo_worker_thread = Process(target=mongo_worker, args=(insert_queue, options))
+    mongo_worker_thread.daemon = True
+    mongo_worker_thread.start()
+
+    #Set up signal handler before we go into the real work
+    SIGINT_ORIG = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, signal_handler)
         
     #Start Processing the entries
     if options.directory:
@@ -397,13 +455,13 @@ def main():
     insert_queue.put("finished")
     mongo_worker_thread.join()
     
-    #Update the stats for this import
-    #TODO this will be inaccurate in a re-do event, need to track better
+    #Update the stats
     meta.update({'metadata': options.identifier}, {'$set' : {
-                                                'total' : NUM_ENTRIES,
-                                                'new' : NUM_NEW,
-                                                'updated' : NUM_UPDATED,
-                                                'unchanged' : NUM_UNCHANGED,
+                                                'total' : STATS['total'],
+                                                'new' : STATS['new'],
+                                                'updated' : STATS['updated'],
+                                                'unchanged' : STATS['unchanged'],
+                                                'duplicates': STATS['duplicates'],
                                                 'changed_stats': CHANGEDCT
                                             }
                                     });
@@ -411,10 +469,11 @@ def main():
 
     if options.stats:
         print "Stats: "
-        print "Total Entries:\t\t %d" % NUM_ENTRIES
-        print "New Entries:\t\t %d" % NUM_NEW
-        print "Updated Entries:\t %d" % NUM_UPDATED
-        print "Unchanged Entries:\t %d" % NUM_UNCHANGED
+        print "Total Entries:\t\t %d" % STATS['total'] 
+        print "New Entries:\t\t %d" % STATS['new'] 
+        print "Updated Entries:\t %d" % STATS['updated'] 
+        print "Duplicate Entries\t %d" % STATS['duplicates'] 
+        print "Unchanged Entries:\t %d" % STATS['unchanged'] 
 
 if __name__ == "__main__":
     main()
