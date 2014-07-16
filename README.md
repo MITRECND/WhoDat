@@ -47,23 +47,30 @@ Populating Mongo with whoisxmlapi data (Ubuntu 12.04.4 LTS)
 - Install [MongoDB](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-ubuntu/)
 - Download latest trimmed (smallest possible) whoisxmlapi quarterly DB dump.
 - Extract the csv files.
+- Create an index on domainName:
+```bash
+$ mongo
+use whois
+db.whois.ensureIndex( {domainName: 1, unique:true} )
+```
 - Import them (adjust for your needs):
 ```
 for file in */*.csv; do echo $file && mongoimport --db whois --collection whois --file $file --type csv --headerline --upsert --upsertFields domainName; done
 ```
-- Create indexes on domainName, registrant_name, contactEmail and registrant_telephone.
-```
-db.whois.ensureIndex( {domainName: 1})
-db.whois.ensureIndex( {contactEmail: 1})
-db.whois.ensureIndex( {registrant_name: 1})
-db.whois.ensureIndex( {registrant_telephone: 1})
+- Create indexes on registrant_name, contactEmail and registrant_telephone.
+```bash
+$ mongo
+use whois
+db.whois.ensureIndex( {contactEmail: 1} )
+db.whois.ensureIndex( {registrant_name: 1} )
+db.whois.ensureIndex( {registrant_telephone: 1} )
 ```
 - Copy pydat to /var/www/ (or prefered location)
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
 - Edit pydat/custom_settings.py to suit your needs.
   - Include your DNSDB key if you have one!
 - Configure Apache to use the provided wsgi interface to pydat.
-```
+```bash
 sudo apt-get install libapache2-mod-wsgi
 sudo vi /etc/apache2/sites-available/whois
 
