@@ -55,6 +55,14 @@ def scan_directory(work_queue, collection, directory, options):
             full_path = os.path.join(root, filename)
             parse_csv(work_queue, collection, full_path, options)
 
+def check_header(header):
+    for field in header:
+        if field == "domainName":
+            return True
+
+    return False
+
+
 def parse_csv(work_queue, collection, filename, options):
     if options.verbose:
         print "Processing file: %s" % filename
@@ -63,6 +71,8 @@ def parse_csv(work_queue, collection, filename, options):
     dnsreader = csv.reader(csvfile, strict = True, skipinitialspace = True)
     try:
         header = dnsreader.next()
+        if not check_header(header):
+            raise csv.Error('CSV header not found')
 
         for row in dnsreader:
             work_queue.put({'header': header, 'row': row})
@@ -274,7 +284,16 @@ def main():
 
 
         insert_queue.put("finished")
-        mongo_worker_thread.join()
+
+        #Give the Mongo process 5 seconds to exit
+        mongo_worker_thread.join(5)
+
+        #If it's still alive, terminate it
+        if mongo_worker_thread.is_alive():
+            try:
+                mongo_worker_thread.terminate()
+            except:
+                pass
 
         #Attempt to update the stats
         try:
