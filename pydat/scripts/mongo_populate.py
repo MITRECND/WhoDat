@@ -118,10 +118,10 @@ def mongo_worker(insert_queue, options):
             except pymongo.bulk.BulkWriteError as bwe:
                 details = bwe.details
                 if options.vverbose:
-                    pprint(bwe.details)
+                    pprint(bwe.details, stream = sys.stderr)
                 elif options.verbose:
                     for error in details['writeErrors']:
-                        print "Error inserting/updating %s\n\tmessage: %s" % (error['op']['domainName'], error['errmsg'])
+                        sys.stderr.write("Error inserting/updating %s\n\tmessage: %s\n" % (error['op']['domainName'], error['errmsg']))
                 #else pass
 
 
