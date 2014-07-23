@@ -481,7 +481,8 @@ def main():
     reader_thread.daemon = True
     reader_thread.start()
 
-    while reader_thread.join(.1):
+    while True:
+        reader_thread.join(.1)
         if not reader_thread.isAlive():
             break
 
