@@ -2,7 +2,7 @@
 
 import sys
 import os
-import csv
+import unicodecsv
 import hashlib
 import signal
 import time
@@ -68,15 +68,15 @@ def parse_csv(work_queue, collection, filename, options):
         print "Processing file: %s" % filename
 
     csvfile = open(filename, 'rb')
-    dnsreader = csv.reader(csvfile, strict = True, skipinitialspace = True)
+    dnsreader = unicodecsv.reader(csvfile, strict = True, skipinitialspace = True)
     try:
         header = dnsreader.next()
         if not check_header(header):
-            raise csv.Error('CSV header not found')
+            raise unicodecsv.Error('CSV header not found')
 
         for row in dnsreader:
             work_queue.put({'header': header, 'row': row})
-    except csv.Error, e:
+    except unicodecsv.Error, e:
         sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
 
 
@@ -121,7 +121,7 @@ def mongo_worker(insert_queue, options):
                     pprint(bwe.details, stream = sys.stderr)
                 elif options.verbose:
                     for error in details['writeErrors']:
-                        sys.stderr.write("Error inserting/updating %s\n\tmessage: %s\n" % (error['op']['domainName'], error['errmsg']))
+                        sys.stderr.write("Error inserting/updating %s\n\tmessage: %s\n" % (error['op']['domainName'], error['errmsg'].encode('ascii', 'replace')))
                 #else pass
 
 
