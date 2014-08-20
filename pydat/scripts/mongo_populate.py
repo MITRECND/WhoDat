@@ -338,7 +338,7 @@ def main():
     optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     optparser.add_option("--vverbose", action="store_true", dest="vverbose",
-        default=False, help="Be very verbose (Prints status of every domain parsed)")
+        default=False, help="Be very verbose (Prints status of every domain parsed, very noisy)")
     optparser.add_option("-s", "--stats", action="store_true", dest="stats",
         default=False, help="Print out Stats after running")
     optparser.add_option("-x", "--exclude", action="store", dest="exclude",
@@ -346,7 +346,7 @@ def main():
     optparser.add_option("-o", "--comment", action="store", dest="comment",
         default="", help="Comment to store with metadata")
     optparser.add_option("-r", "--redo", action="store_true", dest="redo",
-        default=False, help="Attempt to re-import a failed import")
+        default=False, help="Attempt to re-import a failed import or import more data, uses stored metatdata for previous import (-o and -x not required and will be ignored!!)")
 
     (options, args) = optparser.parse_args()
 
@@ -365,6 +365,9 @@ def main():
 
     if options.identifier is None and options.redo is False:
         print "Identifier required"
+        sys.exit(1)
+    elif options.identifier is not None and options.redo is True:
+        print "Redo requested and Identifier Specified. Please choose one or the other"
         sys.exit(1)
 
     metadata = meta.find_one({'metadata':0})
@@ -447,6 +450,9 @@ def main():
         STATS['unchanged'] = int(redo_record['unchanged'])
         STATS['duplicates'] = int(redo_record['duplicates'])
         CHANGEDCT = redo_record['changed_stats']
+
+        if options.verbose:
+            print "Re-importing for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment)
 
         for ch in CHANGEDCT.keys():
             CHANGEDCT[ch] = int(CHANGEDCT[ch])
