@@ -33,7 +33,50 @@ necessitated modifying the way data is stored in the database. To aid in properl
 the database, a script called [mongo_populate](./pydat/scripts/mongo_populate.py) is provided
 to auto-populate the data. Note that the data coming from whoisxmlapi doesn't seem to be always
 consistent so some care should be taken when ingesting data. More testing needs to be done to ensure
-all data is ingested properly
+all data is ingested properly. Anyone setting up their database, should read the available flags for the
+script before running it to ensure they've tweaked it for their setup. The following is the output from
+mongo_populate -h
+
+<pre>
+Options:
+  -h, --help            show this help message and exit
+  -f FILE, --file=FILE  Input CSV file
+  -d DIRECTORY, --directory=DIRECTORY
+                        Directory to recursively search for CSV files -
+                        prioritized over 'file'
+  -e EXTENSION, --extension=EXTENSION
+                        When scanning for CSV files only parse files with
+                        given extension (default: 'csv')
+  -i IDENTIFIER, --identifier=IDENTIFIER
+                        Numerical identifier to use in update to signify
+                        version (e.g., '8' or '20140120')
+  -m MONGO_HOST, --mongo-host=MONGO_HOST
+                        Location of mongo db/cluster
+  -p MONGO_PORT, --mongo-port=MONGO_PORT
+                        Location of mongo db/cluster
+  -b DATABASE, --database=DATABASE
+                        Name of database to use (default: 'whois')
+  -c COLLECTION, --collection=COLLECTION
+                        Name of collection to use (default: 'whois')
+  -t THREADS, --threads=THREADS
+                        Number of worker threads
+  -B BULK_SIZE, --bulk-size=BULK_SIZE
+                        Size of Bulk Insert Requests
+  -v, --verbose         Be verbose
+  --vverbose            Be very verbose (Prints status of every domain parsed)
+  -s, --stats           Print out Stats after running
+  -x EXCLUDE, --exclude=EXCLUDE
+                        Comma separated list of keys to exclude if updating
+                        entry
+  -o COMMENT, --comment=COMMENT
+                        Comment to store with metadata
+  -r, --redo            Attempt to re-import a failed import
+
+</pre>
+
+
+Note that when adding a new version of data to the database, you should use the -x flag to exclude certain
+fields that are not important to track changes. This will significantly decrease the amount of data that is stored
 
 ScreenShots
 ===========
@@ -48,6 +91,7 @@ pyDat does not provide any data on its own. You must provide your own whois
 data in a MongoDB. Beyond the data in a MongoDB you will need
 [Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/), [unicodecsv](https://pypi.python.org/pypi/unicodecsv)
 and [requests](https://pypi.python.org/pypi/requests) (at least 2.2.1).
+
 
 Populating Mongo with whoisxmlapi data (Ubuntu 12.04.4 LTS)
 ===========================================================
