@@ -1,3 +1,4 @@
+<!DOCTYPE HTML>
 <html>
   <head>
     <title>pyDat: {% block title %}WHOIS exploration{% endblock %}</title>
@@ -13,6 +14,7 @@
         <script type="text/javascript">
           var resolve_url = "{% url 'ajax_resolve' %}";
           var csrf_token = '{{ csrf_token }}';
+          var latest_version = '{{ latest_version }}';
         </script>
     {% block js_constants %}
     {% endblock %}
@@ -21,6 +23,7 @@
     {% endblock %}
   </head>
   <body>
+    <div id="bodywrapper">
 	<div id="header">
         <div id = "topline">
         <div id = "toprow">
@@ -81,6 +84,20 @@
                             </td>
                             <td>
                                 {{ domain_form.fmt }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <label for="id_latest">Latest:</label>
+                            </td>
+                            <td>
+                                {{ domain_form.latest }}
+                            </td>
+                            <td>
+                                &nbsp;
+                            </td>
+                            <td>
+                                &nbsp;
                             </td>
                         </tr>
                         <tr>
@@ -318,5 +335,6 @@
 		This one by: <a href="mailto:wshields@mitre.org">Wesley Shields</a> and <a href="mailto:mkhan@mitre.org">Murad Khan</a>
     </div>
 
+    </div>
   </body>
 </html>

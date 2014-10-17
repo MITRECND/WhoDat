@@ -5,10 +5,12 @@
 {% block js_constants %}
     <script type="text/javascript">
       var domain_url = "{% url 'ajax_domain' %}";
-      var domains_url = "{% url 'ajax_domains' %}";
+      var dataTable_url = "{% url 'ajax_dataTable' %}";
 	  var active_window = 0;
       var key = "{{ key }}";
       var value = "{{ value }}";
+      var low_version = {{ low_version }};
+      var high_version = {{ high_version }};
     </script>
 {% endblock %}
 
@@ -27,6 +29,7 @@
           <th>Email</th>
           <th>Created</th>
           <th>Telephone</th>
+          <th>Version</th>
         </tr>
       </thead>
       <tbody>
@@ -36,6 +39,10 @@
 		<span id="dtext"></span>
 	</div>
 
+
+    <div id="statusDialog" title="Working ...">
+        <span id="statusText">Data is being fetched from the server ... Please Wait</span>
+    </div>
 {% endblock %}
 
 

@@ -20,12 +20,63 @@ featured or extensible as the Python implementation, and is not supported.
 For more information on the PHP implementation please see the [readme](../master/legacy_whodat/README.md). For more information on the Python implementation
 keep reading...
 
+
 pyDat
 =====
 
 pyDat is a Python implementation of [Chris Clark's](https://github.com/Xen0ph0n)
 WhoDat code. It is designed to be more extensible and has more features than
 the PHP implementation.
+
+Version 2.0 of pyDat includes support for historical whois searches. This capability
+necessitated modifying the way data is stored in the database. To aid in properly populating
+the database, a script called [mongo_populate](./pydat/scripts/mongo_populate.py) is provided
+to auto-populate the data. Note that the data coming from whoisxmlapi doesn't seem to be always
+consistent so some care should be taken when ingesting data. More testing needs to be done to ensure
+all data is ingested properly. Anyone setting up their database, should read the available flags for the
+script before running it to ensure they've tweaked it for their setup. The following is the output from
+mongo_populate -h
+
+<pre>
+Options:
+  -h, --help            show this help message and exit
+  -f FILE, --file=FILE  Input CSV file
+  -d DIRECTORY, --directory=DIRECTORY
+                        Directory to recursively search for CSV files -
+                        prioritized over 'file'
+  -e EXTENSION, --extension=EXTENSION
+                        When scanning for CSV files only parse files with
+                        given extension (default: 'csv')
+  -i IDENTIFIER, --identifier=IDENTIFIER
+                        Numerical identifier to use in update to signify
+                        version (e.g., '8' or '20140120')
+  -m MONGO_HOST, --mongo-host=MONGO_HOST
+                        Location of mongo db/cluster
+  -p MONGO_PORT, --mongo-port=MONGO_PORT
+                        Location of mongo db/cluster
+  -b DATABASE, --database=DATABASE
+                        Name of database to use (default: 'whois')
+  -c COLLECTION, --collection=COLLECTION
+                        Name of collection to use (default: 'whois')
+  -t THREADS, --threads=THREADS
+                        Number of worker threads
+  -B BULK_SIZE, --bulk-size=BULK_SIZE
+                        Size of Bulk Insert Requests
+  -v, --verbose         Be verbose
+  --vverbose            Be very verbose (Prints status of every domain parsed)
+  -s, --stats           Print out Stats after running
+  -x EXCLUDE, --exclude=EXCLUDE
+                        Comma separated list of keys to exclude if updating
+                        entry
+  -o COMMENT, --comment=COMMENT
+                        Comment to store with metadata
+  -r, --redo            Attempt to re-import a failed import
+
+</pre>
+
+
+Note that when adding a new version of data to the database, you should use the -x flag to exclude certain
+fields that are not important to track changes. This will significantly decrease the amount of data that is stored
 
 ScreenShots
 ===========
@@ -38,8 +89,9 @@ Running pyDat
 
 pyDat does not provide any data on its own. You must provide your own whois
 data in a MongoDB. Beyond the data in a MongoDB you will need
-[Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/),
+[Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/), [unicodecsv](https://pypi.python.org/pypi/unicodecsv)
 and [requests](https://pypi.python.org/pypi/requests) (at least 2.2.1).
+
 
 Populating Mongo with whoisxmlapi data (Ubuntu 12.04.4 LTS)
 ===========================================================
@@ -47,24 +99,13 @@ Populating Mongo with whoisxmlapi data (Ubuntu 12.04.4 LTS)
 - Install [MongoDB](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-ubuntu/)
 - Download latest trimmed (smallest possible) whoisxmlapi quarterly DB dump.
 - Extract the csv files.
-- Create an index on domainName:
-```bash
-$ mongo
-use whois
-db.whois.ensureIndex( {domainName: 1, unique:true} )
+
+- Use the included script in the scripts/ directory:
+
 ```
-- Import them (adjust for your needs):
+./mongo_populate.py -f ~/whois/data/1.csv -i '1' -v -s -x Audit_auditUpdatedDate,updatedDate,standardRegUpdatedDate,expiresDate,standardRegExpiresDate
 ```
-for file in */*.csv; do echo $file && mongoimport --db whois --collection whois --file $file --type csv --headerline --upsert --upsertFields domainName; done
-```
-- Create indexes on registrant_name, contactEmail and registrant_telephone.
-```bash
-$ mongo
-use whois
-db.whois.ensureIndex( {contactEmail: 1} )
-db.whois.ensureIndex( {registrant_name: 1} )
-db.whois.ensureIndex( {registrant_telephone: 1} )
-```
+
 - Copy pydat to /var/www/ (or prefered location)
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
 - Edit pydat/custom_settings.py to suit your needs.
@@ -86,6 +127,57 @@ sudo vi /etc/apache2/sites-available/whois
 </VirtualHost>
 ```
 
+pyDat API
+===========================================================
+
+pyDat 2.0 has a scriptable API that allows you to make search requests and obtain JSON data. The following endpoints are exposed:
+
+```
+ajax/metadata/
+ajax/metadata/<version>/
+```
+
+The metadata endpoint returns metadata available for the data in the database. Specifying a version will return metadata for that specific version
+
+```
+ajax/domain/<domainName>/
+ajax/domain/<domainName>/latest/
+ajax/domain/<domainName>/<version>/
+ajax/domain/<domainName>/<version1>/<version2>/
+ajax/domain/<domainName>/diff/<version1>/<version2>/
+```
+
+The domain endpoint allows you to get information about a specific domain name. By default, this will return information for any version of a domain that is found in the database. You can specify more information to obtain specific versions of domain information or to obtain the latest entry. You can also obtain a diff between two versions of a domain to see what has changed.
+
+
+```
+ajax/domains/<searchKey>/<searchValue>/
+ajax/domains/<searchKey>/<searchValue>/latest/
+ajax/domains/<searchKey>/<searchValue>/<version>/
+ajax/domains/<searchKey>/<searchValue>/<version1>/<version2>/
+```
+
+The domains endpoint allows you to search for domains based on a specified key. Currently the following keys are supported:
+
+```
+domainName
+registrant_name
+contactEmail
+registrant_telephone
+```
+
+Similar to the domain endpoint you can specify what versions of the data you are looking for.
+
+
+Example Queries:
+
+```
+curl http://pydat.myorg.domain/ajax/domain/google.com/latest/
+
+curl http://pydat.myorg.domain/ajax/domains/domainName/google.com/
+```
+
+
 Untested Stuff
 =============
 
@@ -97,7 +189,6 @@ TODO
 ====
 
 - Move Chris' update script to a common directory and test it out.
-- Find a way to implement historical searches.
 
 Legal Stuff
 ===========

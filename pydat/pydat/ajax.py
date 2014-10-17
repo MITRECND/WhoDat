@@ -7,8 +7,7 @@ from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response, HttpResponse
 import urllib
 
-from pydat.handlers import do_search, ajax_search, sort_lookup
-
+from pydat.handlers import handler
 
 def __renderErrorJSON__(message):
     context = {'success': False,
@@ -16,7 +15,17 @@ def __renderErrorJSON__(message):
               }
     return HttpResponse(json.dumps(context), content_type='application/json') 
 
-def domains(request, key, value):
+
+def metadata(request, version = None):
+    results = handler.metadata(version)
+
+    if results['success'] == False:
+        return __renderErrorJSON__(results['message'])
+
+    return HttpResponse(json.dumps(results), content_type='application/json')
+
+
+def dataTable(request, key, value, low = None, high = None):
     if not request.is_ajax():
         return __renderErrorJSON__('Expected AJAX')
 
@@ -25,6 +34,7 @@ def domains(request, key, value):
 
     if key not in [keys[0] for keys in settings.SEARCH_KEYS]:
         return __renderErrorJSON__('Invalid Key')
+
 
     key = urllib.unquote(key)
     value = urllib.unquote(value)
@@ -35,14 +45,14 @@ def domains(request, key, value):
         pagesize = int(request.GET.get('iDisplayLength', 50))
         sortcols = int(request.GET.get('iSortingCols', 0))
         sEcho = request.GET.get('sEcho')
-        sSearch = request.GET.get('sSearch', None)
+        sSearch = request.GET.get('sSearch', '')
 
         sort = []
         for x in range(sortcols):
-            (sort_key, sort_dir) = sort_lookup(int(request.GET.get("iSortCol_%d" % x)), 
+            sortTuple = handler.formatSort(int(request.GET.get("iSortCol_%d" % x)), 
                                                 request.GET.get("sSortDir_%d" % x))
-            if sort_key is not None:
-                sort.append((sort_key, sort_dir))
+            if sortTuple is not None:
+                sort.append(sortTuple)
 
     else:
         return __renderErrorJSON__('Unsupported Method')
@@ -56,23 +66,64 @@ def domains(request, key, value):
     if key == "registrant_telephone":
         value = int(value)
 
-    results = ajax_search(key, value, page, pagesize, sort, sSearch)
+    results = handler.dataTableSearch(key, value, page, pagesize, sort, sSearch, low, high)
     #Echo back the echo
     results['sEcho'] = sEcho
     
     return HttpResponse(json.dumps(results), content_type='application/json')
 
-def domain(request, domainName = None):
-    if not request.is_ajax():
-        return __renderErrorJSON__('Expected AJAX')
+def domains_latest(request, key, value):
+    return domains(request, key, value, low = handler.lastVersion())
+
+def domains(request, key, value, low = None, high = None):
+    #if not request.is_ajax():
+    #    return __renderErrorJSON__('Expected AJAX')
+
+    if key is None or value is None:
+        return __renderErrorJSON__('Missing Key and/or Value')
+
+    if key not in [keys[0] for keys in settings.SEARCH_KEYS]:
+        return __renderErrorJSON__('Invalid Key')
+
+
+    key = urllib.unquote(key)
+    value = urllib.unquote(value)
+    
+    #TODO Support Post -- need to add cooresponding form
+    if request.method == "GET":
+        limit = int(request.GET.get('limit', settings.LIMIT))
+    else:
+        return __renderErrorJSON__('Unsupported Method')
+
+    #XXX For some reason registrant_telephone needs to be treated as an integer
+    #I'm assuming mongo consumed the value as an int since there's only numbers and
+    #no symbols (such as () or -)
+    if key == "registrant_telephone":
+        value = int(value)
+
+    results = handler.search(key, value, filt = {'_id': False}, low = low, high = high)
+    if results['success'] == False:
+        return __renderErrorJSON__(results['message'])
+
+    return HttpResponse(json.dumps(results), content_type='application/json')
+
+def domain_latest(request, domainName):
+    return domain(request, domainName, low = handler.lastVersion());
+
+
+def domain(request, domainName = None, low = None, high = None):
+    #if not request.is_ajax():
+    #    return __renderErrorJSON__('Expected AJAX')
 
     if request.method == "GET":
         if not domainName:
             return __renderErrorJSON__('Requires Domain Name Argument')
         domainName = urllib.unquote(domainName)
 
-        results = do_search('domainName', domainName, filt={'_id': False}, limit = 1)
+        results = handler.search('domainName', domainName, filt={'_id': False}, low = low, high = high)
 
+
+        return HttpResponse(json.dumps(results), content_type='application/json')
         if results['success']: #Clean up the data
             results['data'] = results['data'][0]
             del results['total']
@@ -82,6 +133,45 @@ def domain(request, domainName = None):
             return __renderErrorJSON__(results['message'])
     else:
         return __renderErrorJSON__('Bad Method.')
+
+def domain_diff(request, domainName = None, v1 = None, v2 = None):
+    if request.method == "GET":
+        if not domainName or not v1 or not v2:
+            return __renderErrorJSON__('Required Parameters Missing')
+        domainName = urllib.unquote(domainName)
+
+        v1_res = handler.search('domainName', domainName, filt={'_id':False}, low = int(v1))
+        v2_res = handler.search('domainName', domainName, filt={'_id':False}, low = int(v2))
+
+        try:
+            v1_res = v1_res['data'][0]
+            v2_res = v2_res['data'][0]
+        except:
+            return __renderErrorJSON__("Did not find results")
+
+        keylist = set(v1_res.keys()).union(set(v2_res.keys()))
+
+        keylist.remove('Version')
+        keylist.remove('domainName')
+
+        output = {}
+        for key in keylist: 
+            if key in v1_res and key in v2_res:
+                if v1_res[key] == v2_res[key]:
+                    output[key] = v1_res[key] 
+                else:
+                    output[key] = [v1_res[key], v2_res[key]]
+            else:
+                try:
+                    output[key] = [v1_res[key], '']
+                except:
+                    output[key] = ['', v2_res[key]]
+        
+        output['success'] = True 
+        return HttpResponse(json.dumps(output), content_type='application/json')
+    else:
+        return __renderErrorJSON__('Bad Method.')
+
 
 def resolve(request, domainName = None):
     if domainName is None:
