@@ -63,13 +63,15 @@ def formatSort(colID, direction):
     if(colID == 1):
         sort_key = "domainName"
     elif(colID == 2):
-        sort_key = "registrant_name"
+        sort_key = "details.registrant_name"
     elif(colID == 3):
-        sort_key = "contactEmail"
+        sort_key = "details.contactEmail"
     elif(colID == 4):
-        sort_key = "standardRegCreatedDate" 
+        sort_key = "details.standardRegCreatedDate" 
     elif(colID == 5):
-        sort_key = "registrant_telephone"
+        sort_key = "details.registrant_telephone"
+    elif(colID == 6):
+        sort_key = "dataVersion"
 
     if direction == "desc":
         sort_dir = pymongo.DESCENDING
@@ -125,7 +127,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
                 else:
                     exp = {skey: {'$regex': regx}}
                 query['$or'].append(exp)
-                
+
     domains = coll.find(query, skip=skip, limit=pagesize, sort=sortset)
 
     results['aaData'] = []

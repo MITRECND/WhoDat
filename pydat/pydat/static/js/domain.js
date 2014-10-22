@@ -38,7 +38,7 @@ $(document).ready(function() {
                     "sDom" : '<"H"lfirp>t<"F"lfip>',
                     "aoColumnDefs":[
 						  {"sClass": "dtExpand", 'bSortable': false, 'aTargets': [0]},
-						  {'bSortable': false, 'aTargets': [6]},
+						  //{'bSortable': false, 'aTargets': [6]},
 						  {"sClass": "dnCell", 'aTargets': [1]},
                     ],
 /*
