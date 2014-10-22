@@ -60,12 +60,6 @@ def dataTable(request, key, value, low = None, high = None):
     if (len(sSearch) == 0):
         sSearch = None
 
-    #XXX For some reason registrant_telephone needs to be treated as an integer
-    #I'm assuming mongo consumed the value as an int since there's only numbers and
-    #no symbols (such as () or -)
-    if key == "registrant_telephone":
-        value = int(value)
-
     results = handler.dataTableSearch(key, value, page, pagesize, sort, sSearch, low, high)
     #Echo back the echo
     results['sEcho'] = sEcho
@@ -76,9 +70,6 @@ def domains_latest(request, key, value):
     return domains(request, key, value, low = handler.lastVersion())
 
 def domains(request, key, value, low = None, high = None):
-    #if not request.is_ajax():
-    #    return __renderErrorJSON__('Expected AJAX')
-
     if key is None or value is None:
         return __renderErrorJSON__('Missing Key and/or Value')
 
@@ -95,12 +86,6 @@ def domains(request, key, value, low = None, high = None):
     else:
         return __renderErrorJSON__('Unsupported Method')
 
-    #XXX For some reason registrant_telephone needs to be treated as an integer
-    #I'm assuming mongo consumed the value as an int since there's only numbers and
-    #no symbols (such as () or -)
-    if key == "registrant_telephone":
-        value = int(value)
-
     results = handler.search(key, value, filt = {'_id': False}, low = low, high = high)
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
@@ -110,11 +95,7 @@ def domains(request, key, value, low = None, high = None):
 def domain_latest(request, domainName):
     return domain(request, domainName, low = handler.lastVersion());
 
-
 def domain(request, domainName = None, low = None, high = None):
-    #if not request.is_ajax():
-    #    return __renderErrorJSON__('Expected AJAX')
-
     if request.method == "GET":
         if not domainName:
             return __renderErrorJSON__('Requires Domain Name Argument')

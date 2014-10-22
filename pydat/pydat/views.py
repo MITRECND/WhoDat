@@ -99,9 +99,6 @@ def domains(request, key=None, value=None):
         return render_to_response('domain.html', context)
 
     else:
-        if key == "registrant_telephone":
-            value = int(value)
-
         results = handler.search(key, value, filt=filt, limit=limit, low = low_version)
         if results['success'] == False:
             return __renderErrorPage__(request, results['message'])

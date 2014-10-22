@@ -153,7 +153,10 @@ def search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None):
         results['message'] = str(e)
         return results
 
-    search_document = {key: value}
+    if key != settings.SEARCH_KEYS[0][0]:
+        search_document = {'details.' + key: value}
+    else:
+        search_document = {key: value}
 
     if low != None:
         if low == high or high is None:
