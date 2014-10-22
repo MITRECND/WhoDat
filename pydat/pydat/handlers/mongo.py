@@ -145,7 +145,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     results['success'] = True
     return results
 
-def search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None):
+def search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None, versionSort = False):
     results = {'success': False}
     try:
         coll = mongo_connector(settings.COLL_WHOIS)
@@ -164,7 +164,10 @@ def search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None):
         elif high is not None:
             search_document['dataVersion'] = {'$gte': int(low), '$lte': int(high)}
 
-    domains = coll.find(search_document, filt, limit=limit)
+    sortset = None
+    if versionSort:
+        sortset = [('dataVersion', pymongo.ASCENDING)] 
+    domains = coll.find(search_document, filt, limit=limit, sort = sortset)
 
     results['total'] = domains.count()
     results['data'] = []

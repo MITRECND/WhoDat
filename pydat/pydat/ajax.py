@@ -86,7 +86,11 @@ def domains(request, key, value, low = None, high = None):
     else:
         return __renderErrorJSON__('Unsupported Method')
 
-    results = handler.search(key, value, filt = {'_id': False}, low = low, high = high)
+    versionSort = False
+    if key == 'domainName':
+        versionSort = True
+
+    results = handler.search(key, value, filt = {'_id': False}, low = low, high = high, versionSort = versionSort)
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
 
@@ -101,8 +105,7 @@ def domain(request, domainName = None, low = None, high = None):
             return __renderErrorJSON__('Requires Domain Name Argument')
         domainName = urllib.unquote(domainName)
 
-        results = handler.search('domainName', domainName, filt={'_id': False}, low = low, high = high)
-
+        results = handler.search('domainName', domainName, filt={'_id': False}, low = low, high = high, versionSort = True)
 
         return HttpResponse(json.dumps(results), content_type='application/json')
         if results['success']: #Clean up the data
