@@ -208,11 +208,17 @@ def process_entry(insert_queue, collection, header, input_entry, options):
             update_stats('duplicates')
             return
 
-        if len(options.exclude):
+        if options.exclude is not None:
             details_copy = details.copy()
             for exclude in options.exclude:
                 del details_copy[exclude]
-
+        elif options.include is not None:
+            details_copy = {}
+            for include in options.include:
+                try: #TODO
+                    details_copy[include] = details[include]
+                except:
+                    pass
 
             changed = set(details_copy.items()) - set(current_entry['details'].items()) 
             diff = len(set(details_copy.items()) - set(current_entry['details'].items())) > 0
@@ -343,6 +349,8 @@ def main():
         default=False, help="Print out Stats after running")
     optparser.add_option("-x", "--exclude", action="store", dest="exclude",
         default="", help="Comma separated list of keys to exclude if updating entry")
+    optparser.add_option("-n", "--include", action="store", dest="include",
+        default="", help="Comma separated list of keys to include if updating entry (mutually exclusive to -x)")
     optparser.add_option("-o", "--comment", action="store", dest="comment",
         default="", help="Comment to store with metadata")
     optparser.add_option("-r", "--redo", action="store_true", dest="redo",
@@ -368,6 +376,9 @@ def main():
         sys.exit(1)
     elif options.identifier is not None and options.redo is True:
         print "Redo requested and Identifier Specified. Please choose one or the other"
+        sys.exit(1)
+    elif options.exclude != "" and options.include != "":
+        print "Options include and exclude are mutually exclusive, choose only one"
         sys.exit(1)
 
     metadata = meta.find_one({'metadata':0})
@@ -407,7 +418,12 @@ def main():
         if options.exclude != "":
             options.exclude = options.exclude.split(',')
         else:
-            options.exclude = []
+            options.exclude = None
+
+        if options.include != "":
+            options.include = options.include.split(',')
+        else:
+            options.include = None
 
         #Start worker threads
         if options.verbose:
@@ -427,22 +443,39 @@ def main():
         #Upate the lastVersion in the metadata
         meta.update({'_id': meta_id}, {'$set' : {'lastVersion': options.identifier}})
         #Create the entry for this import
-        meta.insert({ 
+        meta_struct = {  
                         'metadata': options.identifier,
                         'comment' : options.comment,
-                        'excluded_keys': options.exclude,
                         'total' : 0,
                         'new' : 0,
                         'updated' : 0,
                         'unchanged' : 0,
                         'duplicates': 0,
                         'changed_stats': {} 
-                })
+                       }
+
+        if options.exclude != None:
+            meta_struct['excluded_keys'] = options.exclude
+        elif options.include != None:
+            meta_struct['included_keys'] = options.include
+            
+        meta.insert(meta_struct)
+
     else: #redo is True
         #Get the record for the attempted import
         options.identifier = int(metadata['lastVersion'])
         redo_record = meta.find_one({'metadata': options.identifier})
-        options.exclude = redo_record['excluded_keys']
+
+        if 'excluded_keys' in redo_record:
+            options.exclude = redo_record['excluded_keys']
+        else:
+            options.exclude = None
+
+        if 'included_keys' in redo_record:
+            options.include = redo_record['included_keys']
+        else:
+            options.include = None
+
         options.comment = redo_record['comment']
         STATS['total'] = int(redo_record['total'])
         STATS['new'] = int(redo_record['new'],)
