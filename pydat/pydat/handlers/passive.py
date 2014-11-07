@@ -37,7 +37,11 @@ def request_pdns(domain, absolute, rrtypes, limit, pretty = False):
             if not line:
                 continue
             # Convert epoch timestamps to human readable.
-            tmp = json.loads(line)
+            try:
+              tmp = json.loads(line)
+            except Exception as e:
+              results['error'] = str(e)
+              return results
             for key in ['time_first', 'time_last']:
                 if key in tmp:
                     tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(tmp[key]))
