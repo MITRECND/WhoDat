@@ -81,7 +81,7 @@ def domains(request, key=None, value=None):
         low_version = None
         high_version = None
     
-
+    filt = None
     if fmt == 'list': #Only filter if a list was requested
         filt = filt_key
 
