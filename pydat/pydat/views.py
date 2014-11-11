@@ -78,15 +78,12 @@ def domains(request, key=None, value=None):
         low_version = handler.lastVersion()
         high_version = low_version
     else:
-        low_version = 'null' 
-        high_version = 'null'
+        low_version = None
+        high_version = None
     
 
     if fmt == 'list': #Only filter if a list was requested
-        filt = {filt_key: 1, '_id': False}
-    else:
-        filt = {'_id': False}
-
+        filt = filt_key
 
     #All web searches are AJAXy
     if fmt == "normal":

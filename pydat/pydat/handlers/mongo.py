@@ -147,7 +147,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     results['success'] = True
     return results
 
-def search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None, versionSort = False):
+def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None, versionSort = False):
     results = {'success': False}
     try:
         coll = mongo_connector(settings.COLL_WHOIS)
@@ -160,6 +160,15 @@ def search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None, v
     else:
         search_document = {key: value}
 
+    # Always filter out _id.
+    filt_document = {'_id': False}
+
+    # If filter key requested, use it.
+    if filt == 'domainName':
+        filt_document[filt] = 1
+    elif filt != None:
+        filt_document['details.' + filt] = 1
+
     if low != None:
         if low == high or high is None:
             search_document['dataVersion'] = int(low)
@@ -169,17 +178,18 @@ def search(key, value, filt={}, limit=settings.LIMIT, low = None, high = None, v
     sortset = None
     if versionSort:
         sortset = [('dataVersion', pymongo.ASCENDING)] 
-    domains = coll.find(search_document, filt, limit=limit, sort = sortset)
+    domains = coll.find(search_document, filt_document, limit=limit, sort = sortset)
 
     results['total'] = domains.count()
     results['data'] = []
     for domain in domains:
-        dom = domain['details']
-        dom['domainName'] = domain['domainName']
-        dom['Version'] = domain['dataVersion']
-        results['data'].append(dom)
+        # Take each key in details (if any) and stuff it in top level dict.
+        if 'details' in domain:
+            for k, v in domain['details'].iteritems():
+                domain[k] = v
+            del domain['details']
+        results['data'].append(domain)
 
-    #results['data'] = [domain for domain in domains]
     results['avail'] = len(results['data'])
     results['success'] = True
     return results
