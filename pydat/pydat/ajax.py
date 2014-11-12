@@ -90,7 +90,7 @@ def domains(request, key, value, low = None, high = None):
     if key == 'domainName':
         versionSort = True
 
-    results = handler.search(key, value, filt = {'_id': False}, low = low, high = high, versionSort = versionSort)
+    results = handler.search(key, value, filt = None, low = low, high = high, versionSort = versionSort)
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
 
@@ -105,7 +105,7 @@ def domain(request, domainName = None, low = None, high = None):
             return __renderErrorJSON__('Requires Domain Name Argument')
         domainName = urllib.unquote(domainName)
 
-        results = handler.search('domainName', domainName, filt={'_id': False}, low = low, high = high, versionSort = True)
+        results = handler.search('domainName', domainName, filt=None, low = low, high = high, versionSort = True)
 
         return HttpResponse(json.dumps(results), content_type='application/json')
         if results['success']: #Clean up the data
@@ -124,8 +124,8 @@ def domain_diff(request, domainName = None, v1 = None, v2 = None):
             return __renderErrorJSON__('Required Parameters Missing')
         domainName = urllib.unquote(domainName)
 
-        v1_res = handler.search('domainName', domainName, filt={'_id':False}, low = int(v1))
-        v2_res = handler.search('domainName', domainName, filt={'_id':False}, low = int(v2))
+        v1_res = handler.search('domainName', domainName, filt=None, low = int(v1))
+        v2_res = handler.search('domainName', domainName, filt=None, low = int(v2))
 
         try:
             v1_res = v1_res['data'][0]

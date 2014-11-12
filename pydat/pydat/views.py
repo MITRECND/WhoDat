@@ -78,22 +78,25 @@ def domains(request, key=None, value=None):
         low_version = handler.lastVersion()
         high_version = low_version
     else:
-        low_version = 'null' 
-        high_version = 'null'
+        low_version = None
+        high_version = None
     
-
+    filt = None
     if fmt == 'list': #Only filter if a list was requested
-        filt = {filt_key: 1, '_id': False}
-    else:
-        filt = {'_id': False}
-
+        filt = filt_key
 
     #All web searches are AJAXy
     if fmt == "normal":
+        low_version_js = low_version
+        high_version_js = high_version
+        if low_version == None:
+            low_version_js = 'null'
+        if high_version == None:
+            high_version_js = 'null'
         context = __createRequestContext__(request, data = { 'key': urllib.quote(key),
                                                              'value': urllib.quote(value),
-                                                             'low_version': low_version,
-                                                             'high_version': high_version,
+                                                             'low_version': low_version_js,
+                                                             'high_version': high_version_js,
                                                              'domain_form': search_f,
                })
         return render_to_response('domain.html', context)
