@@ -79,9 +79,9 @@ Options:
 
 
 Note that when adding a new version of data to the database, you should use either the -x flag to exclude certain
-fields that are not important to track changes or the -n flag to include specific fields that are subject to scrutiny. 
+fields that are not important to track changes or the -n flag to include specific fields that are subject to scrutiny.
 This will significantly decrease the amount of data that is stored between versions. You can only use either -x or -n not both
-at the same time, but you can choose whichever is best for your given environment. As an example, if you get daily updates, you 
+at the same time, but you can choose whichever is best for your given environment. As an example, if you get daily updates, you
 might decide that for daily updates you only care if contactEmail changes but every quarter you might want to instead only exclude
 certain fields you don't find important.
 
