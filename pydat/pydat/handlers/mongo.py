@@ -188,6 +188,8 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
             for k, v in domain['details'].iteritems():
                 domain[k] = v
             del domain['details']
+        domain['Version'] = domain['dataVersion']
+        del domain['dataVersion']
         results['data'].append(domain)
 
     results['avail'] = len(results['data'])
