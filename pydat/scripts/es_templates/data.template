@@ -1,0 +1,185 @@
+{
+    "template": "whois-*",
+    "settings" : {
+        "number_of_shards" : 5,
+        "analysis": {
+            "analyzer": {
+                "default": {
+                    "type": "custom",
+                    "tokenizer": "keyword",
+                    "filter": "lowercase"
+                },
+                "url_email_analyzer":{
+                    "type": "custom",
+                    "tokenizer": "uax_url_email",
+                    "filter": "lowercase"
+                },
+                "reversed":{
+                    "type": "custom",
+                    "tokenizer": "keyword",
+                    "filter": ["lowercase", "reverse"]
+                },
+                "hierarchy":{
+                    "type": "custom",
+                    "tokenizer": "hierarchy"
+                }  
+            },
+            "tokenizer": {
+                "hierarchy":{
+                    "type": "PathHierarchy",
+                    "delimiter" : ".",
+                    "reverse": "true"
+                }
+            }
+        }
+    },
+    "mappings" : {
+      "_default_" : {
+        "properties" : {
+          "dataFirstSeen" : {
+            "type" : "long"
+          },
+          "dataVersion" : {
+            "type" : "long"
+          },
+          "domainName" : {
+            "type" : "string",
+            "fields": {
+                "parts": {
+                            "type": "string",
+                            "analyzer": "standard"
+                },
+                "reverse": {
+                            "type": "string",
+                            "analyzer": "reversed"
+                }
+            }
+          },
+          "dataUniqueID" : {
+            "type" : "string"
+          },
+          "details" : {
+            "properties" : {
+              "Audit_auditUpdatedDate" : {
+                "type" : "string"
+              },
+              "administrativeContact_city" : {
+                "type" : "string"
+              },
+              "administrativeContact_country" : {
+                "type" : "string"
+              },
+              "administrativeContact_email" : {
+                "type" : "string"
+              },
+              "administrativeContact_fax" : {
+                "type" : "string"
+              },
+              "administrativeContact_faxExt" : {
+                "type" : "string"
+              },
+              "administrativeContact_name" : {
+                "type" : "string"
+              },
+              "administrativeContact_organization" : {
+                "type" : "string"
+              },
+              "administrativeContact_postalCode" : {
+                "type" : "string"
+              },
+              "administrativeContact_state" : {
+                "type" : "string"
+              },
+              "administrativeContact_street1" : {
+                "type" : "string"
+              },
+              "administrativeContact_street2" : {
+                "type" : "string"
+              },
+              "administrativeContact_street3" : {
+                "type" : "string"
+              },
+              "administrativeContact_telephone" : {
+                "type" : "string"
+              },
+              "administrativeContact_telephoneExt" : {
+                "type" : "string"
+              },
+              "contactEmail" : {
+                "type" : "string"
+              },
+              "createdDate" : {
+                "type" : "string"
+              },
+              "expiresDate" : {
+                "type" : "string"
+              },
+              "nameServers" : {
+                "type" : "string"
+              },
+              "registrant_city" : {
+                "type" : "string"
+              },
+              "registrant_country" : {
+                "type" : "string"
+              },
+              "registrant_email" : {
+                "type" : "string"
+              },
+              "registrant_fax" : {
+                "type" : "string"
+              },
+              "registrant_faxExt" : {
+                "type" : "string"
+              },
+              "registrant_name" : {
+                "type" : "string"
+              },
+              "registrant_organization" : {
+                "type" : "string"
+              },
+              "registrant_postalCode" : {
+                "type" : "string"
+              },
+              "registrant_state" : {
+                "type" : "string"
+              },
+              "registrant_street1" : {
+                "type" : "string"
+              },
+              "registrant_street2" : {
+                "type" : "string"
+              },
+              "registrant_street3" : {
+                "type" : "string"
+              },
+              "registrant_telephone" : {
+                "type" : "string"
+              },
+              "registrant_telephoneExt" : {
+                "type" : "string"
+              },
+              "registrarName" : {
+                "type" : "string"
+              },
+              "standardRegCreatedDate" : {
+                "type" : "string"
+              },
+              "standardRegExpiresDate" : {
+                "type" : "string"
+              },
+              "standardRegUpdatedDate" : {
+                "type" : "string"
+              },
+              "status" : {
+                "type" : "string"
+              },
+              "updatedDate" : {
+                "type" : "string"
+              }
+            }
+          }
+        }
+      }
+    }
+}
