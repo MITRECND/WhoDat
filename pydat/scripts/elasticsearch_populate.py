@@ -195,7 +195,10 @@ def process_entry(insert_queue, es, header, input_entry, options):
                 sys.stdout.write("Processing domain: %s\n" % item)
             domainName = item
             continue
-        details[header[i]] = htmlparser.unescape(item)
+        if item == "":
+            details[header[i]] = None
+        else:
+            details[header[i]] = htmlparser.unescape(item)
 
     entry = {
                 VERSION_KEY: options.identifier,
