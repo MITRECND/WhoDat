@@ -25,6 +25,10 @@ if HANDLER == 'mongo':
     MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
     COLL_WHOIS = 'whois'
 
+if HANDLER == 'es':
+    ES_URI = 'localhost:9200'
+    ES_INDEX_PREFIX = 'whois'
+
 PROXIES = {}
 
 DNSDB_HEADERS = {}

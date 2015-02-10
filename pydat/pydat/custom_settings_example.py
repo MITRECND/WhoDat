@@ -25,6 +25,10 @@ if HANDLER == 'mongo':
     MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
     COLL_WHOIS = 'whois'
 
+if HANDLER == 'es':
+    ES_URI = 'localhost:9200'
+    ES_INDEX_PREFIX = 'whois'
+
 # If you need to use a proxy set it here.
 #PROXIES = {
 #  "http": "http://127.0.0.1",
@@ -47,7 +51,7 @@ if HANDLER == 'mongo':
 #Maximum Value for requests
 #DNSDB_LIMIT = 1000
 
-# Limit all mongo queries to this many documents.
+# Limit all db queries to this many documents.
 LIMIT = 50000
 
 ADMINS = (
