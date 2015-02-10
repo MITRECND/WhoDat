@@ -7,12 +7,27 @@
                 "default": {
                     "type": "custom",
                     "tokenizer": "keyword",
-                    "filter": "lowercase"
+                    "filter": ["asciifolding", "lowercase"]
                 },
-                "url_email_analyzer":{
+                "standard_folding":{
+                    "type": "custom",
+                    "tokenizer": "standard",
+                    "filter": ["standard", "asciifolding", "lowercase", "stop"]
+                },
+                "email_analyzer":{
                     "type": "custom",
                     "tokenizer": "uax_url_email",
-                    "filter": "lowercase"
+                    "filter": ["email", "lowercase", "unique", "lowercase"]
+                },
+                "email_domain_analyzer":{
+                    "type": "custom",
+                    "tokenizer": "uax_url_email",
+                    "filter": ["email_domain", "email", "unique", "lowercase"]
+                },
+                "email_local_analyzer":{
+                    "type": "custom",
+                    "tokenizer": "uax_url_email",
+                    "filter": ["email_local", "email", "unique", "lowercase"]
                 },
                 "reversed":{
                     "type": "custom",
@@ -22,13 +37,58 @@
                 "hierarchy":{
                     "type": "custom",
                     "tokenizer": "hierarchy"
-                }  
+                },
+                "domain_analyzer": {
+                    "type": "custom",
+                    "tokenizer": "keyword",
+                    "filter": ["lowercase", "domain", "unique"]
+                },
+                "name_server_analyzer": {
+                    "type": "pattern",
+                    "pattern": "[|]",
+                    "filter": ["unique", "lowercase"]
+                }
             },
             "tokenizer": {
                 "hierarchy":{
                     "type": "PathHierarchy",
                     "delimiter" : ".",
                     "reverse": "true"
+                }
+            },
+            "filter": {
+                "domain" : {
+                   "type" : "pattern_capture",
+                   "preserve_original" : "true",
+                   "patterns" : [
+                      "(\\w+)",
+                      "(\\p{L}+)",
+                      "(\\d+)"
+                   ]
+                },
+                "email" : {
+                   "type" : "pattern_capture",
+                   "preserve_original" : "true",
+                   "patterns" : [
+                      "(\\w+)",
+                      "(\\p{L}+)",
+                      "(\\d+)",
+                      "@(.+)"
+                   ]
+                },
+                "email_local" : {
+                   "type" : "pattern_capture",
+                   "preserve_original" : "false",
+                   "patterns" : [
+                      "(.+)@"
+                   ]
+                },
+                "email_domain" : {
+                   "type" : "pattern_capture",
+                   "preserve_original" : "false",
+                   "patterns" : [
+                      "@(.+)"
+                   ]
                 }
             }
         }
@@ -44,33 +104,77 @@
           },
           "domainName" : {
             "type" : "string",
+            "include_in_all": "false",
             "fields": {
                 "parts": {
                             "type": "string",
-                            "analyzer": "standard"
+                            "analyzer": "domain_analyzer",
+                            "include_in_all": "true"
                 },
                 "reverse": {
                             "type": "string",
-                            "analyzer": "reversed"
+                            "analyzer": "reversed",
+                            "include_in_all": "false"
                 }
             }
           },
           "dataUniqueID" : {
-            "type" : "string"
+            "type" : "string",
+            "index": "not_analyzed",
+            "include_in_all": "false"
           },
           "details" : {
             "properties" : {
               "Audit_auditUpdatedDate" : {
-                "type" : "string"
+                "include_in_all": "false",
+                "type": "date",
+                "format": "yyyy-MM-dd HH:mm:ss zzz",
+                "fields": {
+                    "raw": {
+                        "include_in_all": "false",
+                        "type": "string",
+                        "analyzer": "default"
+                    }
+                }
               },
               "administrativeContact_city" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_country" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_email" : {
-                "type" : "string"
+                "type" : "string",
+                "fields": {
+                    "local": { 
+                                "type": "string",
+                                "analyzer": "email_local_analyzer"
+                    },
+                    "domain": { 
+                                "type": "string",
+                                "analyzer": "email_domain_analyzer"
+                    },
+                    "parts": {
+                                "type": "string",
+                                "analyzer": "email_analyzer"
+                    }
+                }
               },
               "administrativeContact_fax" : {
                 "type" : "string"
@@ -79,25 +183,81 @@
                 "type" : "string"
               },
               "administrativeContact_name" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_organization" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_postalCode" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_state" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_street1" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_street2" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_street3" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "administrativeContact_telephone" : {
                 "type" : "string"
@@ -106,7 +266,21 @@
                 "type" : "string"
               },
               "contactEmail" : {
-                "type" : "string"
+                "type" : "string",
+                "fields": {
+                    "local": { 
+                                "type": "string",
+                                "analyzer": "email_local_analyzer"
+                    },
+                    "domain": { 
+                                "type": "string",
+                                "analyzer": "email_domain_analyzer"
+                    },
+                    "parts": {
+                                "type": "string",
+                                "analyzer": "email_analyzer"
+                    }
+                }
               },
               "createdDate" : {
                 "type" : "string"
@@ -115,16 +289,52 @@
                 "type" : "string"
               },
               "nameServers" : {
-                "type" : "string"
+                "type" : "string",
+                "fields": {
+                    "servers": {
+                        "type": "string",
+                        "analyzer": "name_server_analyzer"
+                    }
+                }
               },
               "registrant_city" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "registrant_country" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "registrant_email" : {
-                "type" : "string"
+                "type" : "string",
+                "fields": {
+                    "local": { 
+                                "type": "string",
+                                "analyzer": "email_local_analyzer"
+                    },
+                    "domain": { 
+                                "type": "string",
+                                "analyzer": "email_domain_analyzer"
+                    },
+                    "parts": {
+                                "type": "string",
+                                "analyzer": "email_analyzer"
+                    }
+                }
               },
               "registrant_fax" : {
                 "type" : "string"
@@ -163,13 +373,40 @@
                 "type" : "string"
               },
               "standardRegCreatedDate" : {
-                "type" : "string"
+                "include_in_all": "false",
+                "type": "date",
+                "format": "yyyy-MM-dd HH:mm:ss zzz",
+                "fields": {
+                    "raw": {
+                        "include_in_all": "false",
+                        "type": "string",
+                        "analyzer": "default"
+                    }
+                }
               },
               "standardRegExpiresDate" : {
-                "type" : "string"
+                "include_in_all": "false",
+                "type": "date",
+                "format": "yyyy-MM-dd HH:mm:ss zzz",
+                "fields": {
+                    "raw": {
+                        "include_in_all": "false",
+                        "type": "string",
+                        "analyzer": "default"
+                    }
+                }
               },
               "standardRegUpdatedDate" : {
-                "type" : "string"
+                "include_in_all": "false",
+                "type": "date",
+                "format": "yyyy-MM-dd HH:mm:ss zzz",
+                "fields": {
+                    "raw": {
+                        "include_in_all": "false",
+                        "type": "string",
+                        "analyzer": "default"
+                    }
+                }
               },
               "status" : {
                 "type" : "string"

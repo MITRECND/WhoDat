@@ -15,6 +15,7 @@ from multiprocessing import Process, Queue as mpQueue
 from pprint import pprint
 from elasticsearch import Elasticsearch
 import json
+import HTMLParser
 
 STATS = {'total': 0,
          'new': 0,
@@ -183,6 +184,8 @@ def process_entry(insert_queue, es, header, input_entry, options):
     if len(input_entry) == 0:
         return
 
+    htmlparser = HTMLParser.HTMLParser()
+
     current_entry = None
     details = {}
     domainName = ''
@@ -192,7 +195,7 @@ def process_entry(insert_queue, es, header, input_entry, options):
                 sys.stdout.write("Processing domain: %s\n" % item)
             domainName = item
             continue
-        details[header[i]] = item
+        details[header[i]] = htmlparser.unescape(item)
 
     entry = {
                 VERSION_KEY: options.identifier,
