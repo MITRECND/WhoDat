@@ -1,6 +1,4 @@
-import json
 from elasticsearch import Elasticsearch
-import re
 
 from django.conf import settings
 
@@ -109,7 +107,9 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
     if key != settings.SEARCH_KEYS[0][0]:
         key = 'details.' + key
-    #All data in ES is lowercased
+    #All data in ES is lowercased (during ingestion/analysis) and we're using a term filter to take
+    #advantage of filter caching, we could probably use a match query instead, but these seems more
+    #efficient
     value = value.lower()
 
     query_filter = {"term": {key: value}}
@@ -218,7 +218,6 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
 
     if key != settings.SEARCH_KEYS[0][0]:
         key = 'details.' + key
-    #All data in ES is lowercased
     value = value.lower()
 
 

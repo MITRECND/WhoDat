@@ -352,16 +352,48 @@
                 "type" : "string"
               },
               "registrant_state" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "registrant_street1" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "registrant_street2" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "registrant_street3" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "registrant_telephone" : {
                 "type" : "string"
@@ -370,7 +402,15 @@
                 "type" : "string"
               },
               "registrarName" : {
-                "type" : "string"
+                "type" : "string",
+                "include_in_all": "false",
+                "fields": {
+                    "standard": {
+                        "type": "string",
+                        "analyzer": "standard_folding",
+                        "include_in_all": "true"
+                    }
+                }
               },
               "standardRegCreatedDate" : {
                 "include_in_all": "false",
