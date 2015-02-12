@@ -16,18 +16,13 @@ SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
 HANDLER = 'mongo'
 
-if HANDLER == 'mongo':
-    from pymongo import ReadPreference
+MONGO_HOST = 'localhost'
+MONGO_PORT = 27017
+MONGO_DATABASE = 'whois'
+COLL_WHOIS = 'whois'
 
-    MONGO_HOST = 'localhost'
-    MONGO_PORT = 27017
-    MONGO_DATABASE = 'whois'
-    MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
-    COLL_WHOIS = 'whois'
-
-if HANDLER == 'es':
-    ES_URI = 'localhost:9200'
-    ES_INDEX_PREFIX = 'whois'
+ES_URI = 'localhost:9200'
+ES_INDEX_PREFIX = 'whois'
 
 PROXIES = {}
 
@@ -230,3 +225,11 @@ LOGGING = {
 csfile = os.path.join(SITE_ROOT, 'custom_settings.py')
 if os.path.exists(csfile):
     execfile(csfile)
+
+#Set the mongo read preference if it isn't already
+if HANDLER == 'mongo':
+    try:
+        MONGO_READ_PREFERENCE
+    except NameError:
+            from pymongo import ReadPreference
+            MONGO_READ_PREFERENCE = ReadPreference.PRIMARY

@@ -14,20 +14,26 @@ DEBUG = False
 # to access the application
 ALLOWED_HOSTS = ['*']
 
-#HANDLER = 'mongo'
+#Default handler is mongo
+#Uncomment below line to switch handler to ElasticSearch
+#HANDLER = 'es'
 
-if HANDLER == 'mongo':
-    from pymongo import ReadPreference
+#To override the mongo read preference
+#Uncomment the following two lines
+#from pymongo import ReadPreference
+#MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
 
-    MONGO_HOST = 'localhost'
-    MONGO_PORT = 27017
-    MONGO_DATABASE = 'whois'
-    MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
-    COLL_WHOIS = 'whois'
+#Default settings for mongo
+#Uncomment to change
+#MONGO_HOST = 'localhost'
+#MONGO_PORT = 27017
+#MONGO_DATABASE = 'whois'
+#COLL_WHOIS = 'whois'
 
-if HANDLER == 'es':
-    ES_URI = 'localhost:9200'
-    ES_INDEX_PREFIX = 'whois'
+#Default settings for elasticsearch
+#Uncomment to change
+#ES_URI = 'localhost:9200'
+#ES_INDEX_PREFIX = 'whois'
 
 # If you need to use a proxy set it here.
 #PROXIES = {
@@ -52,7 +58,7 @@ if HANDLER == 'es':
 #DNSDB_LIMIT = 1000
 
 # Limit all db queries to this many documents.
-LIMIT = 50000
+#LIMIT = 50000
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
