@@ -87,7 +87,6 @@ def advDataTable(request):
     sSearch = None
 
     results = handler.advDataTableSearch(query, page, pagesize)
-    print results
     #Echo back the echo
     results['sEcho'] = sEcho
     

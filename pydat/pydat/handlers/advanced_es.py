@@ -337,13 +337,15 @@ def p_specific(t):
         word -- a general match query will be used on .parts
              -- FUZZY honored
         quoted -> FUZZY is none
-                    -- a terms query will be used on the entire string (boost 2.0)
+                    -- a terms query will be used on the entire string (boost 1.5)
                     -- a terms query will be used on the string split on whitespace against .parts (no boost)
                -> FUZZY is not none
                     -- a match phrase query will be used on the entire string against .parts
-        wildcard -- a wildcard query will be used on .parts
+        wildcard -- a wildcard query will be used on the entire string (boost 1.5)
+                 -- a wildcard query will be used on .parts
                  -- FUZZY ignored
-        regex -- a regex query will be used on .parts
+        regex -- a regex query will be used ont he entire string (boost 1.5)
+              -- a regex query will be used on .parts
               -- FUZZY ignored
     """
     
@@ -365,10 +367,13 @@ def p_specific(t):
 
     if key in special_keywords:
         fields1 = special_keywords[key]
-        if (value.type == 'quoted' and 
-            fuzzy is None and 
-            ' ' in str(value)):
-            fields2 = fields1
+        if ((value.type == 'quoted' and 
+            fuzzy is None) or value.type == 'regex' or
+            value.type == 'wildcard'): 
+            for f in fields1:
+                if f not in no_parts:
+                    f += ".parts"
+                    fields2.append(f)
     else:
         if key in shortcut_keywords:
             fields1 = shortcut_keywords[key]
@@ -377,28 +382,29 @@ def p_specific(t):
                 key = 'details.' + key
             fields1 = [key]
 
-        if (value.type == 'word' or 
-            value.type == 'wildcard' or 
-            value.type == 'regex'):
+        if (value.type == 'word'):
             nf = []
             for f in fields1:
                 if f not in no_parts:
                     f += ".parts" 
                 nf.append(f)
             fields1 = nf
-        elif value.type == 'quoted':
-            if fuzzy is None:
-                for f in fields1:
-                    if f not in no_parts:
-                        f += ".parts"
+        elif (value.type == 'quoted' and 
+                fuzzy is not None):
+            nf = []
+            for f in fields1:
+                if f not in no_parts:
+                    f += ".parts"
+                nf.append(f)
+            fields1 = nf
+        elif ((value.type == 'quoted' and 
+                fuzzy is None) or
+                value.type == 'wildcard' or
+                value.type == 'regex'):
+            for f in fields1:
+                if f not in no_parts:
+                    f += ".parts"
                     fields2.append(f)
-            else:
-                nf = []
-                for f in fields1:
-                    if f not in no_parts:
-                        f += ".parts"
-                    nf.append(f)
-                fields1 = nf
 
     print fields1, fields2
 
@@ -415,72 +421,53 @@ def p_specific(t):
     elif value.type == 'wildcard':
         shds = []
         for f in fields1:
+            shd = {'wildcard': {f: {"value": str(value), "boost": 1.5}}}
+            shds.append(shd)
+        for f in fields2:
             shd = {'wildcard': {f: str(value)}}
             shds.append(shd)
-        q['bool'] = {'should': shds}
+        if len(shds) == 1:
+            q['query'] =  shds[0]
+        else:
+            q['bool'] = {'should': shds}
 
     elif value.type == 'regex':
         shds = []
         for f in fields1:
-            shd = {'regexp': {f: str(value)}}
+            shd = {'regexp': {f: {"value": str(value), "boost": 1.5}}}
             shds.append(shd)
-        q['bool'] = {'should': shds}
+        for f in fields2:
+            shd = {'regexp': {f: {"value": str(value)}}}
+            shds.append(shd)
+        if len(shds) == 1:
+            q['query'] = shds[0]
+        else:
+            q['bool'] = {'should': shds}
     elif value.type == 'quoted':
         if fuzzy is None:
             shds = []
             for f in fields1:
-                shd = {'term': { f: {"value": str(value), "boost" : 2.0}}}
+                shd = {'term': { f: {"value": str(value), "boost" : 1.5}}}
                 shds.append(shd)
             for f in fields2:
                 for p in str(value).split():
                     shd = {'term': {f: p}}
                     shds.append(shd)
-            q['bool'] = {'should': shds}
+            if len(shds) == 1:
+                q['query'] = shds[0]
+            else:
+                q['bool'] = {'should': shds}
         else:
             q['multi_match'] = {
                 "query": str(value),
                 "fields": fields1,
                 "fuzziness": fuzzy
             }
-    print json.dumps({"query": q})
-                    
-                    
-    
 
-    newfields = []
-
-    if key in special_keywords:
-        newfields = special_keywords[key]
-    else:
-        if key in shortcut_keywords:
-            fields = shortcut_keywords[key]
-        elif key in original_keywords:
-            if key != 'domainName':
-                key = 'details.' + key
-            fields = [key]
-        else:
-            raise KeyError("Unknown Keyword")
-
-        if value.type == 'word':
-            for f in fields:
-                if f not in no_parts:
-                    f += ".parts"
-                newfields.append(f)
-        else:
-            newfields = fields
-
-
-    t[0] = {
-            "query": {
-                "multi_match" : {
-                    "query" : str(t[3]),
-                    "fields" : newfields
-                  }
-                }
-            }
-
-    if fuzzy is not None:
-        t[0]["query"]["multi_match"]["fuzziness"] = fuzzy
+    if 'query' not in q:
+        t[0] = {'query': q}
+    else:  
+        t[0] = q
 
 def p_value(t):
     'value : string'

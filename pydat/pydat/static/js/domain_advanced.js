@@ -69,19 +69,19 @@ $(document).ready(function() {
                         $('td:eq(1)', nRow).html( '<a href="/pdns/' + encodeURIComponent(domainName) + '/">' 
                                                     + domainName + "</a>").attr('title', 'Click to Search Passive DNS').addClass(oldVersion);
                         var registrant = aData[2];
-                        $('td:eq(2)', nRow).html( '<a href=/domains/registrant_name/' 
-                                                    + encodeURIComponent(registrant) + '>' 
+                        $('td:eq(2)', nRow).html( '<a href=/advdomains/?query=registrant_name:"' 
+                                                    + encodeURIComponent(registrant.toLowerCase()) + '">' 
                                                     + registrant + '</a>').attr('title', 'Click to search by Registrant').addClass(oldVersion);
 
                         var reg_email = aData[3];
-                        $('td:eq(3)', nRow).html( '<a href=/domains/contactEmail/' + encodeURIComponent(reg_email) 
-                                                    + '>' + reg_email + '</a>').attr('title', 'Click to search by Email').addClass(oldVersion);
+                        $('td:eq(3)', nRow).html( '<a href=/advdomains/?query=email:"' + encodeURIComponent(reg_email.toLowerCase()) 
+                                                    + '">' + reg_email + '</a>').attr('title', 'Click to search by Email').addClass(oldVersion);
 
                         $('td:eq(4)', nRow).addClass(oldVersion);
 
                         var telephone = aData[5];
-                        $('td:eq(5)', nRow).html( '<a href=/domains/registrant_telephone/' 
-                                                    + encodeURIComponent(telephone) + '>'
+                        $('td:eq(5)', nRow).html( '<a href=/advdomains/?query=telephone:"' 
+                                                    + encodeURIComponent(telephone) + '">'
                                                     + telephone + '</a>').attr('title', 'Click to search by Telephone').addClass(oldVersion);
 
                         $('td:eq(6)', nRow).addClass(oldVersion);

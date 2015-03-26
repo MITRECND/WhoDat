@@ -45,7 +45,7 @@ class domain_form(forms.Form):
 
 
 class advdomain_form(forms.Form):
-    query = forms.CharField(label='Search')
+    query = forms.CharField(label='Search', widget=forms.TextInput(attrs={'size': '60'}))
 
 
 #Allows you to provide a drop down of numbers but support non listed number

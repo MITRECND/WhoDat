@@ -354,7 +354,12 @@ def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dat
     query['size'] = size
     query['from'] = skip
 
-    domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
+    try:
+        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
+    except Exception as e:
+        results['message'] = str(e)
+        return results
+
     results['total'] = domains['hits']['total']
     results['data'] = []
 
