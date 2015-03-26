@@ -4,6 +4,7 @@ urlpatterns = patterns('',
   url(r'^$', 'pydat.views.index', name='index'),
   url(r'^domains/(?P<key>.*)/(?P<value>.*)/$', 'pydat.views.domains'),
   url(r'^domains/$', 'pydat.views.domains', name='domains'),
+  url(r'^advdomains/$', 'pydat.views.advdomains', name='advdomains'),
   url(r'^pdns/(?P<domain>.*)/$', 'pydat.views.pdns', name='pdns_rest'),
   url(r'^pdns/$', 'pydat.views.pdns', name='pdns'),
   url(r'^pdnsr/(?P<key>.*)/(?P<value>.*)/$', 'pydat.views.pdns_r', name='pdns_r_rest'),
@@ -21,6 +22,8 @@ urlpatterns = patterns('',
   url(r'^ajax/domain/(?P<domainName>.*)/$', 'pydat.ajax.domain'),
   url(r'^ajax/domain/$', 'pydat.ajax.domain', name='ajax_domain'),
 
+  url(r'^ajax/query/$', 'pydat.ajax.advanced_search', name='ajax_advanced'),
+
   url(r'^ajax/domains/(?P<key>.*)/(?P<value>.*)/(?P<low>.*)/(?P<high>.*)/$', 'pydat.ajax.domains' ),
   url(r'^ajax/domains/(?P<key>.*)/(?P<value>.*)/latest/$', 'pydat.ajax.domains_latest' ),
   url(r'^ajax/domains/(?P<key>.*)/(?P<value>.*)/(?P<low>.*)/$', 'pydat.ajax.domains' ),
@@ -29,6 +32,9 @@ urlpatterns = patterns('',
 
   url(r'^ajax/dataTable/(?P<key>.*)/(?P<value>.*)/(?P<low>.*)/(?P<high>.*)/$', 'pydat.ajax.dataTable' ),
   url(r'^ajax/dataTable/$', 'pydat.ajax.dataTable', name='ajax_dataTable'),
+
+
+  url(r'^ajax/advDataTable/$', 'pydat.ajax.advDataTable', name='ajax_advDataTable'),
 
   url(r'^ajax/resolve/(?P<domainName>.*)/$', 'pydat.ajax.resolve'),
   url(r'^ajax/resolve/$', 'pydat.ajax.resolve', name='ajax_resolve'),

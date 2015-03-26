@@ -7,7 +7,7 @@ from django.shortcuts import render_to_response, HttpResponse
 from django.http import QueryDict
 import urllib
 
-from pydat.forms import domain_form, pdns_form, pdns_r_form, validate_ip, validate_hex
+from pydat.forms import domain_form, advdomain_form, pdns_form, pdns_r_form, validate_ip, validate_hex
 from pydat.handlers import handler
 from pydat.handlers import passive
 
@@ -24,8 +24,10 @@ def __createRequestContext__(request, data = None):
     search_f = domain_form()
     pdns_f = pdns_form()
     pdns_r_f = pdns_r_form()
-   
+    advdomain_f = advdomain_form()
+
     ctx_var = { 'domain_form' : search_f,
+                'advdomain_form': advdomain_f,
                 'pdns_form': pdns_f,
                 'pdns_r_form': pdns_r_f,
                 'latest_version': handler.lastVersion()
@@ -35,9 +37,11 @@ def __createRequestContext__(request, data = None):
         ctx_var.update(data)
         if 'active' not in data:
             if 'pdns_form' in data:
-                ctx_var['active'] = 1
-            elif 'pdns_r_form' in data:
                 ctx_var['active'] = 2
+            elif 'pdns_r_form' in data:
+                ctx_var['active'] = 3
+            elif 'advdomain_form' in data:
+                ctx_var['active'] = 1
             else:
                 ctx_var['active'] = 0
 
@@ -46,6 +50,26 @@ def __createRequestContext__(request, data = None):
 def index(request):
     context = __createRequestContext__(request)
     return render_to_response('index.html', context)
+
+def advdomains(request):
+    if request.method == "POST":
+        search_f = advdomain_form(request.POST)
+    elif request.method == "GET":
+        search_f = advdomain_form(QueryDict(''))
+        search_f.data['query'] = request.GET.get('query', None)
+    else:
+        return __renderErrorPage__(request, 'Bad Method')
+
+    if not search_f.is_valid():
+        return __renderErrorPage__(request, '', {'advdomain_form': search_f})
+
+    search_string = urllib.quote(urllib.unquote(search_f.cleaned_data['query']))
+    
+    context = __createRequestContext__(request, data = { 'search_string': search_string or '',
+                                                         'advdomain_form': search_f,
+           })
+
+    return render_to_response('advdomain.html', context)
 
 def domains(request, key=None, value=None):
     if request.method == "POST":

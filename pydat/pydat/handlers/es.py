@@ -1,6 +1,6 @@
 from elasticsearch import Elasticsearch
-
 from django.conf import settings
+from handlers.advanced_es import yacc
 
 class ElasticsearchError(Exception):
     pass
@@ -207,6 +207,52 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     results['success'] = True
     return results
 
+
+def advDataTableSearch(query, skip, pagesize):
+    results = {'success': False}
+    #domains = advanced_search(query, skip, pagesize)
+
+    try:
+        es = es_connector()
+        index = '%s-*' % settings.ES_INDEX_PREFIX
+    except ElasticsearchError as e:
+        results['message'] = str(e)
+        return results
+
+    try:
+        q = yacc.parse(query)
+        print query
+        print q
+    except Exception as e:
+        results['message'] = str(e)
+        return results
+
+    q['size'] = pagesize
+    q['from'] = skip
+
+    domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q)
+
+    results['iTotalDisplayRecords'] = domains['hits']['total']
+    results['aaData'] = []
+    results['iTotalRecords'] = record_count()
+
+
+    if domains['hits']['total'] > 0:
+        for domain in domains['hits']['hits']:
+            pdomain = domain['_source']
+            details = pdomain['details']
+            # Take each key in details (if any) and stuff it in top level dict.
+            dom_arr = ["&nbsp;", pdomain['domainName'], 
+                        details['registrant_name'], details['contactEmail'], 
+                        details['standardRegCreatedDate'], details['registrant_telephone'], 
+                        pdomain['dataVersion'], "%.2f" % round(domain['_score'], 2)]
+            results['aaData'].append(dom_arr)
+
+    results['success'] = True
+    return results
+
+    
+
 def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None, versionSort = False):
     results = {'success': False}
     try:
@@ -263,6 +309,7 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     if es_source:
         query["_source"] = es_source
 
+    #XXX DEBUG CODE
     import sys
     sys.stdout.write("%s\n" % str(query))
     domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
@@ -285,4 +332,48 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     results['avail'] = len(results['data'])
     results['success'] = True
     return results
+
+
+def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dates, etc
+    results = {'success': False}
+    try:
+        es = es_connector()
+        index = '%s-*' % settings.ES_INDEX_PREFIX
+    except ElasticsearchError as e:
+        results['message'] = str(e)
+        return results
+
+    try:
+        query = yacc.parse(search_string)
+        print search_string
+        print query
+    except Exception as e:
+        results['message'] = str(e)
+        return results
+
+    query['size'] = size
+    query['from'] = skip
+
+    domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
+    results['total'] = domains['hits']['total']
+    results['data'] = []
+
+    for domain in domains['hits']['hits']:
+        pdomain = domain['_source']
+        # Take each key in details (if any) and stuff it in top level dict.
+        if 'details' in pdomain:
+            for k, v in pdomain['details'].iteritems():
+                pdomain[k] = v
+            del pdomain['details']
+        if 'dataVersion' in pdomain:
+            pdomain['Version'] = pdomain['dataVersion']
+            del pdomain['dataVersion']
+        results['data'].append(pdomain)
+
+    results['avail'] = len(results['data'])
+    results['skip'] = skip
+    results['page_size'] = size
+    results['success'] = True
+    return results
+
 

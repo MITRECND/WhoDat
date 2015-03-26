@@ -43,6 +43,11 @@ class domain_form(forms.Form):
                 return value
         return value
 
+
+class advdomain_form(forms.Form):
+    query = forms.CharField(label='Search')
+
+
 #Allows you to provide a drop down of numbers but support non listed number
 class ChoiceNumberField(forms.ChoiceField):
     minimum = 0

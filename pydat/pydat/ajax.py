@@ -66,6 +66,52 @@ def dataTable(request, key, value, low = None, high = None):
     
     return HttpResponse(json.dumps(results), content_type='application/json')
 
+
+def advDataTable(request):
+    if not request.is_ajax():
+        return __renderErrorJSON__('Expected AJAX')
+
+    #TODO Support Post -- need to add cooresponding form
+    if request.method == "GET":
+        query = request.GET.get('query', '')
+        page = int(request.GET.get('iDisplayStart', 0))
+        pagesize = int(request.GET.get('iDisplayLength', 50))
+        sortcols = int(request.GET.get('iSortingCols', 0))
+        sEcho = request.GET.get('sEcho')
+        sSearch = request.GET.get('sSearch', '')
+        sort = []
+    else:
+        return __renderErrorJSON__('Unsupported Method')
+
+    query = urllib.unquote(query)
+    sSearch = None
+
+    results = handler.advDataTableSearch(query, page, pagesize)
+    print results
+    #Echo back the echo
+    results['sEcho'] = sEcho
+    
+    return HttpResponse(json.dumps(results), content_type='application/json')
+
+def advanced_search(request):
+    if request.method == "GET":
+        search_string = urllib.unquote(request.GET.get('query', None))
+        size = int(request.GET.get('size', 20))
+        page = int(request.GET.get('page', 1)) 
+    else:
+        return __renderErrorJSON__('Unsupported Method')
+
+    if search_string is None:
+        return __renderErrorJSON__("Query required")
+        
+    skip = (page - 1) * size
+    results = handler.advanced_search(search_string, skip, size)
+    if results['success'] == False:
+        return __renderErrorJSON__(results['message'])
+
+    return HttpResponse(json.dumps(results), content_type='application/json')
+
+
 def domains_latest(request, key, value):
     return domains(request, key, value, low = handler.lastVersion())
 

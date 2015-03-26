@@ -54,9 +54,42 @@
 		<div id="forms" style="text-align:center">
 			<ul>
 				<li title="Search Domains"><a href="#domain">Domain Search</a></li>
+				<li title="Advanced Search"><a href="#advdomain">Advanced Domain Search</a></li>
 				<li title="Search PDNS for records that are pointed to by the given query"><a href="#pdnsf">PDNS Search</a></li>
 				<li title="Search PDNS for records that point to the given query"><a href="#pdnsr">PDNS Inverse</a></li>
 			</ul>
+
+            <div id="advdomain" class='search_form'>
+            {% if advdomain_form %}
+            <form action="{% url 'advdomains' %}" method="POST">
+             {% csrf_token %}
+                <table id="advdomain_form">
+                    <tbody>
+                        <tr>
+                            <td>
+                                {{ advdomain_form.query}}
+                            </td>
+                            <td>
+                                  <input type="submit" value="Search"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+             </form>
+                <div class='errors'>
+                    {% for field in advdomain_form %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                            <span class='error'>
+                                {{ error }}
+                            </span>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            </div>
+             
 
 			<div id="domain" class='search_form'>
 			{% if domain_form %}
