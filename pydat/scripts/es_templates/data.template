@@ -450,7 +450,7 @@
               "standardRegCreatedDate" : {
                 "include_in_all": "false",
                 "type": "date",
-                "format": "yyyy-MM-dd HH:mm:ss zzz",
+                "format": "yyyy-MM-dd HH:mm:ss zzz||yyyy-MM-dd HH:mm:ss",
                 "fields": {
                     "raw": {
                         "type": "string",
@@ -461,7 +461,7 @@
               "standardRegExpiresDate" : {
                 "include_in_all": "false",
                 "type": "date",
-                "format": "yyyy-MM-dd HH:mm:ss zzz",
+                "format": "yyyy-MM-dd HH:mm:ss zzz||yyyy-MM-dd HH:mm:ss",
                 "fields": {
                     "raw": {
                         "type": "string",
@@ -472,7 +472,7 @@
               "standardRegUpdatedDate" : {
                 "include_in_all": "false",
                 "type": "date",
-                "format": "yyyy-MM-dd HH:mm:ss zzz",
+                "format": "yyyy-MM-dd HH:mm:ss zzz||yyyy-MM-dd HH:mm:ss",
                 "fields": {
                     "raw": {
                         "type": "string",
