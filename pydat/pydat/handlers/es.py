@@ -229,6 +229,11 @@ def advDataTableSearch(query, skip, pagesize):
 
     q['size'] = pagesize
     q['from'] = skip
+    q['sort'] = [
+                    {'_score': {'order': 'desc'}}, 
+                    {'domainName': {'order': 'asc'}}, 
+                    {'dataVersion': {'order': 'desc'}}
+                ]
 
     domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q)
 

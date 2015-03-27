@@ -2,6 +2,8 @@
 import re
 from ply.lex import TOKEN
 import json
+import datetime
+
 tokens = [
     'COLON', 
     'WORD', 
@@ -13,6 +15,7 @@ tokens = [
     'FUZZY',
     'REGEX',
     'WILDCARD',
+    'DATE'
 ]
 
 regex_pattern = r'(r"(\\.|[^\t\n\r\f\v"])+")|' + r"(r'(\\.|[^\t\n\r\f\v'])+')"
@@ -22,6 +25,7 @@ wildcard_pattern = r'(w"([^\t\n\r\f\v"])+")|' + r"(w'([^\t\n\r\f\v'])+')"
 # Regex precendence is functions in file order followed by regex string with decreasing complexity
 t_QUOTED =  r'"(\\[\\"~:\(\)]|[^\t\n\r\f\v\\"~:\(\)])+"|' + r"'(\\[\\~':\(\)]|[^\t\n\r\f\v\\'~:\(\)])*'"
 t_WORD =    r'((\\[\\~:\(\)])|[^\s\\~:\(\)\'"])+'
+t_DATE =    r'[0-9]{4}-((0[1-9])|1[1-2])-((0[1-9])|([1-2][0-9])|(3[0-1]))'
 t_FUZZY =   r'~[0-9]?'
 t_COLON =   r':'
 t_LPAREN =  r'\('
@@ -88,10 +92,16 @@ query : (query)
       | query AND query
       | query OR query
       | specific
+      | daterange
       | terms
 
 specific : FUZZY WORD COLON value
          | WORD COLON value
+
+daterange : WORD COLON DATE
+          | WORD COLON DATE COLON DATE
+          | WORD COLON COLON DATE
+          | WORD COLON DATE COLON
 
 value : string
 
@@ -127,6 +137,12 @@ no_parts = [
             'details.administrativeContact_telephone',
             'details.administrativeContact_telephoneExt',
             ]
+
+date_keywords = {
+                    'created': 'details.standardRegCreatedDate',
+                    'updated': 'details.standardRegUpdatedDate',
+                    'expires': 'details.standardRegExpiresDate'
+                }
 
 original_keywords = [
                         'domainName', 
@@ -252,33 +268,80 @@ def p_query_query(t):
     print('AND QUERY', queries[0], queries[1])
 
     query = { "bool": { "must": [] }}
+    filt = {'and': []}
 
     for q in queries:
-        if 'query' in q:
-            query["bool"]["must"].append(q['query'])
-        else:
-            query["bool"]["must"].append(q)
+        qq = q['query']['filtered']['query']
+        if 'match_all' not in qq:
+            query["bool"]["must"].append(qq)
+        qf = q['query']['filtered']['filter']
+        if 'match_all' not in qf:
+            filt['and'].append(qf)
 
-    t[0] = {"query": query}
+    if len(filt['and']) == 0:
+        filt = {'match_all': {}}
+    elif len(filt['and']) == 1:
+        filt = filt['and'][0]
+
+    if len(query['bool']['must']) == 0:
+        query = {'match_all': {}}
+    elif len(query['bool']['must']) == 1:
+        query = query['bool']['must'][0]
+    
+
+    t[0] = {
+        "query": {
+            "filtered": {
+                "query": query,
+                "filter": filt
+            }
+        }
+    }
 
 def p_query_or_query(t):
     'query : query OR query'
     print('OR QUERY', t[1], t[2], t[3])
 
     query = {"bool": {"should": []}}
+    filt = {"or": []}
 
     for q in (t[1], t[3]):
-        if 'query' in q:
-            query["bool"]["should"].append(q['query'])
-        else:
-            query["bool"]["should"].append(q)
+        qq = q['query']['filtered']['query']
+        if 'match_all' not in qq:
+            query["bool"]["should"].append(qq)
 
-    t[0] = {"query": query}
+        qf = q['query']['filtered']['filter']
+        if 'match_all' not in qf:
+            filt['or'].append(qf)
+
+    if len(filt['or']) == 0:
+        filt = {'match_all': {}}
+    elif len(filt['or']) == 1:
+        filt = filt['or'][0]
+
+    if len(query['bool']['should']) == 0:
+        query = {'match_all': {}}
+    elif len(query['bool']['should']) == 1:
+        query = query['bool']['should'][0]
+
+
+    t[0] = {
+        "query": {
+            "filtered": {
+                "query": query,
+                "filter": filt
+            }
+        }
+    }
 
 
 
 def p_query_specific(t):
     'query : specific'
+    t[0] = t[1]
+
+def p_query_daterange(t):
+    'query : daterange'
     t[0] = t[1]
 
 def p_query_term(t):
@@ -321,9 +384,57 @@ def p_query_term(t):
                 })
 
         if len(parts) == 1:
-            t[0] = {"query": parts[0]}
+            t[0] = {"query": {"filtered": {"query": parts[0], "filter": {"match_all":{}}}}}
         else:
-            t[0] = {"query": {"bool": {"must" : parts }}}
+            t[0] = {"query": {"filtered": {"query": {"bool": {"must" : parts }}, "filter": {'match_all': {}}}}}
+
+def p_daterange(t):
+    '''daterange : WORD COLON DATE
+                 | WORD COLON DATE COLON DATE'''
+
+    if len(t) == 4:
+        try:
+            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
+        except Exception as e:
+           print "Invalid Date Format: %s" % str(e) 
+
+        end_date = start_date + datetime.timedelta(1,0)
+        key = t[1]
+    else:
+        try:
+            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
+            end_date = datetime.datetime.strptime(t[5], '%Y-%m-%d') + datetime.timedelta(1,0)
+        except Exception as e:
+            print "Invalid Date Range"
+
+        if end_date < start_date:
+            print "End date less than start date"
+        key = t[1] 
+
+    print start_date, end_date
+
+    if key not in date_keywords:
+        raise KeyError("Unknown Key")
+
+    key = date_keywords[key]
+
+    qf = {
+    'query':{
+        'filtered': {
+            'filter': { 
+                'range': {
+                    key: {
+                        'gte': start_date.strftime('%Y-%m-%d %H:%M:%S'),
+                        'lt': end_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    }
+                }
+            },
+            'query': {'match_all': {}},
+            }
+        }
+    }
+
+    t[0] = qf 
 
 def p_specific(t):
     '''specific : FUZZY WORD COLON value
@@ -465,9 +576,9 @@ def p_specific(t):
             }
 
     if 'query' not in q:
-        t[0] = {'query': q}
+        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
     else:  
-        t[0] = q
+        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
 
 def p_value(t):
     'value : string'
@@ -535,3 +646,23 @@ def p_error(t):
 
 import ply.yacc as yacc
 yacc.yacc()
+
+
+def main():
+    while 1:
+        try:
+            s = raw_input('input > ')
+        except EOFError:
+            break
+        try:
+            results = yacc.parse(s)
+        except ValueError as e:
+            print str(e)
+            continue
+
+        from pprint import pprint
+        print(json.dumps(results))
+
+
+if __name__ == '__main__':
+    main()
