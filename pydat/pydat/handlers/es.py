@@ -235,7 +235,15 @@ def advDataTableSearch(query, skip, pagesize):
                     {'dataVersion': {'order': 'desc'}}
                 ]
 
-    domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q)
+    try:
+        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q)
+    except Exception as e:
+        results['message'] = str(e)
+        return results    
+    
+    if 'error' in domains:
+        results['message'] = 'Error'
+        return results
 
     results['iTotalDisplayRecords'] = domains['hits']['total']
     results['aaData'] = []

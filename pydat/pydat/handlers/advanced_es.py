@@ -67,9 +67,12 @@ import ply.lex as lex
 lex.lex()
 
 precedence = (
-        ('left', 'QUOTED'),
-        ('right', 'AND', 'OR'),
         ('left', 'COLON'),
+        ('left', 'LPAREN', 'RPAREN'),
+        ('left', 'QUOTED', 'REGEX', 'WILDCARD'),
+        ('left', 'FUZZY'),
+        ('left', 'DATE'),
+        ('right', 'AND', 'OR'),
         ('left', 'WORD'),
     )
 
@@ -93,25 +96,21 @@ query : (query)
       | query OR query
       | specific
       | daterange
-      | terms
+      | termquery
 
-specific : FUZZY WORD COLON value
-         | WORD COLON value
+specific : FUZZY WORD COLON valuestring
+         | WORD COLON valuestring
 
 daterange : WORD COLON DATE
           | WORD COLON DATE COLON DATE
-          | WORD COLON COLON DATE
-          | WORD COLON DATE COLON
 
-value : string
+termquery : QUOTED
+          | WORD 
 
-terms : terms terms
-      | string
-
-string : QUOTED
-       | WORD
-       | REGEX
-       | WILDCARD
+valuestring : QUOTED
+            | WORD
+            | REGEX
+            | WILDCARD
 
 """
 
@@ -336,109 +335,17 @@ def p_query_or_query(t):
 
 
 
-def p_query_specific(t):
-    'query : specific'
+def p_query_terminals(t):
+    '''query : specific
+             | daterange
+             | termquery'''
+    print('QSpec', t[1])
     t[0] = t[1]
 
-def p_query_daterange(t):
-    'query : daterange'
-    t[0] = t[1]
-
-def p_query_term(t):
-    'query : terms'
-    print('QString', t[1])
-    parts = []
-
-    for st in t[1]:
-        ll = looks_like(str(st))
-        if ll is None:
-            if st.type == 'word':
-                parts.append({'match': {'_all': str(st)}})
-            else:
-                parts.append({'match_phrase': {'_all': str(st)}})
-        else:
-            if ll == 'email':
-                fields = [ "details.administrativeContact_email.parts^2", 
-                           "details.registrant_email.parts^2", 
-                           "_all" ] 
-            elif ll == 'domain':
-                fields = [ "domainName.parts^3",
-                           "details.administrativeContact_email.parts^2", 
-                           "details.registrant_email.parts^2", 
-                           "_all"]
-
-            if st.type == 'word':
-                parts.append({
-                    "multi_match": {
-                        "query": str(st),
-                        "fields": fields
-                    }
-                })
-            else:
-                parts.append({
-                    "multi_match": {
-                        "query": str(st),
-                        "fields": fields,
-                        "type" : "phrase"
-                    }
-                })
-
-        if len(parts) == 1:
-            t[0] = {"query": {"filtered": {"query": parts[0], "filter": {"match_all":{}}}}}
-        else:
-            t[0] = {"query": {"filtered": {"query": {"bool": {"must" : parts }}, "filter": {'match_all': {}}}}}
-
-def p_daterange(t):
-    '''daterange : WORD COLON DATE
-                 | WORD COLON DATE COLON DATE'''
-
-    if len(t) == 4:
-        try:
-            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
-        except Exception as e:
-           print "Invalid Date Format: %s" % str(e) 
-
-        end_date = start_date + datetime.timedelta(1,0)
-        key = t[1]
-    else:
-        try:
-            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
-            end_date = datetime.datetime.strptime(t[5], '%Y-%m-%d') + datetime.timedelta(1,0)
-        except Exception as e:
-            print "Invalid Date Range"
-
-        if end_date < start_date:
-            print "End date less than start date"
-        key = t[1] 
-
-    print start_date, end_date
-
-    if key not in date_keywords:
-        raise KeyError("Unknown Key")
-
-    key = date_keywords[key]
-
-    qf = {
-    'query':{
-        'filtered': {
-            'filter': { 
-                'range': {
-                    key: {
-                        'gte': start_date.strftime('%Y-%m-%d %H:%M:%S'),
-                        'lt': end_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    }
-                }
-            },
-            'query': {'match_all': {}},
-            }
-        }
-    }
-
-    t[0] = qf 
 
 def p_specific(t):
-    '''specific : FUZZY WORD COLON value
-                | WORD COLON value'''
+    '''specific : FUZZY WORD COLON valuestring
+                | WORD COLON valuestring'''
 
 
     """
@@ -580,22 +487,137 @@ def p_specific(t):
     else:  
         t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
 
-def p_value(t):
-    'value : string'
-    print("Value", t[1])
-    t[0] = t[1]
+def p_daterange(t):
+    '''daterange : WORD COLON DATE
+                 | WORD COLON DATE COLON DATE'''
 
-def p_term(t):
-    'terms : string'
-    print('Terms', t[1])
-    t[0] = [t[1]]
+    if len(t) == 4:
+        try:
+            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
+        except Exception as e:
+           print "Invalid Date Format: %s" % str(e) 
 
-def p_terms(t):
-    'terms : terms terms'
-    print('Terms', t[1])
-    t[0] = []
-    t[0].extend(t[1])
-    t[0].extend(t[2])
+        end_date = start_date + datetime.timedelta(1,0)
+        key = t[1]
+    else:
+        try:
+            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
+            end_date = datetime.datetime.strptime(t[5], '%Y-%m-%d') + datetime.timedelta(1,0)
+        except Exception as e:
+            print "Invalid Date Range"
+
+        if end_date < start_date:
+            print "End date less than start date"
+        key = t[1] 
+
+    print start_date, end_date
+
+    if key not in date_keywords:
+        raise KeyError("Unknown Key")
+
+    key = date_keywords[key]
+
+    qf = {
+    'query':{
+        'filtered': {
+            'filter': { 
+                'range': {
+                    key: {
+                        'gte': start_date.strftime('%Y-%m-%d %H:%M:%S'),
+                        'lt': end_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    }
+                }
+            },
+            'query': {'match_all': {}},
+            }
+        }
+    }
+
+    t[0] = qf 
+
+def p_termquery_quoted(t):
+    '''termquery : QUOTED'''
+    print('TermQueryQ', t[1])
+
+    term = remove_escapes(t[1][1:-1])
+    if ' ' in term:
+        whitespace = True
+    else:
+        whitespace = False
+
+    parts = []
+
+    ll = looks_like(term)
+    if ll is None:
+        #XXX TODO use span queries?
+        for p in term.split():
+            parts.append({'term': {'_all': p }})
+    else:
+        if ll == 'email':
+            fields = [ "details.administrativeContact_email.parts", 
+                       "details.registrant_email.parts", 
+                       "_all" ] 
+        elif ll == 'domain':
+            fields = [ "domainName.parts^3",
+                       "details.administrativeContact_email.parts", 
+                       "details.registrant_email.parts", 
+                       "_all"]
+
+        terms = term.split()
+        if len(terms) > 1:
+            terms.append(term)
+        else:
+            terms = [term]
+
+        print terms
+
+        for p in terms:
+            shds = []
+            for f in fields:
+                 shds.append({'term': {f:p}})
+            if len(shds) > 1:
+                parts.append({'bool': {'should': shds}})
+            else:
+                parts.append(shds[0])
+
+    if len(parts) == 1:
+        t[0] = {"query": {"filtered": {"query": parts[0], "filter": {"match_all":{}}}}}
+    else:
+        t[0] = {"query": {"filtered": {"query": {"bool": {"must" : parts }}, "filter": {'match_all': {}}}}}
+
+def p_termquery_word(t):
+    '''termquery : WORD'''
+    print('TermQueryW', t[1])
+
+    term = remove_escapes(t[1])
+
+    parts = []
+
+    ll = looks_like(term)
+    if ll is None:
+        parts.append({'match': {'_all': term}})
+    else:
+        if ll == 'email':
+            fields = [ "details.administrativeContact_email.parts^2", 
+                       "details.registrant_email.parts^2", 
+                       "_all" ] 
+        elif ll == 'domain':
+            fields = [ "domainName.parts^3",
+                       "details.administrativeContact_email.parts^2", 
+                       "details.registrant_email.parts^2", 
+                       "_all"]
+
+        parts.append({
+            "multi_match": {
+                "query": term,
+                "fields": fields
+            }
+        })
+
+    if len(parts) == 1:
+        t[0] = {"query": {"filtered": {"query": parts[0], "filter": {"match_all":{}}}}}
+    else:
+        t[0] = {"query": {"filtered": {"query": {"bool": {"must" : parts }}, "filter": {'match_all': {}}}}}
 
 
 def remove_escapes(t):
@@ -612,35 +634,35 @@ def remove_escapes(t):
                 unescaped_string += p 
     return unescaped_string
 
-def p_string_quoted(t):
-    'string : QUOTED'
+def p_valuestring_quoted(t):
+    'valuestring : QUOTED'
     print("SQuoted", t[1])
     unes = remove_escapes(t[1][1:-1])
     s = String(unes.lower(), 'quoted')
     t[0] = s
 
-def p_string_word(t):
-    'string : WORD'
+def p_valuestring_word(t):
+    'valuestring : WORD'
     print("SWord", t[1])
     unes = remove_escapes(t[1])
     w = String(unes.lower(), 'word')
     t[0] = w
 
-def p_string_regex(t):
-    'string : REGEX'
+def p_valuestring_regex(t):
+    'valuestring : REGEX'
     print("SRegex", t[1])
     r = String(t[1][2:-1], 'regex')
     t[0] = r
 
-def p_string_wildcard(t):
-    'string : WILDCARD'
+def p_valuestring_wildcard(t):
+    'valuestring : WILDCARD'
     print("SWildcard", t[1])
     w = String(t[1][2:-1], 'wildcard')
     t[0] = w
 
 def p_error(t):
     if t is not None:
-        raise ValueError("Syntax error at '%s'" % t.value())
+        raise ValueError("Syntax error at '%s'" % t)
     else:
         raise ValueError("Syntax error")
 
