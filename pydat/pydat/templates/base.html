@@ -53,12 +53,16 @@
 
 		<div id="forms" style="text-align:center">
 			<ul>
+                {% if handler == 'mongo' %}
 				<li title="Search Domains"><a href="#domain">Domain Search</a></li>
-				<li title="Advanced Search"><a href="#advdomain">Advanced Domain Search</a></li>
+                {% elif handler == 'es' %}
+				<li title="Search Domains"><a href="#advdomain">Domain Search</a></li>
+                {% endif %}
 				<li title="Search PDNS for records that are pointed to by the given query"><a href="#pdnsf">PDNS Search</a></li>
 				<li title="Search PDNS for records that point to the given query"><a href="#pdnsr">PDNS Inverse</a></li>
 			</ul>
 
+            {% if handler == 'es' %}
             <div id="advdomain" class='search_form'>
             {% if advdomain_form %}
             <form action="{% url 'advdomains' %}" method="POST">
@@ -129,8 +133,10 @@
                 </div>
             {% endif %}
             </div>
+            {% endif %}
              
 
+            {% if handler == 'mongo' %}
 			<div id="domain" class='search_form'>
 			{% if domain_form %}
 			<form action="{% url 'domains' %}" method="POST">
@@ -217,6 +223,7 @@
                 </div>
 			{% endif %}
 			</div>
+            {% endif %}
 
 			<div id="pdnsf" class='search_form'>
 			{% if pdns_form %}

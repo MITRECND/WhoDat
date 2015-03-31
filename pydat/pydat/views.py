@@ -30,18 +30,17 @@ def __createRequestContext__(request, data = None):
                 'advdomain_form': advdomain_f,
                 'pdns_form': pdns_f,
                 'pdns_r_form': pdns_r_f,
-                'latest_version': handler.lastVersion()
+                'latest_version': handler.lastVersion(),
+                'handler': settings.HANDLER
               } 
 
     if data is not None:
         ctx_var.update(data)
         if 'active' not in data:
             if 'pdns_form' in data:
-                ctx_var['active'] = 2
-            elif 'pdns_r_form' in data:
-                ctx_var['active'] = 3
-            elif 'advdomain_form' in data:
                 ctx_var['active'] = 1
+            elif 'pdns_r_form' in data:
+                ctx_var['active'] = 2
             else:
                 ctx_var['active'] = 0
 
