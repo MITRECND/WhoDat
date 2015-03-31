@@ -66,16 +66,6 @@ def t_error(t):
 import ply.lex as lex
 lex.lex()
 
-precedence = (
-        ('left', 'COLON'),
-        ('left', 'LPAREN', 'RPAREN'),
-        ('left', 'QUOTED', 'REGEX', 'WILDCARD'),
-        ('left', 'FUZZY'),
-        ('left', 'DATE'),
-        ('right', 'AND', 'OR'),
-        ('left', 'WORD'),
-    )
-
 
 # Extremely naive method of determining if they're searching
 # for a domain or email
@@ -90,7 +80,7 @@ def looks_like(term):
 """
 Grammar
 
-query : (query)
+query : LPAREN query RPAREN
       | query query
       | query AND query
       | query OR query
@@ -98,19 +88,18 @@ query : (query)
       | daterange
       | termquery
 
-specific : FUZZY WORD COLON valuestring
-         | WORD COLON valuestring
+specific : FUZZY WORD COLON WORD
+         | WORD COLON WORD
+         | FUZZY WORD COLON QUOTED
+         | WORD COLON QUOTED
+         | WORD COLON REGEX
+         | WORD COLON WILDCARD
 
 daterange : WORD COLON DATE
           | WORD COLON DATE COLON DATE
 
 termquery : QUOTED
           | WORD 
-
-valuestring : QUOTED
-            | WORD
-            | REGEX
-            | WILDCARD
 
 """
 
@@ -127,57 +116,57 @@ class String(object):
     
 
 no_parts = [ 
-            'details.registrant_fax',
-            'details.registrant_faxExt',   
-            'details.registrant_telephone',
-            'details.registrant_telephoneExt',
-            'details.administrativeContact_fax',
-            'details.administrativeContact_faxExt',
-            'details.administrativeContact_telephone',
-            'details.administrativeContact_telephoneExt',
+                'details.registrant_fax',
+                'details.registrant_faxExt',   
+                'details.registrant_telephone',
+                'details.registrant_telephoneExt',
+                'details.administrativeContact_fax',
+                'details.administrativeContact_faxExt',
+                'details.administrativeContact_telephone',
+                'details.administrativeContact_telephoneExt',
             ]
 
 date_keywords = {
-                    'created': 'details.standardRegCreatedDate',
-                    'updated': 'details.standardRegUpdatedDate',
-                    'expires': 'details.standardRegExpiresDate'
+                'created': 'details.standardRegCreatedDate',
+                'updated': 'details.standardRegUpdatedDate',
+                'expires': 'details.standardRegExpiresDate'
                 }
 
 original_keywords = [
-                        'domainName', 
-                        'administrativeContact_email', 
-                        'administrativeContact_name',
-                        'administrativeContact_organization',
-                        'administrativeContact_street1',
-                        'administrativeContact_street2',
-                        'administrativeContact_street3',
-                        'administrativeContact_street4',
-                        'administrativeContact_city',
-                        'administrativeContact_state',
-                        'administrativeContact_postalCode',
-                        'administrativeContact_country',
-                        'administrativeContact_fax',
-                        'administrativeContact_faxExt',
-                        'administrativeContact_telephone',
-                        'administrativeContact_telephoneExt',
-                        'registrant_email',
-                        'registrant_name',
-                        'registrant_organization',
-                        'registrant_street1',
-                        'registrant_street2',
-                        'registrant_street3',
-                        'registrant_street4',
-                        'registrant_city',
-                        'registrant_state',
-                        'registrant_postalCode',
-                        'registrant_country',
-                        'registrant_fax',
-                        'registrant_faxExt',   
-                        'registrant_telephone',
-                        'registrant_telephoneExt',
-                        'nameServers',
-                        'registrarName',
-                        'whoisServer'
+                'domainName', 
+                'administrativeContact_email', 
+                'administrativeContact_name',
+                'administrativeContact_organization',
+                'administrativeContact_street1',
+                'administrativeContact_street2',
+                'administrativeContact_street3',
+                'administrativeContact_street4',
+                'administrativeContact_city',
+                'administrativeContact_state',
+                'administrativeContact_postalCode',
+                'administrativeContact_country',
+                'administrativeContact_fax',
+                'administrativeContact_faxExt',
+                'administrativeContact_telephone',
+                'administrativeContact_telephoneExt',
+                'registrant_email',
+                'registrant_name',
+                'registrant_organization',
+                'registrant_street1',
+                'registrant_street2',
+                'registrant_street3',
+                'registrant_street4',
+                'registrant_city',
+                'registrant_state',
+                'registrant_postalCode',
+                'registrant_country',
+                'registrant_fax',
+                'registrant_faxExt',   
+                'registrant_telephone',
+                'registrant_telephoneExt',
+                'nameServers',
+                'registrarName',
+                'whoisServer'
                     ]
 
 special_keywords = {
@@ -257,7 +246,7 @@ def p_query_group(t):
     t[0] = t[2]
 
 def p_query_query(t):
-    '''query : query query
+    '''query : query query %prec AND
              | query AND query'''
 
     if len(t) == 4:
@@ -343,55 +332,30 @@ def p_query_terminals(t):
     t[0] = t[1]
 
 
-def p_specific(t):
-    '''specific : FUZZY WORD COLON valuestring
-                | WORD COLON valuestring'''
+def p_specific_word(t):
+    '''specific : FUZZY WORD COLON WORD
+                | WORD COLON WORD'''
 
-
-    """
-        Specific searches behave differently depending on what type of
-        value type is used and if FUZZY is defined. if value is a:
-    
-        word -- a general match query will be used on .parts
-             -- FUZZY honored
-        quoted -> FUZZY is none
-                    -- a terms query will be used on the entire string (boost 1.5)
-                    -- a terms query will be used on the string split on whitespace against .parts (no boost)
-               -> FUZZY is not none
-                    -- a match phrase query will be used on the entire string against .parts
-        wildcard -- a wildcard query will be used on the entire string (boost 1.5)
-                 -- a wildcard query will be used on .parts
-                 -- FUZZY ignored
-        regex -- a regex query will be used ont he entire string (boost 1.5)
-              -- a regex query will be used on .parts
-              -- FUZZY ignored
-    """
-    
     if len(t) == 5:
+        key = t[2]
+        value = t[4]
         if len(t[1]) == 1:
             fuzzy = 'AUTO'
         else:
             fuzzy = int(t[1][1])
-        key = t[2]
-        value = t[4]
     else:
         key = t[1]
         value = t[3]
         fuzzy = None
 
+    print('SWord', key, value, fuzzy)
+
+    value = remove_escapes(value)
+
 
     fields1 = []
-    fields2 = []
-
     if key in special_keywords:
         fields1 = special_keywords[key]
-        if ((value.type == 'quoted' and 
-            fuzzy is None) or value.type == 'regex' or
-            value.type == 'wildcard'): 
-            for f in fields1:
-                if f not in no_parts:
-                    f += ".parts"
-                    fields2.append(f)
     else:
         if key in shortcut_keywords:
             fields1 = shortcut_keywords[key]
@@ -399,88 +363,172 @@ def p_specific(t):
             if key != 'domainName':
                 key = 'details.' + key
             fields1 = [key]
+        else:
+            raise KeyError("Unknown field")
 
-        if (value.type == 'word'):
-            nf = []
-            for f in fields1:
-                if f not in no_parts:
-                    f += ".parts" 
-                nf.append(f)
-            fields1 = nf
-        elif (value.type == 'quoted' and 
-                fuzzy is not None):
+        nf = []
+        for f in fields1:
+            if f not in no_parts:
+                f += ".parts"
+            nf.append(f)
+        fields1 = nf
+
+    print fields1
+
+    q = {
+        'multi_match': {
+            "query": value,
+            "fields": fields1 
+        }
+    } 
+
+    if fuzzy is not None:
+        q['multi_match']['fuzziness'] = fuzzy
+
+    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+
+def p_specific_quoted(t):
+    '''specific : FUZZY WORD COLON QUOTED
+                | WORD COLON QUOTED'''
+
+    if len(t) == 5:
+        key = t[2]
+        value = t[4]
+        if len(t[1]) == 1:
+            fuzzy = 'AUTO'
+        else:
+            fuzzy = int(t[1][1])
+    else:
+        key = t[1]
+        value = t[3]
+        fuzzy = None
+
+    print('SQuoted', key, value, fuzzy)
+    value = remove_escapes(value[1:-1])
+
+    fields1 = []
+    fields2 = []
+
+    if key in special_keywords:
+        fields1 = special_keywords[key]
+    else:
+        if key in shortcut_keywords:
+            fields1 = shortcut_keywords[key]
+        elif key in original_keywords:
+            if key != 'domainName':
+                key = 'details.' + key
+            fields1 = [key]
+        else:
+            raise KeyError("Unknown field")
+
+            
+        if  fuzzy is not None:
             nf = []
             for f in fields1:
                 if f not in no_parts:
                     f += ".parts"
                 nf.append(f)
             fields1 = nf
-        elif ((value.type == 'quoted' and 
-                fuzzy is None) or
-                value.type == 'wildcard' or
-                value.type == 'regex'):
+        else:
             for f in fields1:
                 if f not in no_parts:
                     f += ".parts"
                     fields2.append(f)
 
+
     print fields1, fields2
 
     q = {}
-
-    if value.type == 'word':
-        q['multi_match'] = {
-            "query": str(value),
-            "fields": fields1 
-        } 
-        if fuzzy is not None:
-            q['multi_match']['fuzziness'] = fuzzy
-
-    elif value.type == 'wildcard':
+    
+    if fuzzy is None:
+        split_vals = value.split()
         shds = []
         for f in fields1:
-            shd = {'wildcard': {f: {"value": str(value), "boost": 1.5}}}
+            shd = {'term': { f: {"value": value, "boost" : 1.5}}}
             shds.append(shd)
-        for f in fields2:
-            shd = {'wildcard': {f: str(value)}}
-            shds.append(shd)
-        if len(shds) == 1:
-            q['query'] =  shds[0]
-        else:
-            q['bool'] = {'should': shds}
 
-    elif value.type == 'regex':
-        shds = []
-        for f in fields1:
-            shd = {'regexp': {f: {"value": str(value), "boost": 1.5}}}
-            shds.append(shd)
         for f in fields2:
-            shd = {'regexp': {f: {"value": str(value)}}}
-            shds.append(shd)
+            if len(split_vals) > 1:
+                spans = []
+                for p in split_vals:
+                    spans.append({'span_term': {f:p}})
+                shds.append({'span_near': { 'clauses': spans, 'slop': 1, 'in_order': 'true'}})
+                '''
+                musts = []
+                for p in split_vals:
+                    musts.append({'term': {f: p}})
+                shds.append({'bool': {'must': musts}})
+                '''
+            else:
+                shd = {'term': {f: {"value": value}}}
+                shds.append(shd)
+
         if len(shds) == 1:
             q['query'] = shds[0]
         else:
             q['bool'] = {'should': shds}
-    elif value.type == 'quoted':
-        if fuzzy is None:
-            shds = []
-            for f in fields1:
-                shd = {'term': { f: {"value": str(value), "boost" : 1.5}}}
-                shds.append(shd)
-            for f in fields2:
-                for p in str(value).split():
-                    shd = {'term': {f: p}}
-                    shds.append(shd)
-            if len(shds) == 1:
-                q['query'] = shds[0]
-            else:
-                q['bool'] = {'should': shds}
+    else:
+        q['multi_match'] = {
+            "query": str(value),
+            "fields": fields1,
+            "fuzziness": fuzzy
+        }
+
+    if 'query' not in q:
+        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+    else:  
+        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
+
+def p_specific_wildcard_regex(t):
+    '''specific : WORD COLON WILDCARD
+                | WORD COLON REGEX'''
+
+    key = t[1]
+    value = t[3][2:-1]
+    rorw = t[3][0]
+    
+    print('SWord', key, value)
+
+    fields1 = []
+    fields2 = []
+
+    if key in special_keywords:
+        fields1 = special_keywords[key]
+    else:
+        if key in shortcut_keywords:
+            fields1 = shortcut_keywords[key]
+        elif key in original_keywords:
+            if key != 'domainName':
+                key = 'details.' + key
+            fields1 = [key]
         else:
-            q['multi_match'] = {
-                "query": str(value),
-                "fields": fields1,
-                "fuzziness": fuzzy
-            }
+            raise KeyError("Unknown field")
+
+        for f in fields1:
+            if f not in no_parts:
+                f += ".parts"
+                fields2.append(f)
+
+    print fields1, fields2
+
+    q ={}
+
+    shds = []
+    if rorw == 'w':
+        qtype = 'wildcard'
+    else:
+        qtype = 'regexp'
+
+    for f in fields1:
+        shd = {qtype: {f: {"value": str(value), "boost": 1.5}}}
+        shds.append(shd)
+    for f in fields2:
+        shd = {qtype: {f: str(value)}}
+        shds.append(shd)
+    if len(shds) == 1:
+        q['query'] =  shds[0]
+    else:
+        q['bool'] = {'should': shds}
 
     if 'query' not in q:
         t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
@@ -634,37 +682,16 @@ def remove_escapes(t):
                 unescaped_string += p 
     return unescaped_string
 
-def p_valuestring_quoted(t):
-    'valuestring : QUOTED'
-    print("SQuoted", t[1])
-    unes = remove_escapes(t[1][1:-1])
-    s = String(unes.lower(), 'quoted')
-    t[0] = s
-
-def p_valuestring_word(t):
-    'valuestring : WORD'
-    print("SWord", t[1])
-    unes = remove_escapes(t[1])
-    w = String(unes.lower(), 'word')
-    t[0] = w
-
-def p_valuestring_regex(t):
-    'valuestring : REGEX'
-    print("SRegex", t[1])
-    r = String(t[1][2:-1], 'regex')
-    t[0] = r
-
-def p_valuestring_wildcard(t):
-    'valuestring : WILDCARD'
-    print("SWildcard", t[1])
-    w = String(t[1][2:-1], 'wildcard')
-    t[0] = w
-
 def p_error(t):
     if t is not None:
         raise ValueError("Syntax error at '%s'" % t)
     else:
         raise ValueError("Syntax error")
+
+precedence = (
+        ('left', 'AND', 'OR'),
+        ('left', 'COLON'),
+    )
 
 import ply.yacc as yacc
 yacc.yacc()
@@ -681,8 +708,10 @@ def main():
         except ValueError as e:
             print str(e)
             continue
+        except KeyError as e:
+            print str(e)
+            continue
 
-        from pprint import pprint
         print(json.dumps(results))
 
 
