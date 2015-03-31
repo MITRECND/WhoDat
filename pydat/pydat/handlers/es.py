@@ -210,7 +210,6 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
 def advDataTableSearch(query, skip, pagesize):
     results = {'success': False}
-    #domains = advanced_search(query, skip, pagesize)
 
     try:
         es = es_connector()
