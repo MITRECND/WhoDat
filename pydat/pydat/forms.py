@@ -46,6 +46,27 @@ class domain_form(forms.Form):
 
 class advdomain_form(forms.Form):
     query = forms.CharField(label='Search', widget=forms.TextInput(attrs={'size': '60'}))
+    filt = forms.ChoiceField(label="Filter", required=False)
+    fmt = forms.ChoiceField(label="Format", required=False)
+    limit = forms.IntegerField(label="Limit", min_value=1,
+                               max_value=settings.LIMIT,
+                               initial=settings.LIMIT,
+                                required=False)
+
+    def __init__(self, *args, **kwargs):
+        super(advdomain_form, self).__init__(*args, **kwargs)
+        self.fields['fmt'].choices = [('normal', 'Web'),
+                                      ('json', 'JSON'),
+                                      ('list', 'List')]
+        nonelist = [('none', 'None')]
+        nonelist.extend(settings.SEARCH_KEYS)
+
+        self.fields['filt'].choices = settings.SEARCH_KEYS
+
+        for field in self.fields.values():
+            field.error_messages = {'required':'%s is required' % field.label, 
+                                    'invalid_choice': '%s is invalid' % field.label}
+
 
 
 #Allows you to provide a drop down of numbers but support non listed number

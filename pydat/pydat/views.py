@@ -57,19 +57,45 @@ def advdomains(request):
     elif request.method == "GET":
         search_f = advdomain_form(QueryDict(''))
         search_f.data['query'] = request.GET.get('query', None)
+        search_f.data['fmt'] = request.GET.get('fmt','normal')
+        search_f.data['limit'] = request.GET.get('limit', settings.LIMIT)
+        search_f.data['filt'] = request.GET.get('filt', settings.SEARCH_KEYS[0][0])
     else:
         return __renderErrorPage__(request, 'Bad Method')
 
     if not search_f.is_valid():
         return __renderErrorPage__(request, '', {'advdomain_form': search_f})
 
-    search_string = urllib.quote(urllib.unquote(search_f.cleaned_data['query']))
+    fmt = search_f.cleaned_data['fmt'] or 'normal'
+    search_string = urllib.unquote(search_f.cleaned_data['query'])
     
-    context = __createRequestContext__(request, data = { 'search_string': search_string or '',
-                                                         'advdomain_form': search_f,
-           })
+    if fmt == 'normal':
+        context = __createRequestContext__(request, data = { 'search_string': urllib.quote(search_string) or '',
+                                                             'advdomain_form': search_f,
+               })
 
-    return render_to_response('advdomain.html', context)
+        return render_to_response('advdomain.html', context)
+    else:
+        filt_key = search_f.cleaned_data['filt']
+        try:
+            limit = int(search_f.cleaned_data.get('limit', settings.LIMIT))
+        except:
+            limit = settings.LIMIT
+
+        filt = None
+        if fmt == 'list': #Only filter if a list was requested
+            filt = filt_key
+
+        results = handler.advanced_search(search_string, 0, limit)
+        if not results['success']:
+            return __renderErrorPage__(request, results['message'])
+        if fmt=='json':
+            return HttpResponse(json.dumps(results), content_type='application/json')
+        elif fmt == 'list':
+            data = '\n'.join([d[filt_key] for d in results['data']])
+            return HttpResponse(data, content_type='text/plain')
+        else:
+            return __renderErrorPage__(request, 'Invalid Format.')
 
 def domains(request, key=None, value=None):
     if request.method == "POST":

@@ -23,8 +23,16 @@ html, body{
 
 #forms table {
     margin: 0 auto;
+    width: 90%;
 }
 
+table.adv_table1 #id_query {
+    width: 100%;
+}
+
+table.adv_table2 {
+    text-align: left;
+}
 
 .clear{
 	clear:both;
