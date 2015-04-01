@@ -66,7 +66,7 @@ def advdomains(request):
         return __renderErrorPage__(request, '', {'advdomain_form': search_f})
 
     fmt = search_f.cleaned_data['fmt'] or 'normal'
-    search_string = urllib.unquote(search_f.cleaned_data['query'])
+    search_string = search_f.cleaned_data['query']
     
     if fmt == 'normal':
         context = __createRequestContext__(request, data = { 'search_string': urllib.quote(search_string) or '',

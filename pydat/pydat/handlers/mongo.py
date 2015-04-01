@@ -147,6 +147,14 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     results['success'] = True
     return results
 
+def advDataTableSearch(query, skip, pagesize):
+    results = {
+               'success': False,
+               'aaData' = []
+              }
+
+    return results
+
 def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None, versionSort = False):
     results = {'success': False}
     try:
@@ -197,4 +205,12 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     results['success'] = True
     return results
 
+def test_query(search_string):
+    return "Advanced Search not supported with Mongo"
 
+def advanced_search(search_string, skip = 0, size = 20):
+    results = {
+                'success': False,
+                'message': 'Advanced Search not supported with Mongo',
+              }
+    return results

@@ -1,6 +1,8 @@
 import socket
 from django import forms
 from django.conf import settings
+from pydat.handlers import handler
+import urllib
 
 class domain_form(forms.Form):
     key = forms.ChoiceField(label="Key")
@@ -67,7 +69,17 @@ class advdomain_form(forms.Form):
             field.error_messages = {'required':'%s is required' % field.label, 
                                     'invalid_choice': '%s is invalid' % field.label}
 
-
+    def clean_query(self):
+        if 'query' not in self.cleaned_data:
+            raise forms.ValidationError("query field required")
+        try:
+            query = urllib.unquote(self.cleaned_data['query'])
+        except:
+            raise forms.ValidationError("Unable to unquote query")
+        result = handler.test_query(query)
+        if result is not None:
+            raise forms.ValidationError("Unable to parse query: %s" % result) 
+        return query
 
 #Allows you to provide a drop down of numbers but support non listed number
 class ChoiceNumberField(forms.ChoiceField):
