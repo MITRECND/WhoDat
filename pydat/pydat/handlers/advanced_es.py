@@ -408,6 +408,7 @@ def p_specific_fuzzy_quoted(t):
 
     print('SQuoted', key, value, fuzzy)
     value = remove_escapes(value[1:-1])
+    value = value.lower()
 
     fields1 = []
     fields2 = []
@@ -448,6 +449,7 @@ def p_specific_quoted(t):
 
     print('SQuoted', key, value)
     value = remove_escapes(value[1:-1])
+    value = value.lower()
 
     fields1 = []
     fields2 = []
@@ -613,6 +615,7 @@ def p_termquery_quoted(t):
     print('TermQueryQ', t[1])
 
     term = remove_escapes(t[1][1:-1])
+    term = term.lower()
     query = None
     terms = term.split()
 
