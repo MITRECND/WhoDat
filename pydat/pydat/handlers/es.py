@@ -210,6 +210,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
 def advDataTableSearch(query, skip, pagesize):
     results = {'success': False}
+    results['aaData'] = []
 
     try:
         es = es_connector()
@@ -245,7 +246,6 @@ def advDataTableSearch(query, skip, pagesize):
         return results
 
     results['iTotalDisplayRecords'] = domains['hits']['total']
-    results['aaData'] = []
     results['iTotalRecords'] = record_count()
 
 
