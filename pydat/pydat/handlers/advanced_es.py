@@ -245,14 +245,7 @@ def p_query_group(t):
     'query : LPAREN query RPAREN'
     t[0] = t[2]
 
-def p_query_query(t):
-    '''query : query query %prec AND
-             | query AND query'''
-
-    if len(t) == 4:
-        queries = (t[1], t[3])
-    else:
-        queries = (t[1], t[2])
+def create_combined_and(queries):
     print('AND QUERY', queries[0], queries[1])
 
     query = { "bool": { "must": [] }}
@@ -277,7 +270,7 @@ def p_query_query(t):
         query = query['bool']['must'][0]
     
 
-    t[0] = {
+    return {
         "query": {
             "filtered": {
                 "query": query,
@@ -286,11 +279,20 @@ def p_query_query(t):
         }
     }
 
+def p_query_query(t):
+    'query : query query %prec AND'
+    t[0] = create_combined_and((t[1], t[2]))
+
+def p_query_and_query(t):
+    'query : query AND query'
+    t[0] = create_combined_and((t[1], t[3]))
+
+
 def p_query_or_query(t):
     'query : query OR query'
     print('OR QUERY', t[1], t[2], t[3])
 
-    query = {"bool": {"should": []}}
+    query = {"bool": {"should": [], "disable_coord": "true"}}
     filt = {"or": []}
 
     for q in (t[1], t[3]):
@@ -331,28 +333,7 @@ def p_query_terminals(t):
     print('QSpec', t[1])
     t[0] = t[1]
 
-
-def p_specific_word(t):
-    '''specific : FUZZY WORD COLON WORD
-                | WORD COLON WORD'''
-
-    if len(t) == 5:
-        key = t[2]
-        value = t[4]
-        if len(t[1]) == 1:
-            fuzzy = 'AUTO'
-        else:
-            fuzzy = int(t[1][1])
-    else:
-        key = t[1]
-        value = t[3]
-        fuzzy = None
-
-    print('SWord', key, value, fuzzy)
-
-    value = remove_escapes(value)
-
-
+def create_specific_word_subquery(key, value):
     fields1 = []
     if key in special_keywords:
         fields1 = special_keywords[key]
@@ -364,7 +345,7 @@ def p_specific_word(t):
                 key = 'details.' + key
             fields1 = [key]
         else:
-            raise KeyError("Unknown field")
+            raise KeyError("Unknown field %s" % key)
 
         nf = []
         for f in fields1:
@@ -382,26 +363,48 @@ def p_specific_word(t):
         }
     } 
 
-    if fuzzy is not None:
-        q['multi_match']['fuzziness'] = fuzzy
+    return q
 
-    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
 
-def p_specific_quoted(t):
-    '''specific : FUZZY WORD COLON QUOTED
-                | WORD COLON QUOTED'''
+def p_specific_fuzzy_word(t):
+    'specific : FUZZY WORD COLON WORD'
 
-    if len(t) == 5:
-        key = t[2]
-        value = t[4]
-        if len(t[1]) == 1:
-            fuzzy = 'AUTO'
-        else:
-            fuzzy = int(t[1][1])
+    key = t[2]
+    value = t[4]
+    if len(t[1]) == 1:
+        fuzzy = 'AUTO'
     else:
-        key = t[1]
-        value = t[3]
-        fuzzy = None
+        fuzzy = int(t[1][1])
+    value = remove_escapes(value)
+
+    print('SWord', key, value, fuzzy)
+
+    sub_query = create_specific_word_subquery(key, value)
+    sub_query['multi_match']['fuzziness'] = fuzzy
+
+    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': sub_query}}}
+
+def p_specific_word(t):
+    'specific : WORD COLON WORD'
+
+    key = t[1]
+    value = t[3]
+    value = remove_escapes(value)
+
+    print('SWord', key, value)
+
+    sub_query = create_specific_word_subquery(key, value)
+
+    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': sub_query}}}
+
+def p_specific_fuzzy_quoted(t):
+    'specific : FUZZY WORD COLON QUOTED'
+    key = t[2]
+    value = t[4]
+    if len(t[1]) == 1:
+        fuzzy = 'AUTO'
+    else:
+        fuzzy = int(t[1][1])
 
     print('SQuoted', key, value, fuzzy)
     value = remove_escapes(value[1:-1])
@@ -421,74 +424,82 @@ def p_specific_quoted(t):
         else:
             raise KeyError("Unknown field")
 
-            
-        if  fuzzy is not None:
-            nf = []
-            for f in fields1:
-                if f not in no_parts:
-                    f += ".parts"
-                nf.append(f)
-            fields1 = nf
-        else:
-            for f in fields1:
-                if f not in no_parts:
-                    f += ".parts"
-                    fields2.append(f)
+        nf = []
+        for f in fields1:
+            if f not in no_parts:
+                f += ".parts"
+            nf.append(f)
+        fields1 = nf
 
+    q['multi_match'] = {
+        "query": str(value),
+        "fields": fields1,
+        "fuzziness": fuzzy
+    }
+
+    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+
+
+def p_specific_quoted(t):
+    'specific : WORD COLON QUOTED'
+
+    key = t[1]
+    value = t[3]
+
+    print('SQuoted', key, value)
+    value = remove_escapes(value[1:-1])
+
+    fields1 = []
+    fields2 = []
+
+    if key in special_keywords:
+        fields1 = special_keywords[key]
+    else:
+        if key in shortcut_keywords:
+            fields1 = shortcut_keywords[key]
+        elif key in original_keywords:
+            if key != 'domainName':
+                key = 'details.' + key
+            fields1 = [key]
+        else:
+            raise KeyError("Unknown field")
+
+        for f in fields1:
+            if f not in no_parts:
+                f += ".parts"
+                fields2.append(f)
 
     print fields1, fields2
 
     q = {}
-    
-    if fuzzy is None:
-        split_vals = value.split()
-        shds = []
-        for f in fields1:
-            shd = {'term': { f: {"value": value, "boost" : 1.5}}}
+    split_vals = value.split()
+    shds = []
+    for f in fields1:
+        shd = {'term': { f: {"value": value, "boost" : 1.5}}}
+        shds.append(shd)
+
+    for f in fields2:
+        if len(split_vals) > 1:
+            spans = []
+            for p in split_vals:
+                spans.append({'span_term': {f:p}})
+            shds.append({'span_near': { 'clauses': spans, 'slop': 1, 'in_order': 'true'}})
+        else:
+            shd = {'term': {f: {"value": value}}}
             shds.append(shd)
 
-        for f in fields2:
-            if len(split_vals) > 1:
-                spans = []
-                for p in split_vals:
-                    spans.append({'span_term': {f:p}})
-                shds.append({'span_near': { 'clauses': spans, 'slop': 1, 'in_order': 'true'}})
-                '''
-                musts = []
-                for p in split_vals:
-                    musts.append({'term': {f: p}})
-                shds.append({'bool': {'must': musts}})
-                '''
-            else:
-                shd = {'term': {f: {"value": value}}}
-                shds.append(shd)
-
-        if len(shds) == 1:
-            q['query'] = shds[0]
-        else:
-            q['bool'] = {'should': shds}
+    if len(shds) == 1:
+        q['query'] = shds[0]
     else:
-        q['multi_match'] = {
-            "query": str(value),
-            "fields": fields1,
-            "fuzziness": fuzzy
-        }
+        #q['bool'] = {'should': shds}
+        q['dis_max'] = {'queries': shds}
 
     if 'query' not in q:
         t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
     else:  
         t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
 
-def p_specific_wildcard_regex(t):
-    '''specific : WORD COLON WILDCARD
-                | WORD COLON REGEX'''
-
-    key = t[1]
-    value = t[3][2:-1]
-    rorw = t[3][0]
-    
-    print('SWord', key, value)
-
+def create_wildreg_query(key, value, qtype):
     fields1 = []
     fields2 = []
 
@@ -514,11 +525,6 @@ def p_specific_wildcard_regex(t):
     q ={}
 
     shds = []
-    if rorw == 'w':
-        qtype = 'wildcard'
-    else:
-        qtype = 'regexp'
-
     for f in fields1:
         shd = {qtype: {f: {"value": str(value), "boost": 1.5}}}
         shds.append(shd)
@@ -528,51 +534,44 @@ def p_specific_wildcard_regex(t):
     if len(shds) == 1:
         q['query'] =  shds[0]
     else:
-        q['bool'] = {'should': shds}
+        #q['bool'] = {'should': shds}
+        q['dis_max'] = {'queries': shds}
 
     if 'query' not in q:
-        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+        return {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
     else:  
-        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
+        return {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
 
-def p_daterange(t):
-    '''daterange : WORD COLON DATE
-                 | WORD COLON DATE COLON DATE'''
 
-    if len(t) == 4:
-        try:
-            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
-        except Exception as e:
-           print "Invalid Date Format: %s" % str(e) 
+def p_specific_wildcard(t):
+    'specific : WORD COLON WILDCARD'
 
-        end_date = start_date + datetime.timedelta(1,0)
-        key = t[1]
-    else:
-        try:
-            start_date = datetime.datetime.strptime(t[3], '%Y-%m-%d')
-            end_date = datetime.datetime.strptime(t[5], '%Y-%m-%d') + datetime.timedelta(1,0)
-        except Exception as e:
-            print "Invalid Date Range"
+    key = t[1]
+    value = t[3][2:-1]
 
-        if end_date < start_date:
-            print "End date less than start date"
-        key = t[1] 
+    t[0] = create_wildreg_query(key, value, 'wildcard')
 
-    print start_date, end_date
+def p_specific_regex(t):
+    'specific : WORD COLON REGEX'
 
+    key = t[1]
+    value = t[3][2:-1]
+
+    t[0] = create_wildreg_query(key, value, 'regexp')
+
+
+def create_daterange_query(key, start, end):
     if key not in date_keywords:
         raise KeyError("Unknown Key")
-
     key = date_keywords[key]
-
     qf = {
     'query':{
         'filtered': {
             'filter': { 
                 'range': {
                     key: {
-                        'gte': start_date.strftime('%Y-%m-%d %H:%M:%S'),
-                        'lt': end_date.strftime('%Y-%m-%d %H:%M:%S'),
+                        'gte': start.strftime('%Y-%m-%d %H:%M:%S'),
+                        'lt': end.strftime('%Y-%m-%d %H:%M:%S'),
                     }
                 }
             },
@@ -581,69 +580,90 @@ def p_daterange(t):
         }
     }
 
-    t[0] = qf 
+    return qf
+
+def p_daterange_single(t):
+    'daterange : WORD COLON DATE'
+
+    try:
+        start = datetime.datetime.strptime(t[3], '%Y-%m-%d')
+    except Exception as e:
+       print "Invalid Date Format: %s" % str(e)
+
+    end = start_date + datetime.timedelta(1,0)
+
+    t[0] = create_daterange_query(t[1], start, end)
+
+def p_daterange_range(t):
+    'daterange : WORD COLON DATE COLON DATE'
+
+    try:
+        start = datetime.datetime.strptime(t[3], '%Y-%m-%d')
+        end = datetime.datetime.strptime(t[5], '%Y-%m-%d') + datetime.timedelta(1,0)
+    except Exception as e:
+        print "Invalid Date Range"
+
+    if end < start:
+        print "End date less than start date"
+
+    t[0] = create_daterange_query(t[1], start, end)
 
 def p_termquery_quoted(t):
     '''termquery : QUOTED'''
     print('TermQueryQ', t[1])
 
     term = remove_escapes(t[1][1:-1])
-    if ' ' in term:
-        whitespace = True
-    else:
-        whitespace = False
-
-    parts = []
+    query = None
+    terms = term.split()
 
     ll = looks_like(term)
     if ll is None:
-        #XXX TODO use span queries?
-        for p in term.split():
-            parts.append({'term': {'_all': p }})
+        if len(terms) > 1:
+            spns = []
+            for p in terms:
+                spns.append({'span_term': {'_all': p}})
+            query = {'span_near': {'clauses': spns, 'slop': 1, 'in_order': 'true'}}
+        else:
+            query = {'term': {'_all': term}}
     else:
         if ll == 'email':
-            fields = [ "details.administrativeContact_email.parts", 
-                       "details.registrant_email.parts", 
-                       "_all" ] 
+            fields = [
+                       ("details.administrativeContact_email.parts", 1.5),
+                       ("details.registrant_email.parts", 1.5),
+                       ("_all", 1.0)
+                     ]
         elif ll == 'domain':
-            fields = [ "domainName.parts^3",
-                       "details.administrativeContact_email.parts", 
-                       "details.registrant_email.parts", 
-                       "_all"]
+            fields = [
+                       ("domainName.parts", 2.0),
+                       ("details.administrativeContact_email.parts", 1.5),
+                       ("details.registrant_email.parts", 1.5),
+                       ("_all", 1.0)
+                     ]
 
-        terms = term.split()
-        if len(terms) > 1:
-            terms.append(term)
-        else:
-            terms = [term]
-
-        print terms
-
-        for p in terms:
-            shds = []
-            for f in fields:
-                 shds.append({'term': {f:p}})
-            if len(shds) > 1:
-                parts.append({'bool': {'should': shds}})
+        queries = []
+        for (f, boost_val) in fields:
+            if len(terms) > 1:
+                spans = []
+                for p in terms:
+                    spans.append({'span_term': {f: p}})
+                queries.append({'span_near': {'clauses': spans, 'slop': 1, 'in_order': 'true', 'boost': boost_val}})
             else:
-                parts.append(shds[0])
+                shd = {'term': {f: {"value": terms[0], 'boost': boost_val}}}
+                queries.append(shd)
 
-    if len(parts) == 1:
-        t[0] = {"query": {"filtered": {"query": parts[0], "filter": {"match_all":{}}}}}
-    else:
-        t[0] = {"query": {"filtered": {"query": {"bool": {"must" : parts }}, "filter": {'match_all': {}}}}}
+        query = {'dis_max': {'queries': queries}}
+
+    t[0] = {"query": {"filtered": {"query": query, "filter": {"match_all":{}}}}}
 
 def p_termquery_word(t):
     '''termquery : WORD'''
     print('TermQueryW', t[1])
 
     term = remove_escapes(t[1])
-
-    parts = []
-
+    query = None
     ll = looks_like(term)
     if ll is None:
-        parts.append({'match': {'_all': term}})
+        query = {'match': {'_all': term}}
     else:
         if ll == 'email':
             fields = [ "details.administrativeContact_email.parts^2", 
@@ -655,17 +675,14 @@ def p_termquery_word(t):
                        "details.registrant_email.parts^2", 
                        "_all"]
 
-        parts.append({
+        query = {
             "multi_match": {
                 "query": term,
                 "fields": fields
             }
-        })
+        }
 
-    if len(parts) == 1:
-        t[0] = {"query": {"filtered": {"query": parts[0], "filter": {"match_all":{}}}}}
-    else:
-        t[0] = {"query": {"filtered": {"query": {"bool": {"must" : parts }}, "filter": {'match_all': {}}}}}
+    t[0] = {"query": {"filtered": {"query": query, "filter": {"match_all":{}}}}}
 
 
 def remove_escapes(t):
