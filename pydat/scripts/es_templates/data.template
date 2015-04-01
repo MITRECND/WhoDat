@@ -52,7 +52,7 @@
                 "all_analyzer": {
                     "type": "custom",
                     "tokenizer": "standard",
-                    "filter": ["lowercase", "all_filter", "asciifolding", "unique"]
+                    "filter": ["lowercase", "all_filter", "asciifolding"]
                 }
             },
             "tokenizer": {
