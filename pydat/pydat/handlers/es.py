@@ -236,7 +236,7 @@ def advDataTableSearch(query, skip, pagesize):
                 ]
 
     try:
-        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q)
+        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q, search_type = 'dfs_query_then_fetch')
     except Exception as e:
         results['message'] = str(e)
         return results    
@@ -367,7 +367,7 @@ def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dat
     query['from'] = skip
 
     try:
-        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
+        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query, search_type='dfs_query_then_fetch')
     except Exception as e:
         results['message'] = str(e)
         return results
