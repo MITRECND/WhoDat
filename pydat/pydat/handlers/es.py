@@ -346,6 +346,14 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     return results
 
 
+def test_query(search_string):
+    try:
+        query = yacc.parse(search_string)
+    except Exception as e:
+        return str(e)
+
+    return None
+
 def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dates, etc
     results = {'success': False}
     try:
