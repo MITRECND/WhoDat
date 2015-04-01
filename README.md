@@ -1,6 +1,22 @@
 WhoDat Project
 ==============
 
+<b>
+This branch is currently under testing to support the usage of Elasticsearch as a backend. If you see this message, consider this feature as an early alpha.
+
+This means:
+
+- That some things might be broken
+    -- I.e., some error handling might be non-existent
+- There is random debug output printed out
+- The search language might not be complete
+- The data template used with ElasticSearch might change
+    -- Which means you might have ot re-ingest all of your data at some point!
+
+
+If you're interested in testing this branch out despite the above, please read the README in the pydat directory to figure out how to use the search.  Feeding data into ElasticSearch is the same (or at least, very similar) to feeding data into mongo (look at the elasticsearch_populate.py script in the scripts diretory)
+</b>
+
 The WhoDat project is a front-end for whoisxmlapi data, or any whois data
 living in a MongoDB. It integrates whois data, current IP resolutions and
 passive DNS. In addition to providing an interactive, pivotable application
