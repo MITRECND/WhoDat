@@ -432,10 +432,12 @@ def p_specific_fuzzy_quoted(t):
             nf.append(f)
         fields1 = nf
 
-    q['multi_match'] = {
-        "query": str(value),
-        "fields": fields1,
-        "fuzziness": fuzzy
+    q = {
+        'multi_match': {
+            "query": str(value),
+            "fields": fields1,
+            "fuzziness": fuzzy
+        }
     }
 
     t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
