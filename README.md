@@ -1,21 +1,28 @@
 WhoDat Project
 ==============
 
-<b>
-This branch is currently under testing to support the usage of Elasticsearch as a backend. If you see this message, consider this feature as an early alpha.
+<b>This branch is currently under testing to support the usage of Elasticsearch as a backend. If you see this message, consider this feature as an early alpha.</b>
 
 This means:
 
 - That some things might be broken
-    -- I.e., some error handling might be non-existent
+    - I.e., some error handling might be non-existent
 - There is random debug output printed out
 - The search language might not be complete
 - The data template used with ElasticSearch might change
-    -- Which means you might have ot re-ingest all of your data at some point!
+    - Which means you might have ot re-ingest all of your data at some point!
 
 
 If you're interested in testing this branch out despite the above, please read the README in the pydat directory to figure out how to use the search.  Feeding data into ElasticSearch is the same (or at least, very similar) to feeding data into mongo (look at the elasticsearch_populate.py script in the scripts diretory)
-</b>
+
+<b>PreReqs to run with ElasticSearch</b>:
+
+- ElasticSearch installed somewhere
+- python elasticsearch library (pip install elasticsearch)
+- python lex yacc library (pip install ply)
+- below specified prereqs too (except pymongo)
+
+
 
 The WhoDat project is a front-end for whoisxmlapi data, or any whois data
 living in a MongoDB. It integrates whois data, current IP resolutions and
@@ -44,7 +51,7 @@ pyDat is a Python implementation of [Chris Clark's](https://github.com/Xen0ph0n)
 WhoDat code. It is designed to be more extensible and has more features than
 the PHP implementation.
 
-Version 2.0 of pyDat includes support for historical whois searches. This capability
+Version 2.0 of pyDat included support for historical whois searches. This capability
 necessitated modifying the way data is stored in the database. To aid in properly populating
 the database, a script called [mongo_populate](./pydat/scripts/mongo_populate.py) is provided
 to auto-populate the data. Note that the data coming from whoisxmlapi doesn't seem to be always
