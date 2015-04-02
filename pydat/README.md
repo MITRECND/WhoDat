@@ -57,22 +57,20 @@ domainName:foo AND (email:bar OR email:bah)
 Fuzzy Searching
 --------------------
 
-ElasticSearch's '*fuzzy*' searching capability is exposed in the query syntax using the '**~**' character and works on
-specified fields (this feature will not work on generic searches). Here's an example:
+ElasticSearch's '*fuzzy*' searching capability allows you to find terms that are similar to your search term. This is exposed in the query syntax using the '**~**' character and works on specified fields (this feature will not work on generic searches). Here's an example:
 
 <pre>
 ~domainName:foo
 </pre>
 
-The above query will do a search on the domainName field for the value foo, but will do a fuzzy search with
-fuzziness (or the Levenshtein edit distance if you want to get technical) set to 'AUTO' so ElasticSearch will
-decide how fuzzy to make the search based on the length of the query. To control the fuzziness manually, you can add '**0**', '**1**', or '**2**' to the '**~**' character. For example:
+The above query will do a search on the domainName field for the value foo, but will do a fuzzy search with fuzziness (or the Levenshtein edit distance if you want to get technical) set to 'AUTO' so ElasticSearch will decide how fuzzy to make the search based on the length of the query. To control the fuzziness manually, you can add '**0**', '**1**', or '**2**' to the '**~**' character. For example:
 
 <pre>
 ~2domainName:google
 </pre>
 
-The above will do a fuzzy search on the domainName field using a fuzziness value of 2. 
+The above will do a fuzzy search on the domainName field using a fuzziness value of 2 and will return any whois records that have a domain name that is 2 edits away from '*google*'.
+
 <sub>**Note: ElasticSearch limits fuzziness to 2 at the max, internally. Entering 3 through 9 will not raise an error but will be the same as entering '2'.  the AUTO option uses '0' for terms that are 1 character long, '1' for terms that are between 1 and 5 characters and '2' for terms that are longer than 5 characters. These are generally good values.**
 </sub>
 
@@ -80,6 +78,7 @@ Getting Particular
 ---------------------
 
 The new query syntax supports regex and wildcard searches on specific fields using a special syntax. 
+
 <sub>**Note that fuzzy searching (as detailed above) is not supported for wildcard and regex searches, nor would it really make any sense.**</sub>
 
 ### WildCard Searches
@@ -278,6 +277,30 @@ As briefly mentioned above, quoted strings are processed by pyDat before craftin
 Most shortcut searches (using any of the fields above listed as shortcut for other fields) should work as expected. The only situation where a shortcut might work as expected is the '**street**' shortcut as it will search against each of the fields as if they're competing. What this means is if you try to search for a full address, this will possible not work as expected.
 
 
+### Fuzzy Searches
+
+By default, fuzzy searching in ElasticSearch is limited to 2 edits and 50 expansions (as far as I can tell from the documentation, it's a tad vague). This should fit most cases but is probably something to consider when using fuzzy searching. 
+
+Further specifying a fuzzy search on a quoted string will not search the same way as a non-fuzzy search on a quoted string, nor will it return the same results as two fuzzy searches in the same field. For example:
+
+<pre>
+name:"john smith"
+</pre>
+
+<pre>
+~name:john ~name:smith
+</pre>
+
+<pre>
+~name:"john smith"
+</pre>
+
+
+The above queries will all return different data, with the last one being the most generic and probably returning the most data.
+
+
+
+
 TBD, more caveats eventually
 
 
@@ -287,3 +310,4 @@ Technical Explanation
 If you're interested as to what sort of ElasticSearch searches your query is transformed into, you can read the below, otherwise you can stop here and just use pyDat. This section requires a pretty good understanding of ElasticSearch for it to make any sense. Also, before reading this section, it would  behoove you to look at the template file in the scripts/es_templates directory to be familiar with how the data is organized, processed, and tokenized.
 
 <b>TBD</b>
+
