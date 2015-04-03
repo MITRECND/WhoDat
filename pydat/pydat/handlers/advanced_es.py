@@ -246,8 +246,6 @@ def p_query_group(t):
     t[0] = t[2]
 
 def create_combined_and(queries):
-    print('AND QUERY', queries[0], queries[1])
-
     query = { "bool": { "must": [] }}
     filt = {'and': []}
 
@@ -290,7 +288,6 @@ def p_query_and_query(t):
 
 def p_query_or_query(t):
     'query : query OR query'
-    print('OR QUERY', t[1], t[2], t[3])
 
     query = {"bool": {"should": [], "disable_coord": "true"}}
     filt = {"or": []}
@@ -330,7 +327,6 @@ def p_query_terminals(t):
     '''query : specific
              | daterange
              | termquery'''
-    print('QSpec', t[1])
     t[0] = t[1]
 
 def create_specific_word_subquery(key, value):
@@ -354,8 +350,6 @@ def create_specific_word_subquery(key, value):
             nf.append(f)
         fields1 = nf
 
-    print fields1
-
     q = {
         'multi_match': {
             "query": value,
@@ -377,8 +371,6 @@ def p_specific_fuzzy_word(t):
         fuzzy = int(t[1][1])
     value = remove_escapes(value)
 
-    print('SWord', key, value, fuzzy)
-
     sub_query = create_specific_word_subquery(key, value)
     sub_query['multi_match']['fuzziness'] = fuzzy
 
@@ -390,8 +382,6 @@ def p_specific_word(t):
     key = t[1]
     value = t[3]
     value = remove_escapes(value)
-
-    print('SWord', key, value)
 
     sub_query = create_specific_word_subquery(key, value)
 
@@ -406,7 +396,6 @@ def p_specific_fuzzy_quoted(t):
     else:
         fuzzy = int(t[1][1])
 
-    print('SQuoted', key, value, fuzzy)
     value = remove_escapes(value[1:-1])
     value = value.lower()
 
@@ -449,7 +438,6 @@ def p_specific_quoted(t):
     key = t[1]
     value = t[3]
 
-    print('SQuoted', key, value)
     value = remove_escapes(value[1:-1])
     value = value.lower()
 
@@ -473,7 +461,6 @@ def p_specific_quoted(t):
                 f += ".parts"
                 fields2.append(f)
 
-    print fields1, fields2
 
     q = {}
     split_vals = value.split()
@@ -524,7 +511,6 @@ def create_wildreg_query(key, value, qtype):
                 f += ".parts"
                 fields2.append(f)
 
-    print fields1, fields2
 
     q ={}
 
@@ -592,9 +578,9 @@ def p_daterange_single(t):
     try:
         start = datetime.datetime.strptime(t[3], '%Y-%m-%d')
     except Exception as e:
-       print "Invalid Date Format: %s" % str(e)
+        raise ValueError("Invalid Date Format: %s" % str(e))
 
-    end = start_date + datetime.timedelta(1,0)
+    end = start + datetime.timedelta(1,0)
 
     t[0] = create_daterange_query(t[1], start, end)
 
@@ -605,16 +591,15 @@ def p_daterange_range(t):
         start = datetime.datetime.strptime(t[3], '%Y-%m-%d')
         end = datetime.datetime.strptime(t[5], '%Y-%m-%d') + datetime.timedelta(1,0)
     except Exception as e:
-        print "Invalid Date Range"
+        raise ValueError("Invalid Date Range")
 
     if end < start:
-        print "End date less than start date"
+        raise ValueError("End date less than start date")
 
     t[0] = create_daterange_query(t[1], start, end)
 
 def p_termquery_quoted(t):
     '''termquery : QUOTED'''
-    print('TermQueryQ', t[1])
 
     term = remove_escapes(t[1][1:-1])
     term = term.lower()
@@ -662,7 +647,6 @@ def p_termquery_quoted(t):
 
 def p_termquery_word(t):
     '''termquery : WORD'''
-    print('TermQueryW', t[1])
 
     term = remove_escapes(t[1])
     query = None
@@ -693,7 +677,6 @@ def p_termquery_word(t):
 def remove_escapes(t):
     unescaped_string = ""
     parts = re.split(r'(\\.)', t)
-    print parts
     for p in parts:
         if p == '':
             continue
