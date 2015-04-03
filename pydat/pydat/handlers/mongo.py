@@ -150,7 +150,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 def advDataTableSearch(query, skip, pagesize):
     results = {
                'success': False,
-               'aaData' = []
+               'aaData' : []
               }
 
     return results
