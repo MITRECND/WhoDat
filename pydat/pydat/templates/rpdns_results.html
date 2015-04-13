@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}pDNS{% endblock %}
+
+{% block js_constants %}
+    <script type="text/javascript">
+      var direction = " Inverse";
+      var active = 'rpdns';
+    </script>
+{% endblock %}
+
+{% block js %}
+    <script type="text/javascript" src="/static/js/pdns.js"></script>
+{% endblock %}
+
+{% block searchBar %}
+    {% include 'rpdns_form.html' %}
+{% endblock %}
+
+{% block page %}
+    {% if results.data.items %}
+        {% include 'pdns_table.html' %}
+    {% else %}
+        <div id = 'noresults'>
+        <h2>No Results Found</h2>
+        </div>
+    {% endif %}
+{% endblock %}

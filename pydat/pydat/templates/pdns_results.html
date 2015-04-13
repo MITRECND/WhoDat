@@ -4,11 +4,13 @@
 
 {% block js_constants %}
     <script type="text/javascript">
+      var direction = "";
       var active = 'pdns';
     </script>
 {% endblock %}
 
 {% block js %}
+    <script type="text/javascript" src="/static/js/pdns.js"></script>
 {% endblock %}
 
 {% block searchBar %}
@@ -16,4 +18,11 @@
 {% endblock %}
 
 {% block page %}
+    {% if results.data.items %}
+        {% include 'pdns_table.html' %}
+    {% else %}
+        <div id = 'noresults'>
+        <h2>No Results Found</h2>
+        </div>
+    {% endif %}
 {% endblock %}

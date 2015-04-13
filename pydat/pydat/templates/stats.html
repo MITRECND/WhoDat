@@ -1,0 +1,31 @@
+{% extends 'nosearchbase.html' %}
+
+{% block js_constants %}
+    <script type="text/javascript">
+      var active = 'stats';
+    </script>
+{% endblock %}
+
+{% block page %}
+    <table>
+        <tr>
+            <th>
+                TLD
+            </th>
+            <th>
+                Entries
+            </th>
+            <th>
+                Unique
+            </tr>
+        </tr>
+        {% for tld,values in domain_stats.items %}
+            <tr>
+                <td>{{ tld }}</td>
+                <td>{{ values.0 }}</td>
+                <td>{{ values.1 }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+
+{% endblock %}

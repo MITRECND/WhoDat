@@ -138,6 +138,9 @@
                 "reverse": {
                             "type": "string",
                             "analyzer": "reversed"
+                },
+                "hash": {
+                    "type": "murmur3"
                 }
             }
           },

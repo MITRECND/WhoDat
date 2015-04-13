@@ -1,0 +1,16 @@
+<div id='stats'>
+    <table id='stats_table'>
+        <tr>
+            <td class='right'>Cluster Status:</td>
+            <td><span class='{% filter lower %}{{ health }}{% endfilter %}'>{{ health }}</span></td>
+        </tr>
+        <tr>
+            <td class='right'>WHOIS Entries:</td>
+            <td>{{ record_count }}</td>
+        </tr>
+        <tr>
+            <td class='right'>Latest Import:</td>
+            <td>{{ last_import }}</td>
+        </tr>
+    </table>
+</div>

@@ -28,30 +28,10 @@
     {% include 'navigation_bar.html' %}
     <div class='clear'>
     </div>
-    <div id="searchIcon">
-        <span id="button" class="ui-icon ui-icon-minus"></span>
-    </div>
-    <div class='clear'>
-    </div>
-
-    <div id='searchBar'>
-        <div id='search'>
-        {% block searchBar %}
-        {% endblock %}
-        </div>
-        {% if handler == 'es' %}
-            {% include 'status_part.html' %}
-        {% endif %}
-    </div><!-- searchBar -->
     </div><!-- header -->
 
 	<div class='clear'>
 	</div>
-
-    <div id='errors'>
-    {% block errors %}
-    {% endblock %}
-    </div>
 
     <div id = 'page'>
 	{% block page %}

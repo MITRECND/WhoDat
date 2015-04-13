@@ -3,12 +3,19 @@ from django.conf import settings
 
 urlpatterns = patterns('',
   url(r'^$', 'pydat.views.index', name='index'),
+
   url(r'^domains/(?P<key>.*)/(?P<value>.*)/$', 'pydat.views.domains'),
   url(r'^domains/$', 'pydat.views.domains', name='domains'),
-  url(r'^pdns/(?P<domain>.*)/$', 'pydat.views.pdns', name='pdns_rest'),
-  url(r'^pdns/$', 'pydat.views.pdns', name='pdns'),
-  url(r'^pdnsr/(?P<key>.*)/(?P<value>.*)/$', 'pydat.views.pdns_r', name='pdns_r_rest'),
-  url(r'^pdnsr/$', 'pydat.views.pdns_r', name='pdns_r'),
+
+  url(r'^about/$', 'pydat.views.about', name='about'),
+
+  url(r'^pdns_results/(?P<domain>.*)/$', 'pydat.views.pdns', name='pdns_rest'),
+  url(r'^pdns_results/$', 'pydat.views.pdns', name='pdns_results'),
+  url(r'^pdns_search/$', 'pydat.views.pdns_index', name='pdns'),
+
+  url(r'^pdnsr_results/(?P<key>.*)/(?P<value>.*)/$', 'pydat.views.pdns_r', name='pdns_r_rest'),
+  url(r'^pdnsr_results/$', 'pydat.views.pdns_r', name='pdns_r_results'),
+  url(r'^pdnsr_search/$', 'pydat.views.rpdns_index', name='pdns_r'),
 
   url(r'^ajax/metadata/$', 'pydat.ajax.metadata'),
   url(r'^ajax/metadata/(?P<version>.*)/$', 'pydat.ajax.metadata'),
@@ -39,5 +46,7 @@ if settings.HANDLER == 'es': #Enable ES specific urls
       url(r'^advdomains/$', 'pydat.views.advdomains', name='advdomains'),
       url(r'^ajax/query/$', 'pydat.ajax.advanced_search', name='ajax_advanced'),
       url(r'^ajax/advDataTable/$', 'pydat.ajax.advDataTable', name='ajax_advDataTable'),
+      url(r'^stats/$', 'pydat.views.stats', name='stats'),
+      url(r'^help/$', 'pydat.views.help', name='help'),
     )
 

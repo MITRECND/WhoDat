@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Domain Search{% endblock %}
+
+{% block js_constants %}
+    <script type="text/javascript">
+      var active = 'domain';
+      var domain_url = "{% url 'ajax_domain' %}";
+    {% if legacy_search %}
+      var dataTable_url = "{% url 'ajax_dataTable' %}";
+      var key = "{{ key }}";
+      var value = "{{ value }}";
+      var low_version = {{ low_version }};
+      var high_version = {{ high_version }};
+    {% else %}
+      var advDataTable_url = "{% url 'ajax_advDataTable' %}";
+      var query_string = "{{ search_string }}"; 
+    {% endif %}
+    </script>
+{% endblock %}
+
+{% block js %}
+    {% if legacy_search %}
+        <script type="text/javascript" src="/static/js/domain.js"></script>
+    {% else %}
+        <script type="text/javascript" src="/static/js/domain_advanced.js"></script>
+    {% endif %}
+{%endblock %}
+
+{% block searchBar %}
+    {% if legacy_search %}
+        {% include 'domain_search_form.html' %}
+    {% else %}
+        {% include 'domain_advsearch_form.html' %}
+    {% endif %}
+{% endblock %}
+
+{% block error %}
+{% endblock %}
+
+
+{% block page%}
+    {% include 'domain_table.html' %}
+{% endblock %}

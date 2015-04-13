@@ -1,6 +1,7 @@
 from elasticsearch import Elasticsearch
 from django.conf import settings
 from handlers.advanced_es import yacc
+from datetime import date
 
 class ElasticsearchError(Exception):
     pass
@@ -21,6 +22,61 @@ def record_count():
     records = es.cat.count(index='%s-*' % settings.ES_INDEX_PREFIX, h="count")
 
     return int(records)
+
+def cluster_stats():
+    try:
+        es = es_connector()
+    except:
+        raise
+
+
+    tstr = date.today().timetuple()
+    year = tstr[0] - 2
+    month = tstr[1]
+    year_string = "%i-%.2i-01 00:00:00" % (year, month)
+
+    query = {"aggs": {
+                "type": {"terms": {"field": "_type"}, "aggregations": {"unique": {"cardinality": {"field": "domainName.hash"}}}},
+                "dates": {
+                          "filter": { "range": {"details.standardRegCreatedDate": {"gte": year_string }}}, 
+                            "aggs": {
+                                    "created": {"date_histogram": {"field": "details.standardRegCreatedDate", "interval": "1M", "format": "yyyy-MM"}},
+                                    "updated": {"date_histogram": {"field": "details.standardRegUpdatedDate", "interval": "1M", "format": "yyyy-MM"}},
+                            }
+                          }
+            }}
+    #TODO XXX need to cache this but query_cache doesn't seem to be a parameter to this function
+    #Might need to set query cache in the mapping instead
+    results = es.search(index = '%s-*' % settings.ES_INDEX_PREFIX, body = query, search_type="count")
+
+
+    domain_stats = {}
+    created_histogram = []
+    updated_histogram = []
+
+    for bucket in results['aggregations']['type']['buckets']:
+        domain_stats[bucket['key']] = (bucket['doc_count'], bucket['unique']['value'])
+   
+    for bucket in results['aggregations']['dates']['created']['buckets']:
+       created_histogram.append((bucket['key_as_string'], bucket['doc_count'])) 
+
+    for bucket in results['aggregations']['dates']['updated']['buckets']:
+       updated_histogram.append((bucket['key_as_string'], bucket['doc_count'])) 
+
+    print created_histogram
+    print updated_histogram
+
+    return domain_stats
+
+def cluster_health():
+    try:
+        es = es_connector()
+    except:
+        raise
+
+    health = es.cluster.health()
+
+    return health['status']
 
 def lastVersion():
     try:

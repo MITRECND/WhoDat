@@ -1,22 +1,9 @@
 $(document).ready(function() {
-    $("#about").dialog({
-        "width": 400,
-        "height": 100,
-        "autoOpen": false
-    });
-
-	$('#forms').tabs({
-				"active" : active_window
-				});
-    //Set to the height of the pdns tab since it should be the longest
-	$("#forms div.ui-tabs-panel").css('height', $("#pdnsf").height());
-
     //Associate toggle with click
     $("#searchIcon").on("click", function() { search_toggle();}); 
-    $("#title").on("click", function() { search_toggle();});
 
-    $("#aboutlink span").on("click", function() { $("#about").dialog("open"); });
-    
+    $("#" + active + "_link").addClass("tab_active");
+
     $("#pdnsr [name='key']").change(function(){
         if($(this).find("option:selected").val() == "name"){
             $(".form_rrtypes").removeClass("novis").show();
@@ -40,8 +27,6 @@ $(document).ready(function() {
             $(this).parents('tbody').find('.form_filter').addClass("novis");
         }
     }); 
-
-   $('#forms').tooltip({ items: 'li[title],label[title]'});
 
 });
 
@@ -81,12 +66,12 @@ function search_toggle(duration){
         duration = typeof duration !== 'undefined' ? duration : 200;
         if ($("#button").hasClass('ui-icon-plus')){
                 $("#button").removeClass('ui-icon-plus').addClass('ui-icon-minus');
-                $("#forms").show(duration);
-                $(".domain_nonweb").show(); //Some weird bug that doesn't show the hidden fields
-                $(".pdns_nonweb").show();
+                $("#searchBar").show(duration);
+                //$(".domain_nonweb").show(); //Some weird bug that doesn't show the hidden fields
+                //$(".pdns_nonweb").show();
         }else{
                 $("#button").removeClass('ui-icon-minus').addClass('ui-icon-plus');
-                $("#forms").hide(duration);
+                $("#searchBar").hide(duration);
         }
 }
 

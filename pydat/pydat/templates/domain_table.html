@@ -1,0 +1,26 @@
+<table class = "dnsres">
+  <thead>
+    <tr>
+      <th>&nbsp;</th>
+      <th>Name</th>
+      <th>Registrant</th>
+      <th>Email</th>
+      <th>Created</th>
+      <th>Telephone</th>
+      <th>Version</th>
+      {% if not legacy_search %}
+          <th>Score</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+<div id="dialog">
+    <span id="dtext"></span>
+</div>
+
+
+<div id="statusDialog" title="Working ...">
+    <span id="statusText">Data is being fetched from the server ... Please Wait</span>
+</div>
