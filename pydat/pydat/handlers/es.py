@@ -2,6 +2,7 @@ from elasticsearch import Elasticsearch
 from django.conf import settings
 from handlers.advanced_es import yacc
 from datetime import date
+import collections
 
 class ElasticsearchError(Exception):
     pass
@@ -36,37 +37,51 @@ def cluster_stats():
     year_string = "%i-%.2i-01 00:00:00" % (year, month)
 
     query = {"aggs": {
-                "type": {"terms": {"field": "_type"}, "aggregations": {"unique": {"cardinality": {"field": "domainName.hash"}}}},
-                "dates": {
+                "type": {
+                          "terms": {"field": "_type"}, 
+                            "aggregations": {"unique": {"cardinality": {"field": "domainName.hash"}}}
+                        },
+                "created": {
                           "filter": { "range": {"details.standardRegCreatedDate": {"gte": year_string }}}, 
-                            "aggs": {
-                                    "created": {"date_histogram": {"field": "details.standardRegCreatedDate", "interval": "1M", "format": "yyyy-MM"}},
-                                    "updated": {"date_histogram": {"field": "details.standardRegUpdatedDate", "interval": "1M", "format": "yyyy-MM"}},
+                          "aggs": {
+                                    "dates": {"date_histogram": {"field": "details.standardRegCreatedDate", "interval": "1M", "format": "yyyy-MM"}}
                             }
-                          }
-            }}
+                    },
+                "updated": {
+                          "filter": { "range": {"details.standardRegUpdatedDate": {"gte": year_string }}}, 
+                            "aggs": {
+                                    "dates": {"date_histogram": {"field": "details.standardRegUpdatedDate", "interval": "1M", "format": "yyyy-MM"}},
+                            }
+                    }
+                }
+            }
     #TODO XXX need to cache this but query_cache doesn't seem to be a parameter to this function
     #Might need to set query cache in the mapping instead
     results = es.search(index = '%s-*' % settings.ES_INDEX_PREFIX, body = query, search_type="count")
 
-
-    domain_stats = {}
-    created_histogram = []
-    updated_histogram = []
+    stats = {
+            'domainStats': {},
+            'histogram': {}
+    }
 
     for bucket in results['aggregations']['type']['buckets']:
-        domain_stats[bucket['key']] = (bucket['doc_count'], bucket['unique']['value'])
+        stats['domainStats'][bucket['key']] = (bucket['doc_count'], bucket['unique']['value'])
    
-    for bucket in results['aggregations']['dates']['created']['buckets']:
-       created_histogram.append((bucket['key_as_string'], bucket['doc_count'])) 
+    for bucket in results['aggregations']['created']['dates']['buckets']:
+        date_label = "/".join(bucket['key_as_string'].split('-'))
+        if date_label not in stats['histogram']:
+            stats['histogram'][date_label] = {}
+        stats['histogram'][date_label]['created'] = bucket['doc_count']
 
-    for bucket in results['aggregations']['dates']['updated']['buckets']:
-       updated_histogram.append((bucket['key_as_string'], bucket['doc_count'])) 
+    for bucket in results['aggregations']['updated']['dates']['buckets']:
+        date_label = "/".join(bucket['key_as_string'].split('-'))
+        if date_label not in stats['histogram']:
+            stats['histogram'][date_label] = {}
+        stats['histogram'][date_label]['updated'] = bucket['doc_count']
 
-    print created_histogram
-    print updated_histogram
-
-    return domain_stats
+    stats['histogram'] = collections.OrderedDict(sorted(stats['histogram'].items()))
+    print stats['histogram']
+    return stats
 
 def cluster_health():
     try:
@@ -100,7 +115,7 @@ def metadata(version = None):
         return results
 
     if version is None:
-        res = es.search(index=index, body={"query": {"match_all": {}}})
+        res = es.search(index=index, body={"query": {"match_all": {}},"sort": "metadata"})
         if res['hits']['total'] > 0:
             newres = []
             for r in res['hits']['hits']:

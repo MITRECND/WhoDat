@@ -77,8 +77,22 @@ def rpdns_index(request):
     return render_to_response('rpdns.html', context)
 
 def stats(request):
-    domain_stats = handler.cluster_stats()
-    context = __createRequestContext__(request, data = {'domain_stats': domain_stats})
+    stats = handler.cluster_stats()
+    allversions = handler.metadata()
+    if allversions['success']:
+        lastimport = allversions['data'][-1]
+        lastten = allversions['data'][-10:]
+    else:
+        #XXX TODO returne error
+        pass
+
+    if lastten[0]['metadata'] == 0:
+        lastten = lastten[1:]
+
+    context = __createRequestContext__(request, data = {'domainStats': stats['domainStats'], 
+                                                        'histogram': stats['histogram'],
+                                                        'lastten': lastten,
+                                                        'lastimport': lastimport})
     return render_to_response('stats.html', context)
 
 def help(request):

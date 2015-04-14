@@ -1,31 +1,170 @@
 {% extends 'nosearchbase.html' %}
 
+{% block css %}
+		<link rel="stylesheet" type="text/css" href="/static/css/stats.css">
+{% endblock %}
+
 {% block js_constants %}
     <script type="text/javascript">
       var active = 'stats';
+      var chartData = {
+        labels: [{% for label,dates in histogram.items %}"{{label}}",{%endfor%}],
+        datasets: [
+            {
+                label: "Created",
+                fillColor: "rgba(220,220,220,0.5)",
+                strokeColor: "rgba(220,220,220,0.8)",
+                highlightFill: "rgba(220,220,220,0.75)",
+                highlightStroke: "rgba(220,220,220,1)",
+                data: [{% for label,dates in histogram.items %}{{dates.created}},{%endfor%}]
+            },
+            {
+                label: "Updated",
+                fillColor: "rgba(151,187,205,0.5)",
+                strokeColor: "rgba(151,187,205,0.8)",
+                highlightFill: "rgba(151,187,205,0.75)",
+                highlightStroke: "rgba(151,187,205,1)",
+                data: [{% for label,dates in histogram.items %}{{dates.updated}},{%endfor%}]
+            }
+        ]
+      };
+      var ltData = {
+        labels: [{% for entry in lastten %}"{{ entry.metadata }}",{%endfor%}],
+        datasets: [
+            {
+                label: "New",
+                fillColor: "rgba(220,220,220,0.5)",
+                strokeColor: "rgba(220,220,220,0.8)",
+                highlightFill: "rgba(220,220,220,0.75)",
+                highlightStroke: "rgba(220,220,220,1)",
+                data: [{% for entry in lastten %}{{entry.new}},{%endfor%}]
+            },
+            {
+                label: "Updated",
+                fillColor: "rgba(151,187,205,0.5)",
+                strokeColor: "rgba(151,187,205,0.8)",
+                highlightFill: "rgba(151,187,205,0.75)",
+                highlightStroke: "rgba(151,187,205,1)",
+                data: [{% for entry in lastten %}{{entry.updated}},{%endfor%}]
+            },
+            {
+                label: "Unchanged",
+                fillColor: "rgba(120,120,120,0.5)",
+                strokeColor: "rgba(120,120,120,0.8)",
+                highlightFill: "rgba(120,120,120,0.75)",
+                highlightStroke: "rgba(120,120,120,1)",
+                data: [{% for entry in lastten %}{{entry.unchanged}},{%endfor%}]
+            }
+        ]
+
+     }; 
     </script>
 {% endblock %}
 
-{% block page %}
-    <table>
-        <tr>
-            <th>
-                TLD
-            </th>
-            <th>
-                Entries
-            </th>
-            <th>
-                Unique
-            </tr>
-        </tr>
-        {% for tld,values in domain_stats.items %}
-            <tr>
-                <td>{{ tld }}</td>
-                <td>{{ values.0 }}</td>
-                <td>{{ values.1 }}</td>
-            </tr>
-        {% endfor %}
-    </table>
+{% block js %}
+    <script type="text/javascript" src="/static/js/Chart.js"></script>
+    <script type="text/javascript" src="/static/js/stats.js"></script>
+{% endblock %}
 
+{% block page %}
+
+    <div id='latestImportContainer'>
+        <h1>Latest Import</h1>
+        <div id='importTables'>
+            <div id='importStats'>
+                <table>
+                    <tr>
+                        <th colspan=2>Import Stats</td>
+                    </tr>
+                    <tr>
+                        <td>Version:</td><td> {{ lastimport.metadata}}</td>
+                    </tr>
+                    <tr>
+                        <td>New Entries:</td><td> {{ lastimport.new }} </td>
+                    </tr>
+                    <tr>
+                        <td>Updated Entries:</td><td> {{ lastimport.updated }} </td>
+                    </tr>
+                    <tr>
+                        <td>Unchanged Entries:</td><td> {{ lastimport.unchanged }} </td>
+                    </tr>
+                    <tr>
+                        <td>Import Comment:</td><td> {{ lastimport.comment }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div id='keyImportance'>
+                <table>
+                    <tr>
+                        {% if "included_keys" in lastimport %}
+                            <th>Included Keys</th>
+                        {% else %}
+                            <th>Excluded Keys</th>
+                        {% endif %}
+                    </tr>
+                    {% if "included_keys" in lastimport %}
+                        {% for key in lastimport.included_keys %}
+                            <tr><td> {{ key }} </td></tr>
+                        {% endfor %}
+                   {% else %} 
+                        {% for key in lastimport.excluded_keys %}
+                            <tr><td> {{ key }} </td></tr>
+                        {% endfor %}
+                    {% endif %}
+                </table>
+            </div>
+            <div id="changedStats">
+                <table>
+                    <tr>
+                        <th colspan=2>Entry Diffs</th>
+                    </tr>
+                        {% for key, value in lastimport.changed_stats.items %}
+                            <tr><td>{{ key }}</td><td>{{ value }}</td></tr>
+                        {% endfor %}
+                </table>
+            </div>
+        </div>
+    </div> 
+    
+
+    <div id='ltChartContainer'>
+        <h1> Import Statistics </h1>
+        <div id='ltChartDiv'>
+            <canvas id='ltChart'></canvas>
+        </div>
+        <div id='ltChartLegend'></div>
+    </div>
+
+    <div id='regChartContainer'>
+        <h1>WHOIS Registration Statistics</h1>
+        <div id='chartDiv'>
+            <canvas id="regChart"></canvas>
+        </div>
+        <div id="regChartLegend"></div>
+    </div>
+
+
+    <div id='tldStats'>
+        <h1>Top-Level Domain Stats</h1>
+        <table>
+            <tr>
+                <th>
+                    TLD
+                </th>
+                <th>
+                    Entries
+                </th>
+                <th>
+                    Unique
+                </tr>
+            </tr>
+            {% for tld,values in domainStats.items %}
+                <tr>
+                    <td>{{ tld }}</td>
+                    <td>{{ values.0 }}</td>
+                    <td>{{ values.1 }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
 {% endblock %}
