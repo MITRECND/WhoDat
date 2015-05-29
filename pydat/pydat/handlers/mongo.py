@@ -10,9 +10,9 @@ class MongoError(Exception):
 # Setup standard connector to the MongoDB instance for use in any functions
 def mongo_connector(collection, preference=settings.MONGO_READ_PREFERENCE):
     try:
-        connection = pymongo.Connection("%s" % settings.MONGO_HOST,
-                                        settings.MONGO_PORT,
-                                        read_preference=preference)
+        connection = pymongo.MongoClient(host = settings.MONGO_HOST,
+                                         port = settings.MONGO_PORT,
+                                         read_preference=preference)
         db = connection[settings.MONGO_DATABASE]
         return db[collection]
     except pymongo.errors.ConnectionFailure as e:
