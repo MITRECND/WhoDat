@@ -84,7 +84,7 @@ def request_pdns_reverse(key, value, rrtypes, limit, pretty = False):
 
     results['data'] = {}
     for rrtype in rrtypes:
-        url = "https://api.dnsdb.info/lookup/rdata/"+ key +"/" + urllib.quote(value) + "/" + rrtype + "/?limit=" + str(limit)
+        url = "https://api.dnsdb.info/lookup/rdata/"+ key +"/" + urllib.quote(value) + "/" + rrtype + "?limit=" + str(limit)
         try:
             r = requests.get(url,
                              proxies=settings.PROXIES,
