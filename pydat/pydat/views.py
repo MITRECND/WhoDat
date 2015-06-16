@@ -126,10 +126,8 @@ def pdns(request, domain = None):
         pdns_f.data['absolute'] = request.GET.get('absolute', False)
         pdns_f.data['pretty'] = request.GET.get('pretty', True)
         pdns_f.data['filt'] = request.GET.get('filt', 'rrname')
-
     else:
         return __renderErrorPage__(request, 'Bad Method')
-    
 
     if not pdns_f.is_valid():
         return __renderErrorPage__(request, '', {'pdns_form': pdns_f})
