@@ -66,7 +66,9 @@ def __request_pdns_dnsdb(domain, absolute, rrtypes, limit, pretty):
 def __make_passivetotal_request(url, params):
     results = {'success': False}
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url,
+                                params=params,
+                                proxies=settings.PROXIES)
     except Exception as e:
         results['error'] = "PassiveTotal: network connection error (%s)" % e
         return results
