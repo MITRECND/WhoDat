@@ -47,8 +47,11 @@ ALLOWED_HOSTS = ['*']
 #  'Accept': 'application/json'
 #}
 
-# Verify SSL certificates in DNSDB calls.
-# SSL_VERIFY = True
+# If you have a passivetotal API key set it here.
+#PASSIVETOTAL_KEY = ''
+
+# Verify SSL certificates in external calls.
+#SSL_VERIFY = True
 
 #Array of values to use as limits for DNSDB lookups
 #DNSDB_PAGE_LIMITS = [10, 20, 50, 100, 200, 500, 1000]

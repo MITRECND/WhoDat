@@ -2,7 +2,10 @@ $(document).ready(function() {
 
     //search_toggle(0);
 
-	$('#pdns').tabs();
+    $('#pdns').tabs();
+
+	$('#tab-DNSDB').tabs();
+	$('#tab-PassiveTotal').tabs();
 
     $('.dnsres').dataTable(
 				{
@@ -33,6 +36,6 @@ $(document).ready(function() {
     //tabName.css('color', 'white');
     tabName.css('font-size', '20px');
     tabName.css('top', '13px');
-    $("#pdns").append(tabName);
-
+    $("#pdns-DNSDB").append(tabName);
+    $("#pdns-PassiveTotal").append(tabName);
 });

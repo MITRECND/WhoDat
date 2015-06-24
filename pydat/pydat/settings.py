@@ -27,6 +27,7 @@ ES_INDEX_PREFIX = 'whois'
 PROXIES = {}
 
 DNSDB_HEADERS = {}
+PASSIVETOTAL_KEY = None
 
 # Verify SSL certificates in DNSDB calls.
 SSL_VERIFY = True

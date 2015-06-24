@@ -223,7 +223,7 @@ TODO
 Legal Stuff
 ===========
 
-pyDat is copyright The MITRE Corporation 2014.
+pyDat is copyright The MITRE Corporation 2015.
 
 The PHP implementation is copyright Chris Clark, 2013. Contact him at
 Chris@xenosys.org.
