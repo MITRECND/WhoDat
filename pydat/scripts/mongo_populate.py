@@ -122,7 +122,8 @@ def mongo_worker(insert_queue, options):
                 elif options.verbose:
                     for error in details['writeErrors']:
                         sys.stderr.write("Error inserting/updating %s\n\tmessage: %s\n" % (error['op']['domainName'], error['errmsg'].encode('ascii', 'replace')))
-                #else pass
+            except Exception as e:
+                sys.stderr.write("Error inserting/updating: %s\n" % str(e))
 
 
 ######## WORKER THREADS #########

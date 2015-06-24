@@ -1,3 +1,4 @@
+import cgi
 import time
 import json
 import requests
@@ -36,12 +37,12 @@ def request_pdns(domain, absolute, rrtypes, limit, pretty = False):
             # Skip empty lines.
             if not line:
                 continue
-            # Convert epoch timestamps to human readable.
             try:
-              tmp = json.loads(line)
+                tmp = json.loads(line)
             except Exception as e:
-              results['error'] = str(e)
-              return results
+                results['error'] = "%s: %s" % (str(e), cgi.escape(line, quote=True))
+                return results
+            # Convert epoch timestamps to human readable.
             for key in ['time_first', 'time_last']:
                 if key in tmp:
                     tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(tmp[key]))
@@ -98,12 +99,12 @@ def request_pdns_reverse(key, value, rrtypes, limit, pretty = False):
             # Skip empty lines.
             if not line:
                 continue
-            # Convert epoch timestamps to human readable.
             try:
-              tmp = json.loads(line)
+                tmp = json.loads(line)
             except Exception as e:
-              results['error'] = str(e)
-              return results
+                results['error'] = "%s: %s" % (str(e), cgi.escape(line, quote=True))
+                return results
+            # Convert epoch timestamps to human readable.
             for key in ['time_first', 'time_last']:
                 if key in tmp:
                     tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(tmp[key]))
