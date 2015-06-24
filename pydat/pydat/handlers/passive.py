@@ -68,7 +68,8 @@ def __make_passivetotal_request(url, params):
     try:
         response = requests.get(url,
                                 params=params,
-                                proxies=settings.PROXIES)
+                                proxies=settings.PROXIES,
+                                verify=settings.SSL_VERIFY)
     except Exception as e:
         results['error'] = "PassiveTotal: network connection error (%s)" % e
         return results
