@@ -18,11 +18,5 @@
 {% endblock %}
 
 {% block page %}
-    {% if results.data.items %}
-        {% include 'pdns_table.html' %}
-    {% else %}
-        <div id = 'noresults'>
-        <h2>No Results Found</h2>
-        </div>
-    {% endif %}
+    {% include 'pdns_table.html' %}
 {% endblock %}
