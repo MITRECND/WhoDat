@@ -80,7 +80,6 @@ def cluster_stats():
         stats['histogram'][date_label]['updated'] = bucket['doc_count']
 
     stats['histogram'] = collections.OrderedDict(sorted(stats['histogram'].items()))
-    print stats['histogram']
     return stats
 
 def cluster_health():
@@ -292,8 +291,6 @@ def advDataTableSearch(query, skip, pagesize):
 
     try:
         q = yacc.parse(query)
-        print query
-        print q
     except Exception as e:
         results['message'] = str(e)
         return results
@@ -436,8 +433,6 @@ def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dat
 
     try:
         query = yacc.parse(search_string)
-        print search_string
-        print query
     except Exception as e:
         results['message'] = str(e)
         return results
