@@ -160,13 +160,17 @@ def pdns(request, domain = None):
         return HttpResponse(json.dumps(results), content_type='application/json')
     elif fmt == 'list':
         data = ''
-        for rrtype in results['data'].keys():
-            for record in results['data'][rrtype]:
-                if not isinstance(record[filt_key], basestring): #it's a list
-                    for item in record[filt_key]:
-                        data += '\n%s' % item
-                else: #it's just a string
-                    data += '\n%s' % record[filt_key]
+        for set_ in results['sets']:
+            # Only handle DNSDB in list format.
+            if set_['type'] != 'DNSDB':
+                continue
+            for rrtype in set_['data'].keys():
+                for record in set_['data'][rrtype]:
+                    if not isinstance(record[filt_key], basestring): #it's a list
+                        for item in record[filt_key]:
+                            data += '\n%s' % item
+                    else: #it's just a string
+                        data += '\n%s' % record[filt_key]
         data = data[1:]
         return HttpResponse(data, content_type='text/plain')
     else:
