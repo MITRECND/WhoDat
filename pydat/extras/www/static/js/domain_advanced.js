@@ -71,20 +71,20 @@ $(document).ready(function() {
                         var registrant = aData[2];
                         if (registrant != null)
                             var safe_registrant = encodeURIComponent(registrant.toLowerCase())
-                        $('td:eq(2)', nRow).html( '<a href=/advdomains/?query=registrant_name:"' 
+                        $('td:eq(2)', nRow).html( '<a href=' + advdomains + '?query=registrant_name:"' 
                                                     + safe_registrant + '">' 
                                                     + registrant + '</a>').attr('title', 'Click to search by Registrant').addClass(oldVersion);
 
                         var reg_email = aData[3];
                         if (reg_email != null)
                             var safe_reg_email = encodeURIComponent(reg_email.toLowerCase())
-                        $('td:eq(3)', nRow).html( '<a href=/advdomains/?query=email:"' +  safe_reg_email
+                        $('td:eq(3)', nRow).html( '<a href=' + advdomains + '?query=email:"' +  safe_reg_email
                                                     + '">' + reg_email + '</a>').attr('title', 'Click to search by Email').addClass(oldVersion);
 
                         $('td:eq(4)', nRow).addClass(oldVersion);
 
                         var telephone = aData[5];
-                        $('td:eq(5)', nRow).html( '<a href=/advdomains/?query=telephone:"' 
+                        $('td:eq(5)', nRow).html( '<a href=' + advdomains + '?query=telephone:"' 
                                                     + encodeURIComponent(telephone) + '">'
                                                     + telephone + '</a>').attr('title', 'Click to search by Telephone').addClass(oldVersion);
 
