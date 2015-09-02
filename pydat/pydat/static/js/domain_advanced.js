@@ -66,7 +66,7 @@ $(document).ready(function() {
                         $("td:eq(0)", nRow).html('<span class="ui-icon ui-icon-circle-plus"></span>');
 
                         var domainName = aData[1];
-                        $('td:eq(1)', nRow).html( '<a href="/pdns_results/' + encodeURIComponent(domainName) + '/">' 
+                        $('td:eq(1)', nRow).html( '<a href="' + pdns_rest + encodeURIComponent(domainName) + '/">' 
                                                     + domainName + "</a>").attr('title', 'Click to Search Passive DNS').addClass(oldVersion);
                         var registrant = aData[2];
                         if (registrant != null)

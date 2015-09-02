@@ -7,6 +7,7 @@
       var active = 'domain';
       var domain_url = "{% url 'ajax_domain' %}";
       var advdomains = "{% url 'advdomains' %}";
+      var pdns_rest = "{% url 'pdns_results' %}";
     {% if legacy_search %}
       var dataTable_url = "{% url 'ajax_dataTable' %}";
       var key = "{{ key }}";
