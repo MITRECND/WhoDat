@@ -2,15 +2,14 @@
 <html>
   <head>
     <title>pyDat: {% block title %}WHOIS exploration{% endblock %}</title>
-		<link rel="stylesheet" type="text/css" href="/static/css/jquery-ui-1.10.4.css">
-		<!-- <link rel="stylesheet" type="text/css" href="/static/css/demo_table_jui.css"> -->
-		<link rel="stylesheet" type="text/css" href="/static/css/jquery.dataTables.css">
-		<link rel="stylesheet" type="text/css" href="/static/css/pydat.css">
+		<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}/css/jquery-ui-1.10.4.css">
+		<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}/css/jquery.dataTables.css">
+		<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}/css/pydat.css">
 	{% block css %}
 	{% endblock %}
-		<script type="text/javascript" src="/static/js/jquery-1.11.0.min.js"></script>
-		<script type="text/javascript" src="/static/js/jquery-ui-1.10.4.js"></script>
-        <script type="text/javascript" src="/static/js/jquery.dataTables.js"></script>
+		<script type="text/javascript" src="{{STATIC_URL}}/js/jquery-1.11.0.min.js"></script>
+		<script type="text/javascript" src="{{STATIC_URL}}/js/jquery-ui-1.10.4.js"></script>
+        <script type="text/javascript" src="{{STATIC_URL}}/js/jquery.dataTables.js"></script>
         <script type="text/javascript">
           var resolve_url = "{% url 'ajax_resolve' %}";
           var csrf_token = '{{ csrf_token }}';
@@ -18,7 +17,7 @@
         </script>
     {% block js_constants %}
     {% endblock %}
-		<script type="text/javascript" src="/static/js/pydat.js"></script>
+		<script type="text/javascript" src="{{STATIC_URL}}/js/pydat.js"></script>
     {% block js %}
     {% endblock %}
   </head>

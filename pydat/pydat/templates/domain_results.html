@@ -21,9 +21,9 @@
 
 {% block js %}
     {% if legacy_search %}
-        <script type="text/javascript" src="/static/js/domain.js"></script>
+        <script type="text/javascript" src="{{STATIC_URL}}/js/domain.js"></script>
     {% else %}
-        <script type="text/javascript" src="/static/js/domain_advanced.js"></script>
+        <script type="text/javascript" src="{{STATIC_URL}}/js/domain_advanced.js"></script>
     {% endif %}
 {%endblock %}
 
