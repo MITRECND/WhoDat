@@ -8,6 +8,7 @@ tokens = [
     'COLON', 
     'WORD', 
     'QUOTED', 
+    'NOT',
     'OR', 
     'AND', 
     'LPAREN', 
@@ -43,6 +44,10 @@ def t_WILDCARD(t):
         t_error(t)
         return None
     return t;
+
+@TOKEN('NOT')
+def t_NOT(t):
+    return t
 
 @TOKEN('OR')
 def t_OR(t):
@@ -81,6 +86,7 @@ def looks_like(term):
 Grammar
 
 query : LPAREN query RPAREN
+      | NOT query
       | query query
       | query AND query
       | query OR query
@@ -245,6 +251,45 @@ def p_query_group(t):
     'query : LPAREN query RPAREN'
     t[0] = t[2]
 
+def p_query_not(t):
+    'query : NOT query'
+
+    query = { "bool": { "must_not": [] }}
+    filt = {'not': {}}
+
+    q = t[2]
+
+    #Negate the query if it exists
+    qq = q['query']['filtered']['query']
+    if 'match_all' not in qq:
+        query["bool"]["must_not"].append(qq)
+
+    #Negate the filter if it exists
+    qf = q['query']['filtered']['filter']
+    if 'match_all' not in qf:
+        keys = qf.keys()
+        if len(keys) > 1:
+            #As far as I can tell, this should never have more than one key ...
+            raise NotImplementedError("This condition was not accounted for, please forward what sort of query you were using to the developer")
+        elif len(keys) == 1:
+            filt['not'][keys[0]] = qf[keys[0]]
+
+    if len(filt['not'].keys()) == 0:
+        filt = {'match_all': {}}
+
+    if len(query['bool']['must_not']) == 0:
+        query = {'match_all': {}}
+
+
+    t[0] = {
+        "query": {
+            "filtered": {
+                "query": query,
+                "filter": filt
+            }
+        }
+    }
+
 def create_combined_and(queries):
     query = { "bool": { "must": [] }}
     filt = {'and': []}
@@ -292,25 +337,24 @@ def p_query_or_query(t):
     query = {"bool": {"should": [], "disable_coord": "true"}}
     filt = {"or": []}
 
-    for q in (t[1], t[3]):
-        qq = q['query']['filtered']['query']
-        if 'match_all' not in qq:
-            query["bool"]["should"].append(qq)
-
-        qf = q['query']['filtered']['filter']
-        if 'match_all' not in qf:
-            filt['or'].append(qf)
-
-    if len(filt['or']) == 0:
-        filt = {'match_all': {}}
-    elif len(filt['or']) == 1:
-        filt = filt['or'][0]
-
-    if len(query['bool']['should']) == 0:
+    #If both queries are lacking a 'query' field combine the filters
+    if ('match_all' in t[1]['query']['filtered']['query'] and 'match_all' in t[3]['query']['filtered']['query']):
         query = {'match_all': {}}
-    elif len(query['bool']['should']) == 1:
-        query = query['bool']['should'][0]
-
+        for q in (t[1], t[3]):
+            qf = q['query']['filtered']['filter']
+            filt['or'].append(qf)
+    #If both queries are lacking a filter, combine the queries
+    elif ('match_all' in t[1]['query']['filtered']['filter'] and 'match_all' in t[3]['query']['filtered']['filter']):
+        filt = {'match_all': {}}
+        for q in (t[1], t[3]):
+            qq = q['query']['filtered']['query']
+            query['bool']['should'].append(qq)
+    #Otherwise we need to combine queries under a larger query
+    else:
+        filt = {"match_all": {}}
+        for q in (t[1], t[3]):
+            query['bool']['should'].append(q['query'])
+        
 
     t[0] = {
         "query": {
@@ -695,6 +739,7 @@ def p_error(t):
 
 precedence = (
         ('left', 'AND', 'OR'),
+        ('right', 'NOT'),
         ('left', 'COLON'),
     )
 
