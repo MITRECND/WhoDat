@@ -113,6 +113,7 @@ def advdomains(request):
         search_f.data['fmt'] = request.GET.get('fmt','normal')
         search_f.data['limit'] = request.GET.get('limit', settings.LIMIT)
         search_f.data['filt'] = request.GET.get('filt', settings.SEARCH_KEYS[0][0])
+        search_f.data['unique'] = request.GET.get('unique', False)
     else:
         #return __renderErrorPage__(request, 'Bad Method')
         return __renderErrorResponse__(request, 'domain.html', 'Bad Method')
@@ -125,9 +126,12 @@ def advdomains(request):
 
     fmt = search_f.cleaned_data['fmt'] or 'normal'
     search_string = search_f.cleaned_data['query']
+    query_unique = str(search_f.cleaned_data['unique']).lower()
+
     
     if fmt == 'normal':
         context = __createRequestContext__(request, data = { 'search_string': urllib.quote(search_string) or '',
+                                                             'query_unique': query_unique,
                                                              'advdomain_form': search_f,
                                                              'legacy_search': False,
                })
@@ -144,7 +148,7 @@ def advdomains(request):
         if fmt == 'list': #Only filter if a list was requested
             filt = filt_key
 
-        results = handler.advanced_search(search_string, 0, limit)
+        results = handler.advanced_search(search_string, 0, limit, query_unique)
         if not results['success']:
             #return __renderErrorPage__(request, results['message'])
             return __renderErrorResponse__(request, 'domain.html', results['message'])

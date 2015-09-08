@@ -54,6 +54,7 @@ class advdomain_form(forms.Form):
                                max_value=settings.LIMIT,
                                initial=settings.LIMIT,
                                 required=False)
+    unique = forms.BooleanField(label="Unique", initial=False, required=False)
 
     def __init__(self, *args, **kwargs):
         super(advdomain_form, self).__init__(*args, **kwargs)
@@ -68,6 +69,12 @@ class advdomain_form(forms.Form):
         for field in self.fields.values():
             field.error_messages = {'required':'%s is required' % field.label, 
                                     'invalid_choice': '%s is invalid' % field.label}
+
+    def clean_unique(self):
+        if 'unique' not in self.cleaned_data or self.cleaned_data['unique'] is None:
+            return False
+        else:
+            return self.cleaned_data['unique']
 
     def clean_query(self):
         if 'query' not in self.cleaned_data:

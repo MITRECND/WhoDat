@@ -15,6 +15,7 @@
     {% else %}
       var advDataTable_url = "{% url 'ajax_advDataTable' %}";
       var query_string = "{{ search_string }}"; 
+      var query_unique = {{ query_unique }};
     {% endif %}
     </script>
 {% endblock %}

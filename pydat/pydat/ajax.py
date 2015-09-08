@@ -79,6 +79,7 @@ def advDataTable(request):
         sortcols = int(request.GET.get('iSortingCols', 0))
         sEcho = request.GET.get('sEcho')
         sSearch = request.GET.get('sSearch', '')
+        unique = request.GET.get('unique', 'false')
         sort = []
     else:
         return __renderErrorJSON__('Unsupported Method')
@@ -86,7 +87,12 @@ def advDataTable(request):
     query = urllib.unquote(query)
     sSearch = None
 
-    results = handler.advDataTableSearch(query, page, pagesize)
+    if unique.lower() == 'true':
+        unique = True
+    else:
+        unique = False
+
+    results = handler.advDataTableSearch(query, page, pagesize, unique)
     #Echo back the echo
     results['sEcho'] = sEcho
     
@@ -97,14 +103,20 @@ def advanced_search(request):
         search_string = urllib.unquote(request.GET.get('query', None))
         size = int(request.GET.get('size', 20))
         page = int(request.GET.get('page', 1)) 
+        unique = request.GET.get('unique', 'False')
     else:
         return __renderErrorJSON__('Unsupported Method')
+
+    if unique.lower() == 'true':
+        unique = True
+    else:
+        unique = False
 
     if search_string is None:
         return __renderErrorJSON__("Query required")
         
     skip = (page - 1) * size
-    results = handler.advanced_search(search_string, skip, size)
+    results = handler.advanced_search(search_string, skip, size, unique)
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
 

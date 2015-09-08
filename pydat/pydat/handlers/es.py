@@ -279,9 +279,10 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     return results
 
 
-def advDataTableSearch(query, skip, pagesize):
+def advDataTableSearch(query, skip, pagesize, unique = False):
     results = {'success': False}
     results['aaData'] = []
+
 
     try:
         es = es_connector()
@@ -298,14 +299,42 @@ def advDataTableSearch(query, skip, pagesize):
         results['message'] = str(e)
         return results
 
-    q['size'] = pagesize
-    q['from'] = skip
-    q['sort'] = [
-                    {'_score': {'order': 'desc'}}, 
-                    {'domainName': {'order': 'asc'}}, 
-                    {'dataVersion': {'order': 'desc'}}
-                ]
+    if not unique:
+        q['sort'] = [
+                        {'_score': {'order': 'desc'}}, 
+                        {'domainName': {'order': 'asc'}}, 
+                        {'dataVersion': {'order': 'desc'}}
+                    ]
+        q['size'] = pagesize
+        q['from'] = skip
+    else:
+        q['size'] = 0
+        q["aggs"] = {
+                    "domains": {
+                        "terms":{
+                            "field": "domainName",
+                            "size": pagesize,
+                            "order": {"max_score": "desc"}
+                        },
+                        "aggs": {
+                            "max_score": {
+                                "max": {"script": "_score"}
+                            },
+                            "top_domains":{
+                                "top_hits":{
+                                    "size": 1,
+                                    "sort": [
+                                        {'_score': {'order': 'desc'}}, 
+                                        {"dataVersion": {"order": "desc"}},
+                                    ]
+                                }
+                            }
+                        }
+                    }
+        }
 
+    import json
+    print json.dumps(q)
     try:
         domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q, search_type = 'dfs_query_then_fetch')
     except Exception as e:
@@ -316,22 +345,40 @@ def advDataTableSearch(query, skip, pagesize):
         results['message'] = 'Error'
         return results
 
-    results['iTotalDisplayRecords'] = domains['hits']['total']
-    results['iTotalRecords'] = record_count()
+    if not unique:
+        results['iTotalDisplayRecords'] = domains['hits']['total']
+        results['iTotalRecords'] = record_count()
 
+        if domains['hits']['total'] > 0:
+            for domain in domains['hits']['hits']:
+                pdomain = domain['_source']
+                details = pdomain['details']
+                # Take each key in details (if any) and stuff it in top level dict.
+                dom_arr = ["&nbsp;", pdomain['domainName'], 
+                            details['registrant_name'], details['contactEmail'], 
+                            details['standardRegCreatedDate'], details['registrant_telephone'], 
+                            pdomain['dataVersion'], "%.2f" % round(domain['_score'], 2)]
+                results['aaData'].append(dom_arr)
 
-    if domains['hits']['total'] > 0:
-        for domain in domains['hits']['hits']:
+        results['success'] = True
+    else:
+        buckets = domains['aggregations']['domains']['buckets']
+        results['iTotalDisplayRecords'] = len(buckets)
+        results['iTotalRecords'] = len(buckets)
+
+        for bucket in buckets:
+            domain = bucket['top_domains']['hits']['hits'][0]
             pdomain = domain['_source']
             details = pdomain['details']
             # Take each key in details (if any) and stuff it in top level dict.
-            dom_arr = ["&nbsp;", pdomain['domainName'], 
-                        details['registrant_name'], details['contactEmail'], 
-                        details['standardRegCreatedDate'], details['registrant_telephone'], 
-                        pdomain['dataVersion'], "%.2f" % round(domain['_score'], 2)]
+            dom_arr = ["&nbsp;", pdomain['domainName'],
+                        details['registrant_name'], details['contactEmail'],
+                        details['standardRegCreatedDate'], details['registrant_telephone'],
+                        pdomain['dataVersion'], "%.2f" % round(domain['sort'][0], 2)] # For some reason the _score goes away in the aggregations if you sort by it
             results['aaData'].append(dom_arr)
 
-    results['success'] = True
+        results['success'] = True
+
     return results
 
     
@@ -425,7 +472,7 @@ def test_query(search_string):
 
     return None
 
-def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dates, etc
+def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO XXX versions, dates, etc
     results = {'success': False}
     try:
         es = es_connector()
@@ -442,8 +489,39 @@ def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dat
         results['message'] = str(e)
         return results
 
-    query['size'] = size
-    query['from'] = skip
+    if not unique:
+        query['sort'] = [
+                        {'_score': {'order': 'desc'}}, 
+                        {'domainName': {'order': 'asc'}}, 
+                        {'dataVersion': {'order': 'desc'}}
+                    ]
+        query['size'] = size
+        query['from'] = skip
+    else:
+        query['size'] = 0
+        query["aggs"] = {
+                    "domains": {
+                        "terms":{
+                            "field": "domainName",
+                            "size": size,
+                            "order": {"max_score": "desc"}
+                        },
+                        "aggs": {
+                            "max_score": {
+                                "max": {"script": "_score"}
+                            },
+                            "top_domains":{
+                                "top_hits":{
+                                    "size": 1,
+                                    "sort": [
+                                        {'_score': {'order': 'desc'}}, 
+                                        {"dataVersion": {"order": "desc"}},
+                                    ]
+                                }
+                            }
+                        }
+                    }
+        }
 
     try:
         domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query, search_type='dfs_query_then_fetch')
@@ -451,25 +529,50 @@ def advanced_search(search_string, skip = 0, size = 20): #TODO XXX versions, dat
         results['message'] = str(e)
         return results
 
-    results['total'] = domains['hits']['total']
-    results['data'] = []
+    if not unique:
+        results['total'] = domains['hits']['total']
+        results['data'] = []
 
-    for domain in domains['hits']['hits']:
-        pdomain = domain['_source']
-        # Take each key in details (if any) and stuff it in top level dict.
-        if 'details' in pdomain:
-            for k, v in pdomain['details'].iteritems():
-                pdomain[k] = v
-            del pdomain['details']
-        if 'dataVersion' in pdomain:
-            pdomain['Version'] = pdomain['dataVersion']
-            del pdomain['dataVersion']
-        results['data'].append(pdomain)
+        for domain in domains['hits']['hits']:
+            pdomain = domain['_source']
+            # Take each key in details (if any) and stuff it in top level dict.
+            if 'details' in pdomain:
+                for k, v in pdomain['details'].iteritems():
+                    pdomain[k] = v
+                del pdomain['details']
+            if 'dataVersion' in pdomain:
+                pdomain['Version'] = pdomain['dataVersion']
+                del pdomain['dataVersion']
+            results['data'].append(pdomain)
 
-    results['avail'] = len(results['data'])
-    results['skip'] = skip
-    results['page_size'] = size
-    results['success'] = True
+        results['avail'] = len(results['data'])
+        results['skip'] = skip
+        results['page_size'] = size
+        results['success'] = True
+    else:
+        buckets = domains['aggregations']['domains']['buckets']
+        results['total'] = len(buckets)
+        results['data'] = []
+
+        for bucket in buckets:
+            domain = bucket['top_domains']['hits']['hits'][0]
+            pdomain = domain['_source']
+            # Take each key in details (if any) and stuff it in top level dict.
+            if 'details' in pdomain:
+                for k, v in pdomain['details'].iteritems():
+                    pdomain[k] = v
+                del pdomain['details']
+            if 'dataVersion' in pdomain:
+                pdomain['Version'] = pdomain['dataVersion']
+                del pdomain['dataVersion']
+            results['data'].append(pdomain)
+
+        results['avail'] = len(buckets)
+        results['skip'] = 0 
+        results['page_size'] = size
+        results['success'] = True
+
     return results
+
 
 
