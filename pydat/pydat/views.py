@@ -96,7 +96,14 @@ def stats(request):
     return render_to_response('stats.html', context)
 
 def help(request):
-    context = __createRequestContext__(request)
+    try:
+        f = open("README.md")
+        helptxt = f.read()
+        f.close()
+    except:
+        helptxt = "Unable to render help text."
+
+    context = __createRequestContext__(request, data = {'help': helptxt})
     return render_to_response('help.html', context)
 
 def about(request):
