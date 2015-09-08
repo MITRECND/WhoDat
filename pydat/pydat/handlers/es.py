@@ -279,6 +279,9 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
 
 def advDataTableSearch(query, skip, pagesize, unique = False):
+    if not settings.ES_SCRIPTING_ENABLED:
+        unique = False
+
     results = {'success': False}
     results['aaData'] = []
 
@@ -470,6 +473,9 @@ def test_query(search_string):
     return None
 
 def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO XXX versions, dates, etc
+    if not settings.ES_SCRIPTING_ENABLED:
+        unique = False
+
     results = {'success': False}
     try:
         es = es_connector()

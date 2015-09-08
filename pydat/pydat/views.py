@@ -47,6 +47,7 @@ def __createRequestContext__(request, data = None):
         ctx_var['health'] = handler.cluster_health().capitalize()
         ctx_var['record_count'] = handler.record_count()
         ctx_var['last_import'] = handler.lastVersion()
+        ctx_var['scripting'] = settings.ES_SCRIPTING_ENABLED
 
     if data is not None:
         ctx_var.update(data)
@@ -113,7 +114,8 @@ def advdomains(request):
         search_f.data['fmt'] = request.GET.get('fmt','normal')
         search_f.data['limit'] = request.GET.get('limit', settings.LIMIT)
         search_f.data['filt'] = request.GET.get('filt', settings.SEARCH_KEYS[0][0])
-        search_f.data['unique'] = request.GET.get('unique', False)
+        if settings.ES_SCRIPTING_ENABLED:
+            search_f.data['unique'] = request.GET.get('unique', False)
     else:
         #return __renderErrorPage__(request, 'Bad Method')
         return __renderErrorResponse__(request, 'domain.html', 'Bad Method')
@@ -126,7 +128,10 @@ def advdomains(request):
 
     fmt = search_f.cleaned_data['fmt'] or 'normal'
     search_string = search_f.cleaned_data['query']
-    query_unique = str(search_f.cleaned_data['unique']).lower()
+    if settings.ES_SCRIPTING_ENABLED:
+        query_unique = str(search_f.cleaned_data['unique']).lower()
+    else:
+        query_unique = 'false'
 
     
     if fmt == 'normal':
@@ -148,6 +153,10 @@ def advdomains(request):
         if fmt == 'list': #Only filter if a list was requested
             filt = filt_key
 
+        if query_unique == 'true':
+            query_unique = True
+        else:
+            query_unique = False
         results = handler.advanced_search(search_string, 0, limit, query_unique)
         if not results['success']:
             #return __renderErrorPage__(request, results['message'])
