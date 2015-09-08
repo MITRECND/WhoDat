@@ -250,18 +250,10 @@ tr td.oldVersion {
     text-align: center;
 }
 
-tr td {
+.dnsres tr td {
     color: black;
 }
 
-.rrname a{
-    color: #505050;
-}
-
-.rdata a{
-    color: #505050;
-}
-
-.resolutionTable a {
+.dnsres a {
     color: black;
 }
