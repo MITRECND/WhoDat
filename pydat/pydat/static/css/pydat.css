@@ -249,3 +249,19 @@ tr td.oldVersion {
 #noresults{
     text-align: center;
 }
+
+tr td {
+    color: black;
+}
+
+.rrname a{
+    color: #505050;
+}
+
+.rdata a{
+    color: #505050;
+}
+
+.resolutionTable a {
+    color: black;
+}
