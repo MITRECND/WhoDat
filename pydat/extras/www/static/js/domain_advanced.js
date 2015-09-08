@@ -31,9 +31,6 @@ $(document).ready(function() {
                     "bServerSide": true,
                     "sAjaxSource": ajax_url,
 					"bAutoWidth": false,
-                    "fnServerParams": function ( aoData ) {
-                          aoData.push( { "name": "unique", "value": query_unique} );
-                    },
 					"oLanguage": {
                                   'sProcessing' : 'Fetching Data', 
                                   'sZeroRecords': 'No Results Found',
@@ -56,7 +53,6 @@ $(document).ready(function() {
 						],
 */
 					"sPaginationType": "full_numbers",
-                    "aLengthMenu": [[10, 25, 50, 100, 200, 500, 1000], [10, 25, 50, 100, 200, 500, 1000]],
                     "iDisplayLength" : 50,
                     //Called after ever row is written but not drawn
                     "fnRowCallback": function( nRow, aData, iDisplayIndex, iDisplayIndexFull) {

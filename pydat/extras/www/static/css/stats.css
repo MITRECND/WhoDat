@@ -1,0 +1,82 @@
+#regChartContainer {
+    max-width: 1200px;
+    min-width: 300px;
+    display: block;
+}
+
+#ltChartContainer {
+    max-width: 1200px;
+    min-width: 300px;
+    display: block;
+}
+
+#chartDiv{
+    display:block;
+}
+
+#regChart {
+    min-height: 256px;
+    width: 100%;
+}
+
+#regChartLegend{
+    width: 250px;
+    height: 25px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#ltChartLegend{
+    width: 400px;
+    height: 25px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.chartLegend{
+    width: 100%;
+    display: block;
+}
+
+.legendEntry{
+    float: left;
+    margin-right: 10px;
+}
+
+.legendContainer {
+    display:table;
+    border-spacing: 5px;
+}
+
+.legendColor{
+    display: table-cell;
+    width: 15px;
+    height: 15px;
+    border: solid black 1px;
+}
+
+.legendName{
+    display: table-cell;
+    text-align:right;
+}
+
+#importTables{
+    display: table;
+    border-spacing: 10px;
+}
+
+#importStats {
+    display: table-cell;
+}
+
+#keyImportance {
+    display: table-cell;
+}
+
+#changedStats {
+    display: table-cell;
+}
+
+#tldStats {
+    display:block;
+}

@@ -54,6 +54,18 @@ domainName:foo AND (email:bar OR email:bah)
 </pre>
 
 
+Negating Queries
+---------------------
+
+If a user wants to exclude certain paramters, it is possible by prepending a query with '**NOT**' to negate the query.
+
+<pre>
+email:"domains@google.com" AND NOT domainName:"google.com"
+</pre>
+
+The above example would find all domains that have an email address of 'domains@google.com' but would exclude the domain 'google.com'. Note that the **NOT** keyword has higher precedence than **AND** or **OR** so queries will be negated before they are combined.
+
+
 Fuzzy Searching
 --------------------
 
