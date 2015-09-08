@@ -1,106 +1,158 @@
-html, body{
-    margin: 0;
+html, body {
     overflow: hidden;
+    height: 100%; 
+}
+
+#bodywrapper {
+    overflow-y: auto;
     height: 100%;
 }
 
-#bodywrapper{
-    overflow-y: scroll;
-    height: 100%;
-}
-
-#page{
-    width: 98%;
+#page {
+    width: 100%;
     display: block;
-    margin: 0 auto;
-}
-
-#forms{
-	width: 700px;
-	display: block;
-	margin: 0 auto;
-}
-
-#forms table {
-    margin: 0 auto;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 5px;
 }
 
 
-.clear{
-	clear:both;
+/*
+#header {
+    width: 98%;
 }
+*/
 
-.ui-tabs .ui-tabs-panel {
-    padding: 2px 3px 3px 2px;
-}
-
-#header{
-	width: 98%;
-	margin: 0 auto;
-	margin-bottom: 5px;
-}
-
-#topline{
-    display: table;
+#navigation {
+    display: block;
+    position:relative;
+    background-color: #121212;
+    height: 60px;
     width: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 4px;
 }
 
-#toprow{
-    display: table-row;
-    width: 100%;
-}
-
-#tagline{
-    display:table-cell;
-	padding-bottom: 2px;
-    width: 100px;
-}
-
-#title{
+#tagline {
+    display: inline-block;
+    font-size: 2em;
+    color: white;
+    text-align: right;
+    vertical-align: top;
+    float:right;
+    padding-right:40px;
+    /*position: absolute;
+    right: 20px;
+    top: -5px;
+    */
 	font-family: Gadget, "Arial Black", sans-serif;
-	font-size: 16px;
-	padding-left: 2px;
-	text-align: left;
-    float: left;
-    cursor: pointer;
 }
 
-#searchIcon{
-    float: left;
-    cursor: pointer;
+#navTabs {
+    /*max-width: 700px;*/
+    height: 50px;
+    display: inline-block;
+    position: absolute;
+    bottom: 1px;
 }
 
-#slogan{
-    display:table-cell;
-	font-family: Gadget, "Arial Black", sans-serif;
-	/*font-family: Impact, Charcoal, sans-serif;*/
-	/*font-family: "Lucida Console", Monaco, monospace;*/
-	font-size: 16px;
-	/*width: 50%;*/
-	/*margin-left: auto;*/
-	/*margin-right: auto;*/
-	/*margin-top: 20px;*/
-	/*margin-bottom: 15px;*/
-	text-align: center;
+#searchIcon {
+    display: block;
+    height: 13px;
+    width: 10px;
+    cursor: pointer;
+    margin-top: -4px;
+}
+
+#searchBar {
+    display: block;
+    background-color: #888888;
+    padding-left: 15px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-radius: 4px;
+    color: white;
+    overflow: hidden;
+}
+
+#search{
+    float:left;
     width: 50%;
 }
 
-#aboutlink {
-    display:table-cell;
-    width: 100px;
+#stats {
+    float:right;
+    width: 50%;
 }
 
-#aboutlink span{
-    float: right;
-	font-family: Gadget, "Arial Black", sans-serif;
-	font-size: 16px;
-    cursor:pointer;
+#stats_table{
+    margin-right: 2px;
+    margin-left: auto;
+}
+
+.yellow {
+    color: yellow;
+}
+
+.green{
+    color: green;
+}
+
+.red{
+    color: red;
+}
+
+
+.right {
     text-align: right;
+}
+
+.tabs {
+    margin:  0;
+    padding: 0;
+    list-style: none;
+    display: table; 
+    table-layout: fixed; 
+    text-align: center;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    overflow: hidden;
+}
+
+
+.tabs a {
+    padding: 1em .1em 1em .1em;
+    background-color: #adadad;
+    color: #fff;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.tabs a.tab_active {
+    background-color: #5C5C5C;
+}
+
+.tabs a:hover {
+    background-color: #dddddd;
+}
+
+.tab_item {
+    display: table-cell; 
+    width: 110px;
+}
+
+.b_right {
+    border-right: 1px solid black;
+}
+
+.tab_link {
+    display: block; 
 }
 
 .link{
 	cursor:pointer;
-    color:blue;
+    color: #cdcdcd;
     text-decoration:underline;
 }
 
@@ -134,6 +186,7 @@ html, body{
     font-weight: bold;
 }
 
+
 /***domain.html***/
 .detailTable{
 }
@@ -166,6 +219,7 @@ html, body{
     display: table-cell;
     width: 125px;
     text-align: right;
+    padding-right: 20px;
 }
 
 .domain_quick .qdtable{
@@ -194,4 +248,12 @@ tr td.oldVersion {
 /***pdns.html***/
 #noresults{
     text-align: center;
+}
+
+.dnsres tr td {
+    color: black;
+}
+
+.dnsres a {
+    color: black;
 }
