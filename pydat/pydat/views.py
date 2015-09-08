@@ -97,7 +97,7 @@ def stats(request):
 
 def help(request):
     try:
-        f = open("README.md")
+        f = open(settings.SITE_ROOT + "/../README.md")
         helptxt = f.read()
         f.close()
     except:
