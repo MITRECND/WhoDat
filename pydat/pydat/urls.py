@@ -7,8 +7,6 @@ urlpatterns = patterns('',
   url(r'^domains/(?P<key>.*)/(?P<value>.*)/$', 'pydat.views.domains'),
   url(r'^domains/$', 'pydat.views.domains', name='domains'),
 
-  url(r'^about/$', 'pydat.views.about', name='about'),
-
   url(r'^pdns_results/(?P<domain>.*)/$', 'pydat.views.pdns', name='pdns_rest'),
   url(r'^pdns_results/$', 'pydat.views.pdns', name='pdns_results'),
   url(r'^pdns_search/$', 'pydat.views.pdns_index', name='pdns'),

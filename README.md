@@ -20,6 +20,7 @@ If you're interested in testing this branch out despite the above, please read t
 - ElasticSearch installed somewhere
 - python elasticsearch library (pip install elasticsearch)
 - python lex yacc library (pip install ply)
+- python markdown library (pip install markdown)
 - below specified prereqs too (except pymongo)
 
 
