@@ -250,10 +250,10 @@ tr td.oldVersion {
     text-align: center;
 }
 
-.dnsres tr td {
+#pdns .dnsres tr td {
     color: black;
 }
 
-.dnsres a {
+#pdns .dnsres a {
     color: black;
 }
