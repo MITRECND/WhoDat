@@ -1,29 +1,6 @@
 WhoDat Project
 ==============
 
-<b>This branch is currently under testing to support the usage of Elasticsearch as a backend. If you see this message, consider this feature as an early alpha.</b>
-
-This means:
-
-- That some things might be broken
-    - I.e., some error handling might be non-existent
-- There is random debug output printed out
-- The search language might not be complete
-- The data template used with ElasticSearch might change
-    - Which means you might have ot re-ingest all of your data at some point!
-
-
-If you're interested in testing this branch out despite the above, please read the README in the pydat directory to figure out how to use the search.  Feeding data into ElasticSearch is the same (or at least, very similar) to feeding data into mongo (look at the elasticsearch_populate.py script in the scripts diretory)
-
-<b>PreReqs to run with ElasticSearch</b>:
-
-- ElasticSearch installed somewhere
-- python elasticsearch library (pip install elasticsearch)
-- python lex yacc library (pip install ply)
-- python markdown library (pip install markdown)
-- below specified prereqs too (except pymongo)
-
-
 
 The WhoDat project is a front-end for whoisxmlapi data, or any whois data
 living in a MongoDB. It integrates whois data, current IP resolutions and
@@ -43,6 +20,31 @@ featured or extensible as the Python implementation, and is not supported.
 
 For more information on the PHP implementation please see the [readme](../master/legacy_whodat/README.md). For more information on the Python implementation
 keep reading...
+
+
+ElasticSearch
+==============
+
+<b>The ElasticSearch backend code is still under testing, please consider the following before using ES as a backend:</b>
+
+- Some things might be broken
+    - I.e., some error handling might be non-existent
+- There might be random debug output printed out
+- The search language might not be complete
+- The data template used with ElasticSearch might change
+    - Which means you might have ot re-ingest all of your data at some point!
+
+
+<b>PreReqs to run with ElasticSearch</b>:
+
+- ElasticSearch installed somewhere
+- python elasticsearch library (pip install elasticsearch)
+- python lex yacc library (pip install ply)
+- below specified prereqs too (except pymongo)
+
+<b>ElasticSearch Scripting</b>
+ElasticSearch comes with dynamic Groovy scripting disabled due to potential sandbox breakout issues with the Groovy container. Unfortunately, the only way to do certain things in ElasticSearch is via this scripting language. Because default installation of ES do not have a work-around, there is a setting called ES_SCRIPTING_ENABLED in the pyDat settings file which is set to False by default. When set to True, the pyDat advanced search capability will expose an extra feature called 'Unique Domains' which given search results that will return multiple results for a given domain (e.g., due to multiple versions of a domain matching) will return only the latest entry instead of all entries. Before setting this option to True, you must either re-enable dynamic Groovy Scripting (**NOT RECOMMENDED** but relatively safe for ES installs that are not publicly accessible) or install a script server-side on every ES node -- to do this, please copy the file called \_score.groovy from the es_scripts directory to your scripts directory located in the elasticsearch configuration directory. On package-based installs of ES on RedHat/CentOS or Ubuntu this should be /etc/elasticsearch/scripts. If the scripts directory does not exist, please create it. Note you have to restart the Node for it to pick up the script.
+
 
 
 pyDat
@@ -120,8 +122,8 @@ Running pyDat
 
 pyDat does not provide any data on its own. You must provide your own whois
 data in a MongoDB. Beyond the data in a MongoDB you will need
-[Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/), [unicodecsv](https://pypi.python.org/pypi/unicodecsv)
-and [requests](https://pypi.python.org/pypi/requests) (at least 2.2.1).
+[Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/), [unicodecsv](https://pypi.python.org/pypi/unicodecsv), 
+[requests](https://pypi.python.org/pypi/requests) (at least 2.2.1) and [markdown](https://pypi.python.org/pypi/Markdown). 
 
 
 Populating Mongo with whoisxmlapi data (Ubuntu 12.04.4 LTS)
