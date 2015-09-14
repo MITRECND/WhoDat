@@ -224,6 +224,10 @@ def process_entry(insert_queue, es, header, input_entry, options):
             details_copy = details.copy()
             for exclude in options.exclude:
                 del details_copy[exclude]
+
+            changed = set(details_copy.items()) - set(current_entry['details'].items())
+            diff = len(set(details_copy.items()) - set(current_entry['details'].items())) > 0
+
         elif options.include is not None:
             details_copy = {}
             for include in options.include:
