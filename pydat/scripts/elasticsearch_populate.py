@@ -10,7 +10,7 @@ from optparse import OptionParser
 import threading
 from threading import Thread, Lock
 import Queue
-import multiprocessing #for num cpus
+import multiprocessing
 from multiprocessing import Process, Queue as mpQueue
 from pprint import pprint
 from elasticsearch import Elasticsearch
@@ -23,7 +23,6 @@ STATS = {'total': 0,
          'unchanged': 0,
          'duplicates': 0
         }
-STATS_LOCK = Lock()
 
 VERSION_KEY = 'dataVersion'
 UNIQUE_KEY = 'dataUniqueID'
@@ -31,7 +30,18 @@ FIRST_SEEN = 'dataFirstSeen'
 
 CHANGEDCT = {}
 
-shutdown_event = threading.Event()
+shutdown_event = multiprocessing.Event()
+finished_event = multiprocessing.Event()
+
+def connectElastic(uri):
+    es = Elasticsearch(uri,
+                       sniff_on_start=True,
+                       max_retries=100,
+                       retry_on_timeout=True,
+                       sniff_on_connection_fail=True,
+                       sniff_timeout=1000)
+
+    return es
 
 ######## READER THREAD ######
 def reader_worker(work_queue, options):
@@ -48,6 +58,8 @@ def scan_directory(work_queue, directory, options):
             for subdir in subdirs:
                 scan_directory(work_queue, subdir, options)
         for filename in filenames:
+            if shutdown_event.is_set():
+                return
             if options.extension != '':
                 fn, ext = os.path.splitext(filename)
                 if ext and ext[1:] != options.extension:
@@ -65,6 +77,9 @@ def check_header(header):
 
 
 def parse_csv(work_queue, filename, options):
+    if shutdown_event.is_set():
+        return
+
     if options.verbose:
         print "Processing file: %s" % filename
 
@@ -76,10 +91,21 @@ def parse_csv(work_queue, filename, options):
             raise unicodecsv.Error('CSV header not found')
 
         for row in dnsreader:
+            if shutdown_event.is_set():
+                break
             work_queue.put({'header': header, 'row': row})
     except unicodecsv.Error, e:
         sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
 
+
+####### STATS THREAD ###########
+def stats_worker(stats_queue):
+    global STATS
+    while True:
+        stat = stats_queue.get()
+        if stat == 'finished':
+            break
+        STATS[stat] += 1
 
 ###### ELASTICSEARCH PROCESS ######
 
@@ -91,7 +117,7 @@ def es_worker(insert_queue, options):
     bulk_counter = 0
     finishup = False
     bulk_request = []
-    es = Elasticsearch(options.es_uri)
+    es = connectElastic(options.es_uri)
 
     while not finishup:
         request = insert_queue.get()
@@ -150,37 +176,39 @@ def update_required(es, header, input_entry, options):
     else:
         return True
 
-def update_stats(stat):
-    global STATS_LOCK
-    global STATS
-    STATS_LOCK.acquire()
-    try:
-        STATS[stat] += 1 
-    finally:
-        STATS_LOCK.release()
-
-
-def process_worker(work_queue, insert_queue, es, options):
+def process_worker(work_queue, insert_queue, stats_queue, options):
     global shutdown_event
-    while not shutdown_event.isSet():
-        work = work_queue.get()
-        process_entry(insert_queue, es, work['header'], work['row'], options)
-        work_queue.task_done()
+    global finished_event
+    os.setpgrp()
+    es = connectElastic(options.es_uri)
+    while not shutdown_event.is_set():
+        try:
+            work = work_queue.get_nowait()
+            process_entry(insert_queue, stats_queue, es, work['header'], work['row'], options)
+        except Queue.Empty as e:
+            if finished_event.is_set():
+                return
+            time.sleep(.01)
 
-def process_reworker(work_queue, insert_queue, es, options):
+def process_reworker(work_queue, insert_queue, stats_queue, options):
     global shutdown_event
-    while not shutdown_event.isSet():
-        work = work_queue.get()
-        if update_required(es, work['header'],work['row'], options):
-            process_entry(insert_queue, es, work['header'], work['row'], options)
-        work_queue.task_done()
-        
+    global finished_event
+    os.setpgrp()
+    es = connectElastic(options.es_uri)
+    while not shutdown_event.is_set():
+        try:
+            work = work_queue.get_nowait()
+            if update_required(es, work['header'],work['row'], options):
+                process_entry(insert_queue, stats_queue, es, work['header'], work['row'], options)
+        except Queue.Empty as e:
+            if finished_event.is_set():
+                return
+            time.sleep(.01)
 
-def process_entry(insert_queue, es, header, input_entry, options):
+def process_entry(insert_queue, stats_queue, es, header, input_entry, options):
     global VERSION_KEY
-    global STATS
 
-    update_stats('total')
+    stats_queue.put('total')
     if len(input_entry) == 0:
         return
 
@@ -217,7 +245,7 @@ def process_entry(insert_queue, es, header, input_entry, options):
         current_entry = current_entry_raw['_source']
 
         if current_entry[VERSION_KEY] == options.identifier: # duplicate entry in source csv's?
-            update_stats('duplicates')
+            stats_queue.put('duplicates')
             return
 
         if options.exclude is not None:
@@ -253,7 +281,7 @@ def process_entry(insert_queue, es, header, input_entry, options):
             CHANGEDCT[ch[0]] += 1
 
         if diff:
-            update_stats('updated')
+            stats_queue.put('updated')
             if options.vverbose:
                 sys.stdout.write("%s: Updated\n" % domainName)
         
@@ -267,7 +295,7 @@ def process_entry(insert_queue, es, header, input_entry, options):
                               'insert':entry
                              })
         else:
-            update_stats('unchanged')
+            stats_queue.put('unchanged')
             if options.vverbose:
                 sys.stdout.write("%s: Unchanged\n" % domainName)
             insert_queue.put({'type': 'update', 
@@ -281,7 +309,7 @@ def process_entry(insert_queue, es, header, input_entry, options):
                                         }
                              })
     else:
-        update_stats('new')
+        stats_queue.put('new')
         if options.vverbose:
             sys.stdout.write("%s: New\n" % domainName)
         entry_id = generate_id(domainName, options.identifier)
@@ -303,13 +331,11 @@ def parse_tld(domainName):
     
 
 def find_entry(es, domainName, options):
-    global failed_entries
+    prefix = hashlib.md5(domainName).hexdigest()
     try:
-        result = es.search(index="%s-*" % options.index_prefix, 
+        result = es.search(index="%s-*" % options.index_prefix,
                           body = { "query":{
-                                        "match_phrase" : {
-                                            "domainName" : domainName
-                                        }
+                                        "prefix": { UNIQUE_KEY : prefix }
                                     },
                                     "sort": [
                                         {
@@ -345,6 +371,7 @@ def main():
     global VERSION_KEY
     global CHANGEDCT
     global shutdown_event
+    global finished_event
 
     def signal_handler(signum, frame):
         signal.signal(signal.SIGINT, SIGINT_ORIG)
@@ -356,8 +383,10 @@ def main():
         for t in threads:
             t.join(1)
 
-
+        stats_queue.put('finished')
         insert_queue.put("finished")
+
+        stats_worker_thread.join(5)
 
         #Give the Elasticsearch process 5 seconds to exit
         es_worker_thread.join(5)
@@ -385,8 +414,24 @@ def main():
         except:
             pass
 
-        sys.stdout.write("... Done\n")
+        if reader_thread.is_alive():
+            try:
+                #Flush the queue so reader can see the shutdown_event
+                while not work_queue.empty():
+                    work_queue.get_nowait()
+            except:
+                pass
 
+        reader_thread.join()
+
+        try:
+            work_queue.close()
+            insert_queue.close()
+            stats_queue.close()
+        except:
+            pass
+
+        sys.stdout.write("... Done\n")
         sys.exit(0)
 
 
@@ -400,7 +445,7 @@ def main():
     optparser.add_option("-i", "--identifier", action="store", dest="identifier", type="int",
         default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
     optparser.add_option("-t", "--threads", action="store", dest="threads", type="int",
-        default=multiprocessing.cpu_count(), help="Number of worker threads")
+        default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster")
     optparser.add_option("-B", "--bulk-size", action="store", dest="bulk_size", type="int",
         default=1000, help="Size of Bulk Insert Requests")
     optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
@@ -430,11 +475,12 @@ def main():
 
 
     threads = []
-    work_queue = Queue.Queue(maxsize=options.bulk_size)
+    work_queue = mpQueue(maxsize=options.bulk_size)
     insert_queue = mpQueue(maxsize=options.bulk_size)
+    stats_queue = mpQueue()
 
     meta_index_name = '@' + options.index_prefix + "_meta"
-    es = Elasticsearch(options.es_uri)
+    es = connectElastic(options.es_uri)
 
     data_template = None
     template_path = os.path.dirname(os.path.realpath(__file__))
@@ -531,10 +577,10 @@ def main():
             print "Starting %i worker threads" % options.threads
 
         for i in range(options.threads):
-            t = Thread(target=process_worker, 
+            t = Process(target=process_worker,
                         args=(work_queue, 
                               insert_queue, 
-                              es, 
+                              stats_queue,
                               options), 
                         name='Worker %i' % i)
             t.daemon = True
@@ -601,10 +647,10 @@ def main():
             print "Starting %i reworker threads" % options.threads
 
         for i in range(options.threads):
-            t = Thread(target=process_reworker, 
+            t = Process(target=process_reworker,
                         args=(work_queue, 
                               insert_queue, 
-                              es, 
+                              stats_queue,
                               options), 
                         name='Worker %i' % i)
             t.daemon = True
@@ -617,6 +663,10 @@ def main():
     es_worker_thread.daemon = True
     es_worker_thread.start()
 
+    stats_worker_thread = Thread(target=stats_worker, args=(stats_queue,), name = 'Stats')
+    stats_worker_thread.daemon = True
+    stats_worker_thread.start()
+
     #Set up signal handler before we go into the real work
     SIGINT_ORIG = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, signal_handler)
@@ -628,7 +678,7 @@ def main():
 
     while True:
         reader_thread.join(.1)
-        if not reader_thread.isAlive():
+        if not reader_thread.is_alive():
             break
 
     time.sleep(.1)
@@ -636,9 +686,16 @@ def main():
     while not work_queue.empty():
         time.sleep(.01)
 
-    work_queue.join()
+    finished_event.set()
+
+    for t in threads:
+        t.join()
+
     insert_queue.put("finished")
     es_worker_thread.join()
+
+    stats_queue.put('finished')
+    stats_worker_thread.join()
     
     #Update the stats
     es.update(index=meta_index_name, id=options.identifier, 
