@@ -9,7 +9,9 @@ class ElasticsearchError(Exception):
 
 def es_connector():
     try:
-        es = Elasticsearch(settings.ES_URI)
+        es = Elasticsearch(settings.ES_URI,
+                           max_retries=100,
+                           retry_on_timeout=True)
         return es
     except:
         raise
