@@ -468,6 +468,9 @@ def main():
     optparser.add_option("-p", "--index-prefix", action="store", dest="index_prefix",
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
 
+    if (len(sys.argv) < 2):
+        optparser.parse_args(['-h'])
+
     (options, args) = optparser.parse_args()
 
     if options.vverbose:
@@ -480,7 +483,6 @@ def main():
     stats_queue = mpQueue()
 
     meta_index_name = '@' + options.index_prefix + "_meta"
-    es = connectElastic(options.es_uri)
 
     data_template = None
     template_path = os.path.dirname(os.path.realpath(__file__))
@@ -488,15 +490,16 @@ def main():
         data_template = json.loads(dtemplate.read())
 
     if options.identifier is None and options.redo is False:
-        print "Identifier required"
-        sys.exit(1)
+        print "Identifier required\n"
+        optparser.parse_args(['-h'])
     elif options.identifier is not None and options.redo is True:
-        print "Redo requested and Identifier Specified. Please choose one or the other"
-        sys.exit(1)
+        print "Redo requested and Identifier Specified. Please choose one or the other\n"
+        optparser.parse_args(['-h'])
     elif options.exclude != "" and options.include != "":
-        print "Options include and exclude are mutually exclusive, choose only one"
-        sys.exit(1)
+        print "Options include and exclude are mutually exclusive, choose only one\n"
+        optparser.parse_args(['-h'])
 
+    es = connectElastic(options.es_uri)
     metadata = None
 
     #Create the metadata index if it doesn't exist
