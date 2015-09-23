@@ -2,7 +2,7 @@ FROM httpd:2.4
 
 MAINTAINER mitrecnd, http://github.com/mitrecnd
 
-ENV WSGI_VERSION="4.4.13"
+ENV WSGI_VERSION="4.4.13" PATH=$PATH:/opt/WhoDat/pydat/scripts
 
 COPY . /opt/WhoDat/
 ADD https://bootstrap.pypa.io/get-pip.py /tmp/
@@ -31,5 +31,6 @@ RUN \
     make install && \
     rm -r /tmp/mod_wsgi-${WSGI_VERSION} && \
     cp /opt/WhoDat/docker/apache.config /usr/local/apache2/conf/httpd.conf && \
+    ln -s /opt/WhoDat/pydat/pydat/ /pydat  && \
     apt-get autoremove --purge -y $buildDeps && \
     rm -r /var/lib/apt/lists/*
