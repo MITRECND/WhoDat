@@ -1,0 +1,7 @@
+pymongo
+requests
+unicodecsv
+markdown
+django
+elasticsearch
+ply
