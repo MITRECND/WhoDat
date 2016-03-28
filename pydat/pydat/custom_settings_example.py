@@ -62,7 +62,7 @@ ALLOWED_HOSTS = ['*']
 #DNSDB_LIMIT = 1000
 
 # Limit all db queries to this many documents.
-#LIMIT = 50000
+#LIMIT = 10000
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),

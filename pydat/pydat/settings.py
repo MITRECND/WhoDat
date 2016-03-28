@@ -33,7 +33,8 @@ PASSIVETOTAL_KEY = None
 # Verify SSL certificates in DNSDB calls.
 SSL_VERIFY = True
 
-LIMIT = 50000
+# Elasticsearch limits regular queries to 10000 entries
+LIMIT = 10000
 
 # These keys are the ones we allow you to search on. This list must be
 # kept up to date as more searches are allowed.
