@@ -1,3 +1,4 @@
+import sys
 from elasticsearch import Elasticsearch
 from django.conf import settings
 from handlers.advanced_es import yacc
@@ -255,8 +256,8 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
         query["sort"] = sorter
 
 
-    import sys
-    sys.stdout.write("%s\n" % str(query))
+    if settings.DEBUG:
+        sys.stdout.write("%s\n" % str(query))
 
     domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
 
@@ -320,7 +321,7 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
                         },
                         "aggs": {
                             "max_score": {
-                                "max": {"script": "_score"}
+                                "max": {"script": {"file": "_score"}}
                             },
                             "top_domains":{
                                 "top_hits":{
@@ -335,8 +336,9 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
                     }
         }
 
-    import json
-    print json.dumps(q)
+    if settings.DEBUG:
+        import json
+        sys.stdout.write(json.dumps(q))
     try:
         domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q, search_type = 'dfs_query_then_fetch')
     except Exception as e:

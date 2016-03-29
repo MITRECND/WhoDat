@@ -43,8 +43,21 @@ ElasticSearch
 - below specified prereqs too (except pymongo)
 
 <b>ElasticSearch Scripting</b>
-ElasticSearch comes with dynamic Groovy scripting disabled due to potential sandbox breakout issues with the Groovy container. Unfortunately, the only way to do certain things in ElasticSearch is via this scripting language. Because default installation of ES do not have a work-around, there is a setting called ES_SCRIPTING_ENABLED in the pyDat settings file which is set to False by default. When set to True, the pyDat advanced search capability will expose an extra feature called 'Unique Domains' which given search results that will return multiple results for a given domain (e.g., due to multiple versions of a domain matching) will return only the latest entry instead of all entries. Before setting this option to True, you must either re-enable dynamic Groovy Scripting (**NOT RECOMMENDED** but relatively safe for ES installs that are not publicly accessible) or install a script server-side on every ES node -- to do this, please copy the file called \_score.groovy from the es_scripts directory to your scripts directory located in the elasticsearch configuration directory. On package-based installs of ES on RedHat/CentOS or Ubuntu this should be /etc/elasticsearch/scripts. If the scripts directory does not exist, please create it. Note you have to restart the Node for it to pick up the script.
+ElasticSearch comes with dynamic Groovy scripting disabled due to potential sandbox breakout issues with the Groovy container. Unfortunately, the only way to do certain things in ElasticSearch is via this scripting language. Because the default installation of ES does not have a work-around, there is a setting called ES_SCRIPTING_ENABLED in the pyDat settings file which is set to False by default. When set to True, the pyDat advanced search capability will expose an extra feature called 'Unique Domains' which given search results that will return multiple results for a given domain (e.g., due to multiple versions of a domain matching) will return only the latest entry instead of all entries. Before setting this option to True, you must install a script server-side on every ES node -- to do this, please copy the file called \_score.groovy from the es_scripts directory to your scripts directory located in the elasticsearch configuration directory. On package-based installs of ES on RedHat/CentOS or Ubuntu this should be /etc/elasticsearch/scripts. If the scripts directory does not exist, please create it. Note you have to restart the Node for it to pick up the script.
 
+<b> ElasticSearch Plugins</b>
+
+The murmur3 mapping type was removed from the ElasticSearch core and into a plugin. The stats page uses this field to obtain information about the domains loaded in elasticsearch and further the template provided will not load if the murmur3 mapper is not loaded. Ensure the plugin is installed on *every* node in your cluster before proceeding. Alternatively, you can remove 'hash' field from domainName in the template and disable the stats page (just html comment or remove the link from the header).
+
+
+To install the plugin, use the plugin utility on every node:
+
+<pre>
+plugin install mapper-murmur3
+</pre>
+
+
+This will require a restart of the node to pick up the plugin.
 
 
 pyDat
@@ -209,6 +222,23 @@ curl http://pydat.myorg.domain/ajax/domain/google.com/latest/
 
 curl http://pydat.myorg.domain/ajax/domains/domainName/google.com/
 ```
+
+Advanced Syntax Endpoint
+-------------------------
+
+If using ElasticSearch as the backend, a new endpoint is available that supports search via the advanced query syntax:
+
+```
+ajax/query
+```
+
+This endpoint takes 4 parameters via a GET request:
+
+```
+query - The query to search ES with
+size - The number of elements to return (aka page size)
+page - The page to return, combining this with size you can get the results in chunks
+unique - Only accepted if ES scripting is enabled (read above)
 
 
 Untested Stuff
