@@ -162,6 +162,15 @@ def es_worker(insert_queue, options):
                 bulk_request.append(command)
                 bulk_request.append(data)
                 bulk_counter += 1
+            elif request['type'] == 'delete':
+                command = {"delete": {
+                                        "_id": request['_id'],
+                                        "_index": request['_index'],
+                                        "_type": request['_type']
+                                     }
+                          }
+                bulk_request.append(command)
+                bulk_counter += 1
             else:
                 print "Unrecognized"
         else:
@@ -188,7 +197,7 @@ def update_required(es, header, input_entry, options):
             domainName = item
             break
 
-    current_entry = find_entry(es, domainName, options)
+    (entries, current_entry) = find_entry(es, domainName, options)
 
     if current_entry is None:
         return True
@@ -257,7 +266,7 @@ def process_entry(insert_queue, stats_queue, es, header, input_entry, options):
                 'domainName': domainName,
             }
 
-    current_entry_raw = find_entry(es, domainName, options)
+    (entries, current_entry_raw) = find_entry(es, domainName, options)
 
     global CHANGEDCT
     if current_entry_raw is not None:
@@ -306,7 +315,24 @@ def process_entry(insert_queue, stats_queue, es, header, input_entry, options):
             stats_queue.put('updated')
             if options.vverbose:
                 sys.stdout.write("%s: Updated\n" % domainName)
-        
+
+            if options.enable_delta_indexes and entries > 1:
+                # Delete old entry, put into a 'diff' index
+                insert_queue.put({'type': 'delete',
+                                  '_index': current_index,
+                                  '_id': current_id,
+                                  '_type': current_type
+                                 })
+
+                # Put it into a previousVersion-d index so it doesn't potentially create
+                # a bunch of indexes that will need to be cleaned up later
+                insert_queue.put({'type': 'insert',
+                                  '_id': generate_id(domainName, options.previousVersion),
+                                  '_index': '%s-%s-d' % (options.index_prefix, options.previousVersion),
+                                  '_type': current_type,
+                                  'insert': current_entry
+                                })
+
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
             entry[UNIQUE_KEY] = entry_id
@@ -368,7 +394,7 @@ def find_entry(es, domainName, options):
                                  })
 
         if result['hits']['total'] == 0:
-            return None
+            return (0, None)
 
         """
         tups = []
@@ -378,10 +404,10 @@ def find_entry(es, domainName, options):
         print tups
         """
         
-        return result['hits']['hits'][0]
+        return (result['hits']['total'], result['hits']['hits'][0])
     except Exception as e:
         print "Unable to find %s, %s" % (domainName, str(e))
-        return None
+        return (0, None)
 
 
 
@@ -492,6 +518,8 @@ def main():
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
     optparser.add_option("--bulk-threads", action="store", dest="bulk_threads", type="int",
         default=1, help="How many threads to use for making bulk requests to ES")
+    optparser.add_option("-T", "--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
+        default=False, help="If enabled, will put changed entries that are not the original or latest in a separate index. These indexes can be safely deleted if space is an issue")
 
     if (len(sys.argv) < 2):
         optparser.parse_args(['-h'])
@@ -526,6 +554,7 @@ def main():
 
     es = connectElastic(options.es_uri)
     metadata = None
+    previousVersion = 0
 
     #Create the metadata index if it doesn't exist
     if not es.indices.exists(meta_index_name):
@@ -588,6 +617,25 @@ def main():
             if metadata['lastVersion'] >= options.identifier:
                 print "Identifier must be 'greater than' previous identifier"
                 sys.exit(1)
+
+            previousVersion = metadata['lastVersion']
+        else:
+            result = es.search(index=meta_index_name,
+                               body = { "query": {
+                                            "match_all": {}
+                                        },
+                                        "sort":[
+                                            {"_id": {"order": "asc"}}
+                                        ]
+                                      })
+
+            if result['hits']['total'] == 0:
+                print "Unable to fetch entries from metadata index"
+                sys.exit(1)
+
+            previousVersion = results['hits']['hits'][-2]['_id']
+
+    options.previousVersion = previousVersion
 
     if options.redo is False:
         if options.exclude != "":
