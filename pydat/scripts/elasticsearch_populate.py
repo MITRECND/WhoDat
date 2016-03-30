@@ -109,6 +109,19 @@ def stats_worker(stats_queue):
 
 ###### ELASTICSEARCH PROCESS ######
 
+def es_bulk_thread(bulk_request_queue, options):
+    es = connectElastic(options.es_uri)
+    while 1:
+        try:
+            bulk_request = bulk_request_queue.get()
+            #sys.stdout.write("Making bulk request\n")
+            es.bulk(body=bulk_request)
+            #sys.stdout.write("Bulk request Complete\n")
+        except Exception as e:
+            sys.stdout.write("Exception making bulk request: %s" % str(e))
+        finally:
+            bulk_request_queue.task_done()
+
 def es_worker(insert_queue, options):
     #Ignore signals that are sent to parent process
     #The parent should properly shut this down
@@ -117,7 +130,14 @@ def es_worker(insert_queue, options):
     bulk_counter = 0
     finishup = False
     bulk_request = []
-    es = connectElastic(options.es_uri)
+
+    # Allow the queue to back up to however many threads there will be
+    bulk_request_queue = Queue.Queue(maxsize = options.bulk_threads)
+
+    for count in range(options.bulk_threads):
+        t = Thread(target = es_bulk_thread, args = (bulk_request_queue, options))
+        t.daemon = True
+        t.start()
 
     while not finishup:
         request = insert_queue.get()
@@ -148,10 +168,12 @@ def es_worker(insert_queue, options):
             finishup = True 
 
         if ((bulk_counter >= options.bulk_size) or finishup) and bulk_counter > 0:
-            #TODO
-            es.bulk(body=bulk_request)
+            bulk_request_queue.put(bulk_request)
             bulk_counter = 0
             bulk_request = []
+
+    # Wait for threads to finish sending bulk requests
+    bulk_request_queue.join()
 
 ######## WORKER THREADS #########
 
@@ -447,7 +469,7 @@ def main():
     optparser.add_option("-t", "--threads", action="store", dest="threads", type="int",
         default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster")
     optparser.add_option("-B", "--bulk-size", action="store", dest="bulk_size", type="int",
-        default=1000, help="Size of Bulk Insert Requests")
+        default=5000, help="Size of Bulk Insert Requests")
     optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     optparser.add_option("--vverbose", action="store_true", dest="vverbose",
@@ -462,11 +484,14 @@ def main():
         default="", help="Comment to store with metadata")
     optparser.add_option("-r", "--redo", action="store_true", dest="redo",
         default=False, help="Attempt to re-import a failed import or import more data, uses stored metatdata from previous import (-o and -x not required and will be ignored!!)")
+
     #ES Specific Options
     optparser.add_option("-u", "--es-uri", action="store", dest="es_uri",
         default='localhost:9200', help="Location of ElasticSearch Server (e.g., foo.server.com:9200)")
     optparser.add_option("-p", "--index-prefix", action="store", dest="index_prefix",
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
+    optparser.add_option("--bulk-threads", action="store", dest="bulk_threads", type="int",
+        default=1, help="How many threads to use for making bulk requests to ES")
 
     if (len(sys.argv) < 2):
         optparser.parse_args(['-h'])
