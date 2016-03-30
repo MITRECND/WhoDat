@@ -281,27 +281,8 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     results['success'] = True
     return results
 
-
-def advDataTableSearch(query, skip, pagesize, unique = False):
-    if not settings.ES_SCRIPTING_ENABLED:
-        unique = False
-
-    results = {'success': False}
-    results['aaData'] = []
-
-
-    try:
-        es = es_connector()
-        index = '%s-*' % settings.ES_INDEX_PREFIX
-    except ElasticsearchError as e:
-        results['message'] = str(e)
-        return results
-
-    try:
-        q = yacc.parse(query)
-    except Exception as e:
-        results['message'] = str(e)
-        return results
+def __createAdvancedQuery__(query, skip, size, unique):
+    q = yacc.parse(query)
 
     if not unique:
         q['sort'] = [
@@ -309,7 +290,7 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
                         {'domainName': {'order': 'asc'}}, 
                         {'dataVersion': {'order': 'desc'}}
                     ]
-        q['size'] = pagesize
+        q['size'] = size
         q['from'] = skip
     else:
         q['size'] = 0
@@ -317,7 +298,7 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
                     "domains": {
                         "terms":{
                             "field": "domainName",
-                            "size": pagesize,
+                            "size": size,
                             "order": {"max_score": "desc"}
                         },
                         "aggs": {
@@ -336,6 +317,30 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
                         }
                     }
         }
+
+    return q
+
+
+
+def advDataTableSearch(query, skip, pagesize, unique = False):
+    if not settings.ES_SCRIPTING_ENABLED:
+        unique = False
+
+    results = {'success': False}
+    results['aaData'] = []
+
+    try:
+        es = es_connector()
+        index = '%s-*' % settings.ES_INDEX_PREFIX
+    except ElasticsearchError as e:
+        results['message'] = str(e)
+        return results
+
+    try:
+        q = __createAdvancedQuery__(query, skip, pagesize, unique)
+    except Exception as e:
+        results['message'] = str(e)
+        return results
 
     if settings.DEBUG:
         import json
@@ -375,7 +380,6 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
             domain = bucket['top_domains']['hits']['hits'][0]
             pdomain = domain['_source']
             details = pdomain['details']
-            # Take each key in details (if any) and stuff it in top level dict.
             dom_arr = ["&nbsp;", pdomain['domainName'],
                         details['registrant_name'], details['contactEmail'],
                         details['standardRegCreatedDate'], details['registrant_telephone'],
@@ -490,44 +494,10 @@ def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO X
         return results
 
     try:
-        query = yacc.parse(search_string)
+        query = __createAdvancedQuery__(search_string, skip, size, unique) 
     except Exception as e:
         results['message'] = str(e)
         return results
-
-    if not unique:
-        query['sort'] = [
-                        {'_score': {'order': 'desc'}}, 
-                        {'domainName': {'order': 'asc'}}, 
-                        {'dataVersion': {'order': 'desc'}}
-                    ]
-        query['size'] = size
-        query['from'] = skip
-    else:
-        query['size'] = 0
-        query["aggs"] = {
-                    "domains": {
-                        "terms":{
-                            "field": "domainName",
-                            "size": size,
-                            "order": {"max_score": "desc"}
-                        },
-                        "aggs": {
-                            "max_score": {
-                                "max": {"script": "_score"}
-                            },
-                            "top_domains":{
-                                "top_hits":{
-                                    "size": 1,
-                                    "sort": [
-                                        {'_score': {'order': 'desc'}}, 
-                                        {"dataVersion": {"order": "desc"}},
-                                    ]
-                                }
-                            }
-                        }
-                    }
-        }
 
     try:
         domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query, search_type='dfs_query_then_fetch')
