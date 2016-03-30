@@ -28,7 +28,6 @@ html, body {
     position:relative;
     background-color: #121212;
     height: 60px;
-    width: 100%;
     padding-left: 10px;
     padding-right: 10px;
     border-radius: 4px;
@@ -41,7 +40,7 @@ html, body {
     text-align: right;
     vertical-align: top;
     float:right;
-    padding-right:40px;
+    padding-right:20px;
     /*position: absolute;
     right: 20px;
     top: -5px;
