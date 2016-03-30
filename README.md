@@ -263,6 +263,7 @@ query - The query to search ES with
 size - The number of elements to return (aka page size)
 page - The page to return, combining this with size you can get the results in chunks
 unique - Only accepted if ES scripting is enabled (read above)
+```
 
 ###Note on the unique parameter
 If you're using the unique parameter, note that paging of results is disabled, but the size paramter will still be used to control the number of results returned.
