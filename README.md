@@ -40,7 +40,7 @@ ElasticSearch
 - ElasticSearch installed somewhere
 - python elasticsearch library (pip install elasticsearch)
 - python lex yacc library (pip install ply)
-- below specified prereqs too (except pymongo)
+- below specified prereqs too 
 
 <b>ElasticSearch Scripting</b>
 ElasticSearch comes with dynamic Groovy scripting disabled due to potential sandbox breakout issues with the Groovy container. Unfortunately, the only way to do certain things in ElasticSearch is via this scripting language. Because the default installation of ES does not have a work-around, there is a setting called ES_SCRIPTING_ENABLED in the pyDat settings file which is set to False by default. When set to True, the pyDat advanced search capability will expose an extra feature called 'Unique Domains' which given search results that will return multiple results for a given domain (e.g., due to multiple versions of a domain matching) will return only the latest entry instead of all entries. Before setting this option to True, you must install a script server-side on every ES node -- to do this, please copy the file called \_score.groovy from the es_scripts directory to your scripts directory located in the elasticsearch configuration directory. On package-based installs of ES on RedHat/CentOS or Ubuntu this should be /etc/elasticsearch/scripts. If the scripts directory does not exist, please create it. Note you have to restart the Node for it to pick up the script.
@@ -67,16 +67,18 @@ pyDat is a Python implementation of [Chris Clark's](https://github.com/Xen0ph0n)
 WhoDat code. It is designed to be more extensible and has more features than
 the PHP implementation.
 
-Version 2.0 of pyDat included support for historical whois searches. This capability
+Version 2.0 of pyDat introduced support for historical whois searches. This capability
 necessitated modifying the way data is stored in the database. To aid in properly populating
-the database, a script called [mongo_populate](./pydat/scripts/mongo_populate.py) is provided
+the database, a script called [elasticsearch_populate](./pydat/scripts/elasticsearch_populate.py) is provided
 to auto-populate the data. Note that the data coming from whoisxmlapi doesn't seem to be always
 consistent so some care should be taken when ingesting data. More testing needs to be done to ensure
 all data is ingested properly. Anyone setting up their database, should read the available flags for the
 script before running it to ensure they've tweaked it for their setup. The following is the output from
-mongo_populate -h
+elasticsearch_populate -h
 
 <pre>
+Usage: elasticsearch_populate.py [options]
+
 Options:
   -h, --help            show this help message and exit
   -f FILE, --file=FILE  Input CSV file
@@ -89,20 +91,14 @@ Options:
   -i IDENTIFIER, --identifier=IDENTIFIER
                         Numerical identifier to use in update to signify
                         version (e.g., '8' or '20140120')
-  -m MONGO_HOST, --mongo-host=MONGO_HOST
-                        Location of mongo db/cluster
-  -p MONGO_PORT, --mongo-port=MONGO_PORT
-                        Location of mongo db/cluster
-  -b DATABASE, --database=DATABASE
-                        Name of database to use (default: 'whois')
-  -c COLLECTION, --collection=COLLECTION
-                        Name of collection to use (default: 'whois')
   -t THREADS, --threads=THREADS
-                        Number of worker threads
+                        Number of workers, defaults to 2. Note that each
+                        worker will increase the load on your ES cluster
   -B BULK_SIZE, --bulk-size=BULK_SIZE
                         Size of Bulk Insert Requests
   -v, --verbose         Be verbose
-  --vverbose            Be very verbose (Prints status of every domain parsed)
+  --vverbose            Be very verbose (Prints status of every domain parsed,
+                        very noisy)
   -s, --stats           Print out Stats after running
   -x EXCLUDE, --exclude=EXCLUDE
                         Comma separated list of keys to exclude if updating
@@ -112,8 +108,16 @@ Options:
                         entry (mutually exclusive to -x)
   -o COMMENT, --comment=COMMENT
                         Comment to store with metadata
-  -r, --redo            Attempt to re-import a failed import
-
+  -r, --redo            Attempt to re-import a failed import or import more
+                        data, uses stored metatdata from previous import (-o
+                        and -x not required and will be ignored!!)
+  -u ES_URI, --es-uri=ES_URI
+                        Location of ElasticSearch Server (e.g.,
+                        foo.server.com:9200)
+  -p INDEX_PREFIX, --index-prefix=INDEX_PREFIX
+                        Index prefix to use in ElasticSearch (default: whois)
+  --bulk-threads=BULK_THREADS
+                        How many threads to use for making bulk requests to ES
 </pre>
 
 
@@ -124,38 +128,43 @@ at the same time, but you can choose whichever is best for your given environmen
 might decide that for daily updates you only care if contactEmail changes but every quarter you might want to instead only exclude
 certain fields you don't find important.
 
-ScreenShots
+Version 3.0 of pyDat introduces ElasticSearch as the backend going forward for storing and searching data. Although the mongo backend
+should still work, it should be considered deprecated and it is recommended installations move to ES as a backend as it provides 
+numerous benefits with regards to searching, including a full-featured query language allowing for more powerful searches.
+
+ScreenShot
 ===========
 
-![alt tag](http://imgur.com/DmzZIgH.png)
-![alt tag](http://i.imgur.com/6vPVU6a.png)
+![alt tag](https://imgur.com/QT7Mkfp.png)
 
 Running pyDat
 =============
 
-pyDat does not provide any data on its own. You must provide your own whois
-data in a MongoDB. Beyond the data in a MongoDB you will need
-[Django](https://djangoproject.com), [pymongo](https://pypi.python.org/pypi/pymongo/), [unicodecsv](https://pypi.python.org/pypi/unicodecsv), 
+pyDat does not provide any data on its own. You must provide your own whois data in an ElasticSearch data store . Beyond the data in ElasticSearch you will need
+[Django](https://djangoproject.com), [unicodecsv](https://pypi.python.org/pypi/unicodecsv), 
 [requests](https://pypi.python.org/pypi/requests) (at least 2.2.1) and [markdown](https://pypi.python.org/pypi/Markdown). 
 
 
-Populating Mongo with whoisxmlapi data (Ubuntu 12.04.4 LTS)
+Populating ElasticSearch with whoisxmlapi data (Ubuntu 14.04.3 LTS)
 ===========================================================
 
-- Install [MongoDB](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-ubuntu/)
+- Install ElasticSearch. Using [Docker](https://hub.docker.com/_/elasticsearch/) is the easiest mechanism
 - Download latest trimmed (smallest possible) whoisxmlapi quarterly DB dump.
 - Extract the csv files.
 
 - Use the included script in the scripts/ directory:
 
 ```
-./mongo_populate.py -f ~/whois/data/1.csv -i '1' -v -s -x Audit_auditUpdatedDate,updatedDate,standardRegUpdatedDate,expiresDate,standardRegExpiresDate
+./elasticsearch_populate.py -u localhost:9200 -f ~/whois/data/1.csv -i '1' -v -s -x Audit_auditUpdatedDate,updatedDate,standardRegUpdatedDate,expiresDate,standardRegExpiresDate
 ```
+
+Local Installation
+--------------------
 
 - Copy pydat to /var/www/ (or prefered location)
 - Copy pydat/custom_settings_example.py to pydat/custom_settings.py.
 - Edit pydat/custom_settings.py to suit your needs.
-  - Include your DNSDB key if you have one!
+  - Include your Passive DNS keys if you have any!
 - Configure Apache to use the provided wsgi interface to pydat.
 ```bash
 sudo apt-get install libapache2-mod-wsgi
@@ -173,10 +182,24 @@ sudo vi /etc/apache2/sites-available/whois
 </VirtualHost>
 ```
 
+Docker Installation
+-------------------
+
+If you don't want to install pyDat manually, you can use the docker image to quickly deploy the system.
+
+First, make sure to copy custom_settings_example.py to custom_settings.py and customize it to match your environment
+
+You can then launch pyDat by running
+
+```
+docker run -d --name pydat -p 80:80 -v <path/to/custom_settings.py>:/opt/WhoDat/pydat/pydat/custom_settings.py mitrecnd/pydat
+``` 
+
+
 pyDat API
 ===========================================================
 
-pyDat 2.0 has a scriptable API that allows you to make search requests and obtain JSON data. The following endpoints are exposed:
+Starting with pyDat 2.0 there's a scriptable API that allows you to make search requests and obtain JSON data. The following endpoints are exposed:
 
 ```
 ajax/metadata/
@@ -195,6 +218,7 @@ ajax/domain/<domainName>/diff/<version1>/<version2>/
 
 The domain endpoint allows you to get information about a specific domain name. By default, this will return information for any version of a domain that is found in the database. You can specify more information to obtain specific versions of domain information or to obtain the latest entry. You can also obtain a diff between two versions of a domain to see what has changed.
 
+**Warning**: The output from the /diff endpoint has changed slightly in 3.0 to conform to the output of other endpoints. Data for the diff now resides in the 'data' object nested under the root
 
 ```
 ajax/domains/<searchKey>/<searchValue>/
@@ -240,6 +264,9 @@ size - The number of elements to return (aka page size)
 page - The page to return, combining this with size you can get the results in chunks
 unique - Only accepted if ES scripting is enabled (read above)
 
+###Note on the unique parameter
+If you're using the unique parameter, note that paging of results is disabled, but the size paramter will still be used to control the number of results returned.
+
 
 Untested Stuff
 =============
@@ -256,7 +283,7 @@ TODO
 Legal Stuff
 ===========
 
-pyDat is copyright The MITRE Corporation 2015.
+pyDat is copyright The MITRE Corporation 2016.
 
 The PHP implementation is copyright Chris Clark, 2013. Contact him at
 Chris@xenosys.org.
