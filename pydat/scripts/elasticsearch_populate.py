@@ -331,11 +331,10 @@ def parse_tld(domainName):
     
 
 def find_entry(es, domainName, options):
-    prefix = hashlib.md5(domainName).hexdigest()
     try:
         result = es.search(index="%s-*" % options.index_prefix,
                           body = { "query":{
-                                        "prefix": { UNIQUE_KEY : prefix }
+                                        "term": { 'domainName': domainName}
                                     },
                                     "sort": [
                                         {
@@ -349,12 +348,13 @@ def find_entry(es, domainName, options):
         if result['hits']['total'] == 0:
             return None
 
+        """
         tups = []
         for r in result['hits']['hits']:
             tups.append((r['_source']['domainName'], r['_source']['dataVersion']))
 
-        #print tups
-            
+        print tups
+        """
         
         return result['hits']['hits'][0]
     except Exception as e:
