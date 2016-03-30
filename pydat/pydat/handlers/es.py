@@ -56,11 +56,12 @@ def cluster_stats():
                                     "dates": {"date_histogram": {"field": "details.standardRegUpdatedDate", "interval": "1M", "format": "yyyy-MM"}},
                             }
                     }
-                }
+                },
+             "size": 0
             }
     #TODO XXX need to cache this but query_cache doesn't seem to be a parameter to this function
     #Might need to set query cache in the mapping instead
-    results = es.search(index = '%s-*' % settings.ES_INDEX_PREFIX, body = query, search_type="count")
+    results = es.search(index = '%s-*' % settings.ES_INDEX_PREFIX, body = query)
 
     stats = {
             'domainStats': {},
