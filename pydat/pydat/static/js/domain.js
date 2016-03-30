@@ -261,7 +261,7 @@ function diff(domain, v1, v2) {
 	  if (response.success) {
 		$("#dtext").empty();
 
-		var result = response;
+		var result = response.data;
 		var text = document.createElement('div');
         var dtab = document.createElement('table');
 

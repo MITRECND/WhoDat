@@ -200,21 +200,25 @@ def domain_diff(request, domainName = None, v1 = None, v2 = None):
 
         keylist.remove('Version')
         keylist.remove('domainName')
+        keylist.remove('dataUniqueID')
+        keylist.remove('dataFirstSeen')
 
         output = {}
+        data = {}
         for key in keylist: 
             if key in v1_res and key in v2_res:
                 if v1_res[key] == v2_res[key]:
-                    output[key] = v1_res[key] 
+                    data[key] = v1_res[key]
                 else:
-                    output[key] = [v1_res[key], v2_res[key]]
+                    data[key] = [v1_res[key], v2_res[key]]
             else:
                 try:
-                    output[key] = [v1_res[key], '']
+                    data[key] = [v1_res[key], '']
                 except:
-                    output[key] = ['', v2_res[key]]
+                    data[key] = ['', v2_res[key]]
         
         output['success'] = True 
+        output['data'] = data
         return HttpResponse(json.dumps(output), content_type='application/json')
     else:
         return __renderErrorJSON__('Bad Method.')
