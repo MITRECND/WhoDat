@@ -145,7 +145,7 @@ def es_worker(insert_queue, options):
             request = insert_queue.get()
             if not isinstance(request, basestring):
                 if request['type'] == 'insert':
-                    command = {"create": { "_id": request['_id'], 
+                    command = {"create": {
                                            "_index": request['_index'], 
                                            "_type": request['_type']
                                          }
@@ -155,7 +155,8 @@ def es_worker(insert_queue, options):
                     bulk_request.append(data)
                     bulk_counter += 1
                 elif request['type'] == 'update':
-                    command = {"update": { "_id": request['_id'], 
+                    command = {"update": {
+                                           "_id": request['_id'],
                                            "_index": request['_index'], 
                                            "_type": request['_type']
                                          }
@@ -216,11 +217,13 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
                         continue
 
                     domainName = entry['domainName']
+
                     if options.firstImport:
                         entries = 0
                         current_entry_raw = None
                     else:
                         (entries, current_entry_raw) = find_entry(es, domainName, options)
+
                     stats_queue.put('total')
                     process_entry(insert_queue, stats_queue, es, entry, entries, current_entry_raw, options)
                 finally:
@@ -359,7 +362,6 @@ def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_ent
                 # Put it into a previousVersion-d index so it doesn't potentially create
                 # a bunch of indexes that will need to be cleaned up later
                 insert_queue.put({'type': 'insert',
-                                  '_id': generate_id(domainName, options.previousVersion),
                                   '_index': "%s-%s-d" % (options.index_prefix, options.previousVersion),
                                   '_type': current_type,
                                   'insert': current_entry
@@ -369,7 +371,6 @@ def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_ent
             entry_id = generate_id(domainName, options.identifier)
             entry[UNIQUE_KEY] = entry_id
             insert_queue.put({'type': 'insert', 
-                              '_id': entry_id, 
                               '_index': index_name,
                               '_type': parse_tld(domainName), 
                               'insert':entry
@@ -398,7 +399,6 @@ def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_ent
         if options.enable_delta_indexes:
             index_name += "-o"
         insert_queue.put({'type': 'insert', 
-                          '_id': entry_id, 
                           '_index': index_name,
                           '_type': parse_tld(domainName), 
                           'insert':entry
