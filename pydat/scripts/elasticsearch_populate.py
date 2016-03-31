@@ -254,7 +254,7 @@ def process_reworker(work_queue, insert_queue, stats_queue, options):
 
                     if update_required(entries, current_entry_raw, options):
                         stats_queue.put('total')
-                        process_entry(insert_queue, stats_queue, es, work['header'], work['row'], options)
+                        process_entry(insert_queue, stats_queue, es, entry, entries, current_entry_raw, options)
                 finally:
                     work_queue.task_done()
             except Queue.Empty as e:
@@ -262,7 +262,7 @@ def process_reworker(work_queue, insert_queue, stats_queue, options):
                     break
                 time.sleep(.01)
             except Exception as e:
-                sys.stdout.write("Unhandeled Exception: %s, %s\n" (str(e), traceback.format_exc()))
+                sys.stdout.write("Unhandled Exception: %s, %s\n" % (str(e), traceback.format_exc()))
     except Exception as e:
         sys.stdout.write("Unhandeled Exception: %s, %s\n" % (str(e), traceback.format_exc()))
 
@@ -666,7 +666,7 @@ def main():
                                             "match_all": {}
                                         },
                                         "sort":[
-                                            {"_id": {"order": "asc"}}
+                                            {"metadata": {"order": "asc"}}
                                         ]
                                       })
 
@@ -674,7 +674,7 @@ def main():
                 print "Unable to fetch entries from metadata index"
                 sys.exit(1)
 
-            previousVersion = results['hits']['hits'][-2]['_id']
+            previousVersion = result['hits']['hits'][-2]['_id']
 
     options.previousVersion = previousVersion
 
