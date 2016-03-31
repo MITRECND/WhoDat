@@ -6,7 +6,7 @@ import unicodecsv
 import hashlib
 import signal
 import time
-from optparse import OptionParser
+import argparse
 import threading
 from threading import Thread, Lock
 import Queue
@@ -517,49 +517,51 @@ def main():
         sys.stdout.write("... Done\n")
         sys.exit(0)
 
+    parser = argparse.ArgumentParser()
 
-    optparser = OptionParser(usage='usage: %prog [options]')
-    optparser.add_option("-f", "--file", action="store", dest="file",
+
+    dataSource = parser.add_mutually_exclusive_group(required=True)
+    dataSource.add_argument("-f", "--file", action="store", dest="file",
         default=None, help="Input CSV file")
-    optparser.add_option("-d", "--directory", action="store", dest="directory",
-        default=None, help="Directory to recursively search for CSV files - prioritized over 'file'")
-    optparser.add_option("-e", "--extension", action="store", dest="extension",
+    dataSource.add_argument("-d", "--directory", action="store", dest="directory",
+        default=None, help="Directory to recursively search for CSV files -- mutually exclusive to '-f' option")
+    parser.add_argument("-e", "--extension", action="store", dest="extension",
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
-    optparser.add_option("-i", "--identifier", action="store", dest="identifier", type="int",
-        default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
-    optparser.add_option("-t", "--threads", action="store", dest="threads", type="int",
-        default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster")
-    optparser.add_option("-B", "--bulk-size", action="store", dest="bulk_size", type="int",
-        default=5000, help="Size of Bulk Insert Requests")
-    optparser.add_option("-v", "--verbose", action="store_true", dest="verbose",
-        default=False, help="Be verbose")
-    optparser.add_option("--vverbose", action="store_true", dest="vverbose",
-        default=False, help="Be very verbose (Prints status of every domain parsed, very noisy)")
-    optparser.add_option("-s", "--stats", action="store_true", dest="stats",
-        default=False, help="Print out Stats after running")
-    optparser.add_option("-x", "--exclude", action="store", dest="exclude",
-        default="", help="Comma separated list of keys to exclude if updating entry")
-    optparser.add_option("-n", "--include", action="store", dest="include",
-        default="", help="Comma separated list of keys to include if updating entry (mutually exclusive to -x)")
-    optparser.add_option("-o", "--comment", action="store", dest="comment",
-        default="", help="Comment to store with metadata")
-    optparser.add_option("-r", "--redo", action="store_true", dest="redo",
-        default=False, help="Attempt to re-import a failed import or import more data, uses stored metatdata from previous import (-o and -x not required and will be ignored!!)")
 
-    #ES Specific Options
-    optparser.add_option("-u", "--es-uri", action="store", dest="es_uri",
-        default='localhost:9200', help="Location of ElasticSearch Server (e.g., foo.server.com:9200)")
-    optparser.add_option("-p", "--index-prefix", action="store", dest="index_prefix",
+    parser.add_argument("-r", "--redo", action="store_true", dest="redo",
+        default=False, help="Attempt to re-import a failed import or import more data, uses stored metatdata from previous import (-o, -n, and -x not required and will be ignored!!)")
+    parser.add_argument("-v", "--verbose", action="store_true", dest="verbose",
+        default=False, help="Be verbose")
+    parser.add_argument("--vverbose", action="store_true", dest="vverbose",
+        default=False, help="Be very verbose (Prints status of every domain parsed, very noisy)")
+    parser.add_argument("-s", "--stats", action="store_true", dest="stats",
+        default=False, help="Print out Stats after running")
+
+    updateMethod = parser.add_mutually_exclusive_group()
+    updateMethod.add_argument("-x", "--exclude", action="store", dest="exclude",
+        default="", help="Comma separated list of keys to exclude if updating entry")
+    updateMethod.add_argument("-n", "--include", action="store", dest="include",
+        default="", help="Comma separated list of keys to include if updating entry (mutually exclusive to -x)")
+
+    parser.add_argument("-o", "--comment", action="store", dest="comment",
+        default="", help="Comment to store with metadata")
+    parser.add_argument("-u", "--es-uri", nargs="*", dest="es_uri",
+        default=['localhost:9200'], help="Location(s) of ElasticSearch Server (e.g., foo.server.com:9200) Can take multiple endpoints")
+    parser.add_argument("-p", "--index-prefix", action="store", dest="index_prefix",
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
-    optparser.add_option("--bulk-threads", action="store", dest="bulk_threads", type="int",
+    parser.add_argument("-i", "--identifier", action="store", dest="identifier", type=int,
+        default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
+    parser.add_argument("-B", "--bulk-size", action="store", dest="bulk_size", type=int,
+        default=5000, help="Size of Bulk Insert Requests")
+
+    parser.add_argument("-t", "--threads", action="store", dest="threads", type=int,
+        default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster")
+    parser.add_argument("--bulk-threads", action="store", dest="bulk_threads", type=int,
         default=1, help="How many threads to use for making bulk requests to ES")
-    optparser.add_option("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
+    parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue")
 
-    if (len(sys.argv) < 2):
-        optparser.parse_args(['-h'])
-
-    (options, args) = optparser.parse_args()
+    options = parser.parse_args()
 
     if options.vverbose:
         options.verbose = True
