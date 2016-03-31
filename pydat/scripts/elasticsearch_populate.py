@@ -346,7 +346,9 @@ def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_ent
             if options.vverbose:
                 sys.stdout.write("%s: Updated\n" % domainName)
 
-            if options.enable_delta_indexes and entries > 1:
+            index_name = "%s-%s" % (options.index_prefix, options.identifier)
+            if options.enable_delta_indexes:
+                index_name += "-o"
                 # Delete old entry, put into a 'diff' index
                 insert_queue.put({'type': 'delete',
                                   '_index': current_index,
@@ -358,7 +360,7 @@ def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_ent
                 # a bunch of indexes that will need to be cleaned up later
                 insert_queue.put({'type': 'insert',
                                   '_id': generate_id(domainName, options.previousVersion),
-                                  '_index': '%s-%s-d' % (options.index_prefix, options.previousVersion),
+                                  '_index': "%s-%s-d" % (options.index_prefix, options.previousVersion),
                                   '_type': current_type,
                                   'insert': current_entry
                                 })
@@ -368,7 +370,7 @@ def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_ent
             entry[UNIQUE_KEY] = entry_id
             insert_queue.put({'type': 'insert', 
                               '_id': entry_id, 
-                              '_index': "%s-%s" % (options.index_prefix, options.identifier), 
+                              '_index': index_name,
                               '_type': parse_tld(domainName), 
                               'insert':entry
                              })
@@ -392,9 +394,12 @@ def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_ent
             sys.stdout.write("%s: New\n" % domainName)
         entry_id = generate_id(domainName, options.identifier)
         entry[UNIQUE_KEY] = entry_id
+        index_name = "%s-%s" % (options.index_prefix, options.identifier)
+        if options.enable_delta_indexes:
+            index_name += "-o"
         insert_queue.put({'type': 'insert', 
                           '_id': entry_id, 
-                          '_index': "%s-%s" % (options.index_prefix, options.identifier), 
+                          '_index': index_name,
                           '_type': parse_tld(domainName), 
                           'insert':entry
                          })
@@ -548,8 +553,8 @@ def main():
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
     optparser.add_option("--bulk-threads", action="store", dest="bulk_threads", type="int",
         default=1, help="How many threads to use for making bulk requests to ES")
-    optparser.add_option("-T", "--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
-        default=False, help="If enabled, will put changed entries that are not the original or latest in a separate index. These indexes can be safely deleted if space is an issue")
+    optparser.add_option("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
+        default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue")
 
     if (len(sys.argv) < 2):
         optparser.parse_args(['-h'])
@@ -622,7 +627,10 @@ def main():
 
         #Specially create the first index to have 2x the shards than normal
         #since future indices should be diffs of the first index (ideally)
-        es.indices.create(index='%s-%s' % (options.index_prefix, options.identifier), 
+        index_name = "%s-%s" % (options.index_prefix, options.identifier)
+        if options.enable_delta_indexes:
+            index_name += "-o"
+        es.indices.create(index=index_name,
                             body = {"settings": { 
                                         "index": { 
                                             "number_of_shards": int(data_template["settings"]["number_of_shards"]) * 2
