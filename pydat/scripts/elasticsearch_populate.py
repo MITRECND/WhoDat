@@ -11,11 +11,12 @@ import threading
 from threading import Thread, Lock
 import Queue
 import multiprocessing
-from multiprocessing import Process, Queue as mpQueue
+from multiprocessing import Process, Queue as mpQueue, JoinableQueue as jmpQueue
 from pprint import pprint
 from elasticsearch import Elasticsearch
 import json
 import HTMLParser
+import traceback
 
 STATS = {'total': 0,
          'new': 0,
@@ -131,8 +132,8 @@ def es_worker(insert_queue, options):
     finishup = False
     bulk_request = []
 
-    # Allow the queue to back up to however many threads there will be
-    bulk_request_queue = Queue.Queue(maxsize = options.bulk_threads)
+    # Allow the queue to back up to twice however many threads there will be
+    bulk_request_queue = Queue.Queue(maxsize = options.bulk_threads * 2)
 
     for count in range(options.bulk_threads):
         t = Thread(target = es_bulk_thread, args = (bulk_request_queue, options))
@@ -140,65 +141,56 @@ def es_worker(insert_queue, options):
         t.start()
 
     while not finishup:
-        request = insert_queue.get()
-        if not isinstance(request, basestring):
-            if request['type'] == 'insert':
-                command = {"create": { "_id": request['_id'], 
-                                       "_index": request['_index'], 
-                                       "_type": request['_type']
-                                     }
-                          }
-                data = request['insert']
-                bulk_request.append(command)
-                bulk_request.append(data)
-                bulk_counter += 1
-            elif request['type'] == 'update':
-                command = {"update": { "_id": request['_id'], 
-                                       "_index": request['_index'], 
-                                       "_type": request['_type']
-                                     }
-                          }
-                data = request['update']
-                bulk_request.append(command)
-                bulk_request.append(data)
-                bulk_counter += 1
-            elif request['type'] == 'delete':
-                command = {"delete": {
-                                        "_id": request['_id'],
-                                        "_index": request['_index'],
-                                        "_type": request['_type']
-                                     }
-                          }
-                bulk_request.append(command)
-                bulk_counter += 1
+        try:
+            request = insert_queue.get()
+            if not isinstance(request, basestring):
+                if request['type'] == 'insert':
+                    command = {"create": { "_id": request['_id'], 
+                                           "_index": request['_index'], 
+                                           "_type": request['_type']
+                                         }
+                              }
+                    data = request['insert']
+                    bulk_request.append(command)
+                    bulk_request.append(data)
+                    bulk_counter += 1
+                elif request['type'] == 'update':
+                    command = {"update": { "_id": request['_id'], 
+                                           "_index": request['_index'], 
+                                           "_type": request['_type']
+                                         }
+                              }
+                    data = request['update']
+                    bulk_request.append(command)
+                    bulk_request.append(data)
+                    bulk_counter += 1
+                elif request['type'] == 'delete':
+                    command = {"delete": {
+                                            "_id": request['_id'],
+                                            "_index": request['_index'],
+                                            "_type": request['_type']
+                                         }
+                              }
+                    bulk_request.append(command)
+                    bulk_counter += 1
+                else:
+                    print "Unrecognized"
             else:
-                print "Unrecognized"
-        else:
-            finishup = True 
+                finishup = True 
 
-        if ((bulk_counter >= options.bulk_size) or finishup) and bulk_counter > 0:
-            bulk_request_queue.put(bulk_request)
-            bulk_counter = 0
-            bulk_request = []
+            if ((bulk_counter >= options.bulk_size) or finishup) and bulk_counter > 0:
+                bulk_request_queue.put(bulk_request)
+                bulk_counter = 0
+                bulk_request = []
+        finally:
+            insert_queue.task_done()
 
     # Wait for threads to finish sending bulk requests
     bulk_request_queue.join()
 
 ######## WORKER THREADS #########
 
-def update_required(es, header, input_entry, options):
-    if len(input_entry) == 0:
-        return False
-
-    current_entry = None
-    domainName = ''
-    for i,item in enumerate(input_entry):
-        if header[i] == 'domainName':
-            domainName = item
-            break
-
-    (entries, current_entry) = find_entry(es, domainName, options)
-
+def update_required(num_entries, current_entry, options):
     if current_entry is None:
         return True
 
@@ -210,42 +202,76 @@ def update_required(es, header, input_entry, options):
 def process_worker(work_queue, insert_queue, stats_queue, options):
     global shutdown_event
     global finished_event
-    os.setpgrp()
-    es = connectElastic(options.es_uri)
-    while not shutdown_event.is_set():
-        try:
-            work = work_queue.get_nowait()
-            process_entry(insert_queue, stats_queue, es, work['header'], work['row'], options)
-        except Queue.Empty as e:
-            if finished_event.is_set():
-                return
-            time.sleep(.01)
+    try:
+        os.setpgrp()
+        es = connectElastic(options.es_uri)
+        while not shutdown_event.is_set():
+            try:
+                work = work_queue.get_nowait()
+                try:
+                    entry = parse_entry(work['row'], work['header'], options)
+
+                    if entry is None:
+                        print "Malformed Entry"
+                        continue
+
+                    domainName = entry['domainName']
+                    if options.firstImport:
+                        entries = 0
+                        current_entry_raw = None
+                    else:
+                        (entries, current_entry_raw) = find_entry(es, domainName, options)
+                    stats_queue.put('total')
+                    process_entry(insert_queue, stats_queue, es, entry, entries, current_entry_raw, options)
+                finally:
+                    work_queue.task_done()
+            except Queue.Empty as e:
+                if finished_event.is_set():
+                    break
+                time.sleep(.01)
+            except Exception as e:
+                sys.stdout.write("Unhandled Exception: %s, %s\n" % (str(e), traceback.format_exc()))
+    except Exception as e:
+        sys.stdout.write("Unhandled Exception: %s, %s\n" % (str(e), traceback.format_exc()))
 
 def process_reworker(work_queue, insert_queue, stats_queue, options):
     global shutdown_event
     global finished_event
-    os.setpgrp()
-    es = connectElastic(options.es_uri)
-    while not shutdown_event.is_set():
-        try:
-            work = work_queue.get_nowait()
-            if update_required(es, work['header'],work['row'], options):
-                process_entry(insert_queue, stats_queue, es, work['header'], work['row'], options)
-        except Queue.Empty as e:
-            if finished_event.is_set():
-                return
-            time.sleep(.01)
+    try:
+        os.setpgrp()
+        es = connectElastic(options.es_uri)
+        while not shutdown_event.is_set():
+            try:
+                work = work_queue.get_nowait()
+                try:
+                    entry = parse_entry(work['row'], work['header'], options)
+                    if entry is None:
+                        print "Malformed Entry"
+                        continue
 
-def process_entry(insert_queue, stats_queue, es, header, input_entry, options):
-    global VERSION_KEY
+                    domainName = entry['domainName']
+                    (entries, current_entry_raw) = find_entry(es, domainName, options)
 
-    stats_queue.put('total')
+                    if update_required(entries, current_entry_raw, options):
+                        stats_queue.put('total')
+                        process_entry(insert_queue, stats_queue, es, work['header'], work['row'], options)
+                finally:
+                    work_queue.task_done()
+            except Queue.Empty as e:
+                if finished_event.is_set():
+                    break
+                time.sleep(.01)
+            except Exception as e:
+                sys.stdout.write("Unhandeled Exception: %s, %s\n" (str(e), traceback.format_exc()))
+    except Exception as e:
+        sys.stdout.write("Unhandeled Exception: %s, %s\n" % (str(e), traceback.format_exc()))
+
+def parse_entry(input_entry, header, options):
     if len(input_entry) == 0:
-        return
+        return None
 
     htmlparser = HTMLParser.HTMLParser()
 
-    current_entry = None
     details = {}
     domainName = ''
     for i,item in enumerate(input_entry):
@@ -266,8 +292,12 @@ def process_entry(insert_queue, stats_queue, es, header, input_entry, options):
                 'domainName': domainName,
             }
 
-    (entries, current_entry_raw) = find_entry(es, domainName, options)
+    return entry
 
+
+def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_entry_raw, options):
+    domainName = entry['domainName']
+    details = entry['details']
     global CHANGEDCT
     if current_entry_raw is not None:
         current_index = current_entry_raw['_index']
@@ -529,10 +559,11 @@ def main():
     if options.vverbose:
         options.verbose = True
 
+    options.firstImport = False
 
     threads = []
-    work_queue = mpQueue(maxsize=options.bulk_size)
-    insert_queue = mpQueue(maxsize=options.bulk_size)
+    work_queue = jmpQueue(maxsize=options.bulk_size)
+    insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_threads)
     stats_queue = mpQueue()
 
     meta_index_name = '@' + options.index_prefix + "_meta"
@@ -598,7 +629,7 @@ def main():
                                         }
                                     }
                             })
-
+        options.firstImport = True
     else:
         try:
             result = es.get(index=meta_index_name, id=0)
@@ -759,15 +790,14 @@ def main():
 
     time.sleep(.1)
 
-    while not work_queue.empty():
-        time.sleep(.01)
+    work_queue.join()
 
     finished_event.set()
-
     for t in threads:
         t.join()
 
     insert_queue.put("finished")
+    insert_queue.join()
     es_worker_thread.join()
 
     stats_queue.put('finished')
