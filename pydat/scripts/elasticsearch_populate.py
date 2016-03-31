@@ -445,6 +445,73 @@ def find_entry(es, domainName, options):
         return (0, None)
 
 
+def unOptimizeIndexes(es, template, options):
+    if not options.optimize_import:
+        return
+
+    index_name = "%s-%s" % (options.index_prefix, options.identifier)
+    if options.enable_delta_indexes:
+        index_name += "-o"
+
+        try:
+            es.indices.put_settings(index="%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                body = {"settings": {
+                                            "index": {
+                                                "number_of_replicas": template['settings']['number_of_replicas'],
+                                                "refresh_interval": template['settings']["refresh_interval"]
+                                            }
+                                        }
+                                })
+        except Exception as e:
+            pass
+
+    try:
+        es.indices.put_settings(index=index_name,
+                            body = {"settings": {
+                                        "index": {
+                                            "number_of_replicas": template['settings']['number_of_replicas'],
+                                            "refresh_interval": template['settings']["refresh_interval"]
+                                        }
+                                    }
+                            })
+    except Exception as e:
+        pass
+
+def optimizeIndexes(es, options):
+    if not options.optimize_import:
+        return
+
+    # Update the Index(es) with altered settings to help with bulk import
+    index_name = "%s-%s" % (options.index_prefix, options.identifier)
+    if options.enable_delta_indexes:
+        index_name += "-o"
+
+        try:
+            es.indices.put_settings(index= "%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                body = {"settings": {
+                                            "index": {
+                                                "number_of_replicas": 0,
+                                                "refresh_interval": "300s"
+                                            }
+                                        }
+                                })
+        except Exception as e:
+            pass
+
+    try:
+        es.indices.put_settings(index=index_name,
+                            body = {"settings": {
+                                        "index": {
+                                            "number_of_replicas": 0,
+                                            "refresh_interval": "300s"
+                                        }
+                                    }
+                            })
+    except Exception as e:
+        pass
+
+
+
 
 
 ###### MAIN ######
@@ -496,6 +563,9 @@ def main():
                                             })
         except:
             pass
+
+        # Make sure to de-optimize the indexes for import
+        unOptimizeIndexes(es, data_template, options)
 
         if reader_thread.is_alive():
             try:
@@ -553,6 +623,8 @@ def main():
         default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
     parser.add_argument("-B", "--bulk-size", action="store", dest="bulk_size", type=int,
         default=5000, help="Size of Bulk Insert Requests")
+    parser.add_argument("--optimize-import", action="store_true", dest="optimize_import",
+        default=False, help="If enabled, will change ES index settings to speed up bulk imports, but if the cluster has a failure, data might be lost permanently!")
 
     parser.add_argument("-t", "--threads", action="store", dest="threads", type=int,
         default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster")
@@ -652,6 +724,12 @@ def main():
             sys.exit(1)
 
         if options.redo is False: #Identifier is auto-pulled from db, no need to check
+            # Pre-emptively create index
+            index_name = "%s-%s" % (options.index_prefix, options.identifier)
+            if options.enable_delta_indexes:
+                index_name += "-o"
+            es.indices.create(index=index_name)
+
             if options.identifier < 1:
                 print "Identifier must be greater than 0"
                 sys.exit(1)
@@ -660,6 +738,11 @@ def main():
                 sys.exit(1)
 
             previousVersion = metadata['lastVersion']
+
+            # Pre-emptively create delta index
+            if options.enable_delta_indexes and previousVersion > 0:
+                index_name = "%s-%s-d" % (options.index_prefix, previousVersion)
+                es.indices.create(index=index_name)
         else:
             result = es.search(index=meta_index_name,
                                body = { "query": {
@@ -677,6 +760,9 @@ def main():
             previousVersion = result['hits']['hits'][-2]['_id']
 
     options.previousVersion = previousVersion
+
+    # Change Index settings to better suit bulk indexing
+    optimizeIndexes(es, options)
 
     if options.redo is False:
         if options.exclude != "":
@@ -809,6 +895,9 @@ def main():
     insert_queue.put("finished")
     insert_queue.join()
     es_worker_thread.join()
+
+    # Change settings back
+    unOptimizeIndexes(es, data_template, options)
 
     stats_queue.put('finished')
     stats_worker_thread.join()
