@@ -451,7 +451,11 @@ def parse_tld(domainName):
 
 def find_entry(es, domainName, options):
     try:
-        result = es.search(index="%s-*" % options.index_prefix,
+        index_name = "%s-*" % options.index_prefix
+        if options.enable_delta_indexes:
+            index_name += "-o"
+
+        result = es.search(index= index_name,
                           body = { "query":{
                                         "term": { 'domainName': domainName}
                                     },
@@ -668,7 +672,8 @@ def main():
         #Create the 0th metadata entry
         metadata = { "metadata": 0,
                      "firstVersion": options.identifier,
-                     "lastVersion": options.identifier
+                     "lastVersion": options.identifier,
+                     "deltaIndexes": options.enable_delta_indexes,
                     }
         es.create(index=meta_index_name, doc_type='meta', id = 0, body = metadata)
 
