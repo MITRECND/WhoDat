@@ -17,6 +17,7 @@ from elasticsearch import Elasticsearch
 import json
 import HTMLParser
 import traceback
+import uuid
 
 STATS = {'total': 0,
          'new': 0,
@@ -33,6 +34,7 @@ CHANGEDCT = {}
 
 shutdown_event = multiprocessing.Event()
 finished_event = multiprocessing.Event()
+bulkError_event = multiprocessing.Event()
 
 def connectElastic(uri):
     es = Elasticsearch(uri,
@@ -111,12 +113,38 @@ def stats_worker(stats_queue):
 ###### ELASTICSEARCH PROCESS ######
 
 def es_bulk_thread(bulk_request_queue, options):
+    global bulkError_event
     es = connectElastic(options.es_uri)
     while 1:
         try:
             bulk_request = bulk_request_queue.get()
             #sys.stdout.write("Making bulk request\n")
-            es.bulk(body=bulk_request)
+            resp = es.bulk(body=bulk_request)
+            try:
+                if 'errors' in resp and resp['errors']:
+                    if not bulkError_event.is_set():
+                        bulkError_event.set()
+                        sys.stdout.write("\nErrors making bulk api request!!\nBulk Requests saved to disk (/tmp/pydat-bulk-<identifier>-<random>.txt) and should be submitted manually!!\n")
+                        sys.stdout.write("It is possible you are running too many bulk workers or the bulk size is too big!\n")
+                        sys.stdout.write("ElasticSearch Bulk Syntax (using curl):\n\tcurl -s -XPOST <es_server:port>/_bulk --data-binary @<bulk file name>\n")
+
+                    twoliners = ['create', 'update', 'index']
+                    original_request_position = 0
+                    with open("/tmp/pydat-bulk-%s-%s.txt" % (options.identifier, uuid.uuid1()), 'wb') as f:
+                        for item in resp['items']:
+                            key = item.keys()[0]
+                            if not str(item[key]['status']).startswith('2'):
+                                f.write(json.dumps(bulk_request[original_request_position]) + "\n")
+                                if key in twoliners:
+                                    f.write(json.dumps(bulk_request[original_request_position + 1]) + "\n")
+
+                            if key in twoliners:
+                                original_request_position += 2
+                            else:
+                                original_request_position += 1
+
+            except Exception as e:
+                sys.stdout.write("Unhandled Exception attempting to handle error from bulk import: %s\n" % str(e))
             #sys.stdout.write("Bulk request Complete\n")
         except Exception as e:
             sys.stdout.write("Exception making bulk request: %s" % str(e))
@@ -128,63 +156,71 @@ def es_worker(insert_queue, options):
     #The parent should properly shut this down
     os.setpgrp()
 
+    global finished_event
+
     bulk_counter = 0
     finishup = False
     bulk_request = []
 
-    # Allow the queue to back up to twice however many threads there will be
-    bulk_request_queue = Queue.Queue(maxsize = options.bulk_threads * 2)
+    # Allow the queue to back up a bit
+    bulk_request_queue = Queue.Queue(maxsize = 2)
 
-    for count in range(options.bulk_threads):
-        t = Thread(target = es_bulk_thread, args = (bulk_request_queue, options))
-        t.daemon = True
-        t.start()
+    bulkThread = Thread(target = es_bulk_thread, args = (bulk_request_queue, options))
+    bulkThread.daemon = True
+    bulkThread.start()
 
-    while not finishup:
+    while 1:
         try:
-            request = insert_queue.get()
-            if not isinstance(request, basestring):
-                if request['type'] == 'insert':
-                    command = {"create": {
-                                           "_index": request['_index'], 
-                                           "_type": request['_type']
-                                         }
-                              }
-                    data = request['insert']
-                    bulk_request.append(command)
-                    bulk_request.append(data)
-                    bulk_counter += 1
-                elif request['type'] == 'update':
-                    command = {"update": {
-                                           "_id": request['_id'],
-                                           "_index": request['_index'], 
-                                           "_type": request['_type']
-                                         }
-                              }
-                    data = request['update']
-                    bulk_request.append(command)
-                    bulk_request.append(data)
-                    bulk_counter += 1
-                elif request['type'] == 'delete':
-                    command = {"delete": {
-                                            "_id": request['_id'],
-                                            "_index": request['_index'],
-                                            "_type": request['_type']
-                                         }
-                              }
-                    bulk_request.append(command)
-                    bulk_counter += 1
-                else:
-                    print "Unrecognized"
+            request = insert_queue.get_nowait()
+            if request['type'] == 'insert':
+                command = {"create": {
+                                       "_index": request['_index'],
+                                       "_type": request['_type']
+                                     }
+                          }
+                data = request['insert']
+                bulk_request.append(command)
+                bulk_request.append(data)
+                bulk_counter += 1
+            elif request['type'] == 'update':
+                command = {"update": {
+                                       "_id": request['_id'],
+                                       "_index": request['_index'],
+                                       "_type": request['_type']
+                                     }
+                          }
+                data = request['update']
+                bulk_request.append(command)
+                bulk_request.append(data)
+                bulk_counter += 1
+            elif request['type'] == 'delete':
+                command = {"delete": {
+                                        "_id": request['_id'],
+                                        "_index": request['_index'],
+                                        "_type": request['_type']
+                                     }
+                          }
+                bulk_request.append(command)
+                bulk_counter += 1
             else:
-                finishup = True 
+                print "Unrecognized"
 
-            if ((bulk_counter >= options.bulk_size) or finishup) and bulk_counter > 0:
+            if bulk_counter >= options.bulk_size:
                 bulk_request_queue.put(bulk_request)
                 bulk_counter = 0
                 bulk_request = []
-        finally:
+
             insert_queue.task_done()
+        except Queue.Empty as e:
+            if finished_event.is_set():
+                break
+            time.sleep(.01)
+
+    # Send whatever is left
+    if bulk_counter > 0:
+        bulk_request_queue.put(bulk_request)
+        bulk_counter = 0
+        bulk_request = []
 
     # Wait for threads to finish sending bulk requests
     bulk_request_queue.join()
@@ -522,70 +558,7 @@ def main():
     global CHANGEDCT
     global shutdown_event
     global finished_event
-
-    def signal_handler(signum, frame):
-        signal.signal(signal.SIGINT, SIGINT_ORIG)
-        sys.stdout.write("\rCleaning Up ... Please Wait ...\n")
-        shutdown_event.set()
-
-        #Let the current workload finish
-        sys.stdout.write("\tStopping Workers\n")
-        for t in threads:
-            t.join(1)
-
-        stats_queue.put('finished')
-        insert_queue.put("finished")
-
-        stats_worker_thread.join(5)
-
-        #Give the Elasticsearch process 5 seconds to exit
-        es_worker_thread.join(5)
-
-        #If it's still alive, terminate it
-        if es_worker_thread.is_alive():
-            try:
-                es_worker_thread.terminate()
-            except:
-                pass
-
-        #Attempt to update the stats
-        #XXX
-        try:
-            es.update(index=meta_index_name, id=options.identifier, 
-                                             body = { 'doc': {
-                                                        'total' : STATS['total'],
-                                                        'new' : STATS['new'],
-                                                        'updated' : STATS['updated'],
-                                                        'unchanged' : STATS['unchanged'],
-                                                        'duplicates': STATS['duplicates'],
-                                                        'changed_stats': CHANGEDCT
-                                                    }
-                                            })
-        except:
-            pass
-
-        # Make sure to de-optimize the indexes for import
-        unOptimizeIndexes(es, data_template, options)
-
-        if reader_thread.is_alive():
-            try:
-                #Flush the queue so reader can see the shutdown_event
-                while not work_queue.empty():
-                    work_queue.get_nowait()
-            except:
-                pass
-
-        reader_thread.join()
-
-        try:
-            work_queue.close()
-            insert_queue.close()
-            stats_queue.close()
-        except:
-            pass
-
-        sys.stdout.write("... Done\n")
-        sys.exit(0)
+    global bulkError_event
 
     parser = argparse.ArgumentParser()
 
@@ -861,68 +834,161 @@ def main():
             threads.append(t)
         #No need to update lastVersion or create metadata entry
 
-    #Start up the Elasticsearch Bulk Processor
-    es_worker_thread = Process(target=es_worker, args=(insert_queue, options))
-    es_worker_thread.daemon = True
-    es_worker_thread.start()
+    #Start up the Elasticsearch Bulk Processors
+    es_workers = []
+    for i in range(options.bulk_threads):
+        es_worker_thread = Process(target=es_worker, args=(insert_queue, options))
+        es_worker_thread.daemon = True
+        es_worker_thread.start()
+        es_workers.append(es_worker_thread)
 
     stats_worker_thread = Thread(target=stats_worker, args=(stats_queue,), name = 'Stats')
     stats_worker_thread.daemon = True
     stats_worker_thread.start()
-
-    #Set up signal handler before we go into the real work
-    SIGINT_ORIG = signal.getsignal(signal.SIGINT)
-    signal.signal(signal.SIGINT, signal_handler)
 
     #Start up Reader Thread
     reader_thread = Thread(target=reader_worker, args=(work_queue, options), name='Reader')
     reader_thread.daemon = True
     reader_thread.start()
 
-    while True:
-        reader_thread.join(.1)
-        if not reader_thread.is_alive():
-            break
+    try:
+        while True:
+            reader_thread.join(.1)
+            if not reader_thread.is_alive():
+                break
+            # If bulkError occurs stop reading from the files
+            if bulkError_event.is_set():
+                sys.stdout.write("Bulk API error -- forcing program shutdown \n")
+                raise KeyboardInterrupt("Error response from ES worker, stopping processing")
 
-    time.sleep(.1)
+        if options.verbose:
+            sys.stdout.write("All files ingested ... please wait for processing to complete ... \n")
+            sys.stdout.flush()
 
-    work_queue.join()
+        while not work_queue.empty():
+            # If bulkError occurs stop processing
+            if bulkError_event.is_set():
+                sys.stdout.write("Bulk API error -- forcing program shutdown \n")
+                raise KeyboardInterrupt("Error response from ES worker, stopping processing")
 
-    finished_event.set()
-    for t in threads:
-        t.join()
+        work_queue.join()
 
-    insert_queue.put("finished")
-    insert_queue.join()
-    es_worker_thread.join()
+        try:
+            # Since this is the shutdown section, ignore Keyboard Interrupts
+            # especially since the interrupt code (below) does effectively the same thing
+            insert_queue.join()
 
-    # Change settings back
-    unOptimizeIndexes(es, data_template, options)
+            finished_event.set()
+            for t in threads:
+                t.join()
 
-    stats_queue.put('finished')
-    stats_worker_thread.join()
-    
-    #Update the stats
-    es.update(index=meta_index_name, id=options.identifier, 
-                                     doc_type='meta',
-                                     body = { 'doc': {
-                                              'total' : STATS['total'],
-                                              'new' : STATS['new'],
-                                              'updated' : STATS['updated'],
-                                              'unchanged' : STATS['unchanged'],
-                                              'duplicates': STATS['duplicates'],
-                                              'changed_stats': CHANGEDCT
-                                            }}
-                                    );
+            for t in es_workers:
+                t.join()
+
+            # Change settings back
+            unOptimizeIndexes(es, data_template, options)
+
+            stats_queue.put('finished')
+            stats_worker_thread.join()
+
+            #Update the stats
+            es.update(index=meta_index_name, id=options.identifier,
+                                             doc_type='meta',
+                                             body = { 'doc': {
+                                                      'total' : STATS['total'],
+                                                      'new' : STATS['new'],
+                                                      'updated' : STATS['updated'],
+                                                      'unchanged' : STATS['unchanged'],
+                                                      'duplicates': STATS['duplicates'],
+                                                      'changed_stats': CHANGEDCT
+                                                    }}
+                                            );
+        except KeyboardInterrupt:
+            pass
+
+        if options.verbose:
+            sys.stdout.write("Done ...\n\n")
+            sys.stdout.flush()
 
 
-    if options.stats:
-        print "Stats: "
-        print "Total Entries:\t\t %d" % STATS['total'] 
-        print "New Entries:\t\t %d" % STATS['new'] 
-        print "Updated Entries:\t %d" % STATS['updated'] 
-        print "Duplicate Entries\t %d" % STATS['duplicates'] 
-        print "Unchanged Entries:\t %d" % STATS['unchanged'] 
+        if options.stats:
+            print("Stats: ")
+            print("Total Entries:\t\t %d" % STATS['total'])
+            print("New Entries:\t\t %d" % STATS['new'])
+            print("Updated Entries:\t %d" % STATS['updated'])
+            print("Duplicate Entries\t %d" % STATS['duplicates'])
+            print("Unchanged Entries:\t %d" % STATS['unchanged'])
+
+    except KeyboardInterrupt as e:
+        sys.stdout.write("\rCleaning Up ... Please Wait ...\nWarning!! Forcefully killing this might leave Elasticsearch in an inconsistent state!\n")
+        shutdown_event.set()
+
+        # Flush the queue if the reader is alive so it can see the shutdown_event
+        # in case it's blocked on a put
+        sys.stdout.write("\tShutting down input reader threads ...\n")
+        while reader_thread.is_alive():
+            try:
+                work_queue.get_nowait()
+                work_queue.task_done()
+            except Queue.Empty:
+                break
+
+        reader_thread.join()
+
+        # Don't join on the work queue, we don't care if the work has been finished
+        # The worker threads will exit on their own after getting the shutdown_event
+
+        # Joining on the insert queue is important to ensure ES isn't left in an inconsistent state if delta indexes are being used
+        # since it 'move' documents from one index to another which involves an insert and a delete
+        insert_queue.join()
+
+        # All of the workers should have seen the shutdown event and exited after finishing whatever they were last working on
+        sys.stdout.write("\tStopping workers ... \n")
+        for t in threads:
+            t.join()
+
+        # Send the finished message to the stats queue to shut it down
+        stats_queue.put('finished')
+        stats_worker_thread.join()
+
+        sys.stdout.write("\tWaiting for ElasticSearch bulk uploads to finish ... \n")
+        # The ES workers do not recognize the shutdown event only the graceful finished_event
+        # so set the event so it can gracefully shutdown
+        finished_event.set()
+        # Wait for bulk uploads to finish, otherwise ES can be left in an inconsistent state
+        for es_worker_thread in es_workers:
+            es_worker_thread.join()
+
+        #Attempt to update the stats
+        #XXX
+        try:
+            sys.stdout.write("\tFinalizing metadata\n")
+            es.update(index=meta_index_name, id=options.identifier,
+                                             body = { 'doc': {
+                                                        'total' : STATS['total'],
+                                                        'new' : STATS['new'],
+                                                        'updated' : STATS['updated'],
+                                                        'unchanged' : STATS['unchanged'],
+                                                        'duplicates': STATS['duplicates'],
+                                                        'changed_stats': CHANGEDCT
+                                                    }
+                                            })
+        except:
+            pass
+
+        sys.stdout.write("\tFinalizing settings\n")
+        # Make sure to de-optimize the indexes for import
+        unOptimizeIndexes(es, data_template, options)
+
+        try:
+            work_queue.close()
+            insert_queue.close()
+            stats_queue.close()
+        except:
+            pass
+
+        sys.stdout.write("... Done\n")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
