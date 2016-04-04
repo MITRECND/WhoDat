@@ -18,6 +18,7 @@ import json
 import HTMLParser
 import traceback
 import uuid
+from io import StringIO
 
 STATS = {'total': 0,
          'new': 0,
@@ -122,26 +123,33 @@ def es_bulk_thread(bulk_request_queue, options):
             resp = es.bulk(body=bulk_request)
             try:
                 if 'errors' in resp and resp['errors']:
-                    if not bulkError_event.is_set():
-                        bulkError_event.set()
-                        sys.stdout.write("\nErrors making bulk api request!!\nBulk Requests saved to disk (/tmp/pydat-bulk-<identifier>-<random>.txt) and should be submitted manually!!\n")
-                        sys.stdout.write("It is possible you are running too many bulk workers or the bulk size is too big!\n")
-                        sys.stdout.write("ElasticSearch Bulk Syntax (using curl):\n\tcurl -s -XPOST <es_server:port>/_bulk --data-binary @<bulk file name>\n")
-
                     twoliners = ['create', 'update', 'index']
                     original_request_position = 0
-                    with open("/tmp/pydat-bulk-%s-%s.txt" % (options.identifier, uuid.uuid1()), 'wb') as f:
-                        for item in resp['items']:
-                            key = item.keys()[0]
-                            if not str(item[key]['status']).startswith('2'):
-                                f.write(json.dumps(bulk_request[original_request_position]) + "\n")
-                                if key in twoliners:
-                                    f.write(json.dumps(bulk_request[original_request_position + 1]) + "\n")
+                    bulkOut = StringIO()
 
+                    for item in resp['items']:
+                        key = item.keys()[0]
+                        if not str(item[key]['status']).startswith('2') and item[key]['status'] not in [404, 409]:
+                            bulkOut.write(json.dumps(bulk_request[original_request_position]) + "\n")
                             if key in twoliners:
-                                original_request_position += 2
-                            else:
-                                original_request_position += 1
+                                bulkOut.write(json.dumps(bulk_request[original_request_position + 1]) + "\n")
+
+                        if key in twoliners:
+                            original_request_position += 2
+                        else:
+                            original_request_position += 1
+
+                    if len(bulkOut.getvalue()) > 0:
+                        with open("/tmp/pydat-bulk-%s-%s.txt" % (options.identifier, uuid.uuid1()), 'wb') as f:
+                            f.write(bulkOut.getvalue())
+
+                        if not bulkError_event.is_set():
+                            bulkError_event.set()
+                            sys.stdout.write("\nErrors making bulk api request!!\nBulk Requests saved to disk (/tmp/pydat-bulk-<identifier>-<random>.txt) and should be submitted manually!!\n")
+                            sys.stdout.write("It is possible you are running too many bulk workers or the bulk size is too big!\n")
+                            sys.stdout.write("ElasticSearch Bulk Syntax (using curl):\n\tcurl -s -XPOST <es_server:port>/_bulk --data-binary @<bulk file name>\n")
+
+                    bulkOut.close()
 
             except Exception as e:
                 sys.stdout.write("Unhandled Exception attempting to handle error from bulk import: %s\n" % str(e))
