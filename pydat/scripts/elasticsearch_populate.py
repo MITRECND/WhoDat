@@ -227,7 +227,7 @@ def es_worker(insert_queue, options):
 
 ######## WORKER THREADS #########
 
-def update_required(num_entries, current_entry, options):
+def update_required(current_entry, options):
     if current_entry is None:
         return True
 
@@ -255,13 +255,12 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
                     domainName = entry['domainName']
 
                     if options.firstImport:
-                        entries = 0
                         current_entry_raw = None
                     else:
-                        (entries, current_entry_raw) = find_entry(es, domainName, options)
+                        current_entry_raw = find_entry(es, domainName, options)
 
                     stats_queue.put('total')
-                    process_entry(insert_queue, stats_queue, es, entry, entries, current_entry_raw, options)
+                    process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, options)
                 finally:
                     work_queue.task_done()
             except Queue.Empty as e:
@@ -289,11 +288,11 @@ def process_reworker(work_queue, insert_queue, stats_queue, options):
                         continue
 
                     domainName = entry['domainName']
-                    (entries, current_entry_raw) = find_entry(es, domainName, options)
+                    current_entry_raw = find_entry(es, domainName, options)
 
-                    if update_required(entries, current_entry_raw, options):
+                    if update_required(current_entry_raw, options):
                         stats_queue.put('total')
-                        process_entry(insert_queue, stats_queue, es, entry, entries, current_entry_raw, options)
+                        process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, options)
                 finally:
                     work_queue.task_done()
             except Queue.Empty as e:
@@ -334,7 +333,7 @@ def parse_entry(input_entry, header, options):
     return entry
 
 
-def process_entry(insert_queue, stats_queue, es, entry, num_entries, current_entry_raw, options):
+def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, options):
     domainName = entry['domainName']
     details = entry['details']
     global CHANGEDCT
@@ -465,24 +464,17 @@ def find_entry(es, domainName, options):
                                                        "unmapped_type": "long"
                                                       }
                                         }
-                                    ]
+                                    ],
+                                    "size": 1
                                  })
 
         if result['hits']['total'] == 0:
-            return (0, None)
+            return None
 
-        """
-        tups = []
-        for r in result['hits']['hits']:
-            tups.append((r['_source']['domainName'], r['_source']['dataVersion']))
-
-        print tups
-        """
-        
-        return (result['hits']['total'], result['hits']['hits'][0])
+        return result['hits']['hits'][0]
     except Exception as e:
         print "Unable to find %s, %s" % (domainName, str(e))
-        return (0, None)
+        return None
 
 
 def unOptimizeIndexes(es, template, options):
