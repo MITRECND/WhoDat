@@ -9,16 +9,18 @@ import time
 import argparse
 import threading
 from threading import Thread, Lock
-import Queue
 import multiprocessing
 from multiprocessing import Process, Queue as mpQueue, JoinableQueue as jmpQueue
 from pprint import pprint
-from elasticsearch import Elasticsearch
 import json
-import HTMLParser
 import traceback
 import uuid
 from io import StringIO
+
+from HTMLParser import HTMLParser
+import Queue as queue
+
+from elasticsearch import Elasticsearch
 
 STATS = {'total': 0,
          'new': 0,
@@ -54,7 +56,7 @@ def reader_worker(work_queue, options):
     elif options.file:
         parse_csv(work_queue, options.file, options)
     else:
-        print "File or Directory required"
+        print("File or Directory required")
 
 def scan_directory(work_queue, directory, options):
     for root, subdirs, filenames in os.walk(directory):
@@ -85,12 +87,12 @@ def parse_csv(work_queue, filename, options):
         return
 
     if options.verbose:
-        print "Processing file: %s" % filename
+        print("Processing file: %s" % filename)
 
     csvfile = open(filename, 'rb')
     dnsreader = unicodecsv.reader(csvfile, strict = True, skipinitialspace = True)
     try:
-        header = dnsreader.next()
+        header = next(dnsreader)
         if not check_header(header):
             raise unicodecsv.Error('CSV header not found')
 
@@ -98,7 +100,7 @@ def parse_csv(work_queue, filename, options):
             if shutdown_event.is_set():
                 break
             work_queue.put({'header': header, 'row': row})
-    except unicodecsv.Error, e:
+    except unicodecsv.Error as e:
         sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
 
 
@@ -171,7 +173,7 @@ def es_worker(insert_queue, options):
     bulk_request = []
 
     # Allow the queue to back up a bit
-    bulk_request_queue = Queue.Queue(maxsize = 2)
+    bulk_request_queue = queue.Queue(maxsize = 2)
 
     bulkThread = Thread(target = es_bulk_thread, args = (bulk_request_queue, options))
     bulkThread.daemon = True
@@ -213,7 +215,7 @@ def es_worker(insert_queue, options):
                 bulk_request.append(command)
                 bulk_counter += 1
             else:
-                print "Unrecognized"
+                print("Unrecognized")
 
             if bulk_counter >= options.bulk_size:
                 bulk_request_queue.put(bulk_request)
@@ -221,7 +223,7 @@ def es_worker(insert_queue, options):
                 bulk_request = []
 
             insert_queue.task_done()
-        except Queue.Empty as e:
+        except queue.Empty as e:
             if finished_event.is_set():
                 break
             time.sleep(.01)
@@ -259,7 +261,7 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
                     entry = parse_entry(work['row'], work['header'], options)
 
                     if entry is None:
-                        print "Malformed Entry"
+                        print("Malformed Entry")
                         continue
 
                     domainName = entry['domainName']
@@ -273,7 +275,7 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
                     process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, options)
                 finally:
                     work_queue.task_done()
-            except Queue.Empty as e:
+            except queue.Empty as e:
                 if finished_event.is_set():
                     break
                 time.sleep(.01)
@@ -294,7 +296,7 @@ def process_reworker(work_queue, insert_queue, stats_queue, options):
                 try:
                     entry = parse_entry(work['row'], work['header'], options)
                     if entry is None:
-                        print "Malformed Entry"
+                        print("Malformed Entry")
                         continue
 
                     domainName = entry['domainName']
@@ -305,7 +307,7 @@ def process_reworker(work_queue, insert_queue, stats_queue, options):
                         process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, options)
                 finally:
                     work_queue.task_done()
-            except Queue.Empty as e:
+            except queue.Empty as e:
                 if finished_event.is_set():
                     break
                 time.sleep(.01)
@@ -318,7 +320,7 @@ def parse_entry(input_entry, header, options):
     if len(input_entry) == 0:
         return None
 
-    htmlparser = HTMLParser.HTMLParser()
+    htmlparser = HTMLParser()
 
     details = {}
     domainName = ''
@@ -455,7 +457,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                          })
 
 def generate_id(domainName, identifier):
-    dhash = hashlib.md5(domainName).hexdigest() + str(identifier)
+    dhash = hashlib.md5(domainName.encode('utf-8')).hexdigest() + str(identifier)
     return dhash
 
 def parse_tld(domainName):
@@ -483,7 +485,7 @@ def find_entry(es, domainName, options):
 
         return None
     except Exception as e:
-        print "Unable to find %s, %s" % (domainName, str(e))
+        print("Unable to find %s, %s" % (domainName, str(e)))
         return None
 
 
@@ -632,13 +634,13 @@ def main():
         data_template = json.loads(dtemplate.read())
 
     if options.identifier is None and options.redo is False:
-        print "Identifier required\n"
+        print("Identifier required\n")
         optparser.parse_args(['-h'])
     elif options.identifier is not None and options.redo is True:
-        print "Redo requested and Identifier Specified. Please choose one or the other\n"
+        print("Redo requested and Identifier Specified. Please choose one or the other\n")
         optparser.parse_args(['-h'])
     elif options.exclude != "" and options.include != "":
-        print "Options include and exclude are mutually exclusive, choose only one\n"
+        print("Options include and exclude are mutually exclusive, choose only one\n")
         optparser.parse_args(['-h'])
 
     es = connectElastic(options.es_uri)
@@ -648,7 +650,7 @@ def main():
     #Create the metadata index if it doesn't exist
     if not es.indices.exists(meta_index_name):
         if options.redo:
-            print "Cannot redo when no initial data exists"
+            print("Cannot redo when no initial data exists")
             sys.exit(1)
 
         if data_template is not None:
@@ -700,7 +702,7 @@ def main():
             else:
                 raise Exception("Not Found")
         except:
-            print "Error fetching metadata from index"
+            print("Error fetching metadata from index")
             sys.exit(1)
 
         if options.redo is False: #Identifier is auto-pulled from db, no need to check
@@ -711,10 +713,10 @@ def main():
             es.indices.create(index=index_name)
 
             if options.identifier < 1:
-                print "Identifier must be greater than 0"
+                print("Identifier must be greater than 0")
                 sys.exit(1)
             if metadata['lastVersion'] >= options.identifier:
-                print "Identifier must be 'greater than' previous identifier"
+                print("Identifier must be 'greater than' previous identifier")
                 sys.exit(1)
 
             previousVersion = metadata['lastVersion']
@@ -734,7 +736,7 @@ def main():
                                       })
 
             if result['hits']['total'] == 0:
-                print "Unable to fetch entries from metadata index"
+                print("Unable to fetch entries from metadata index")
                 sys.exit(1)
 
             previousVersion = result['hits']['hits'][-2]['_id']
@@ -775,7 +777,7 @@ def main():
 
         #Start worker threads
         if options.verbose:
-            print "Starting %i worker threads" % options.threads
+            print("Starting %i worker threads" % options.threads)
 
         for i in range(options.threads):
             t = Process(target=process_worker,
@@ -816,7 +818,7 @@ def main():
         try:
             redo_record = es.get(index=meta_index_name, id=options.identifier)['_source']
         except:
-           print "Unable to retrieve information for last import"
+           print("Unable to retrieve information for last import")
            sys.exit(1) 
 
         if 'excluded_keys' in redo_record:
@@ -838,14 +840,14 @@ def main():
         CHANGEDCT = redo_record['changed_stats']
 
         if options.verbose:
-            print "Re-importing for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment)
+            print("Re-importing for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
 
         for ch in CHANGEDCT.keys():
             CHANGEDCT[ch] = int(CHANGEDCT[ch])
 
         #Start the reworker threads
         if options.verbose:
-            print "Starting %i reworker threads" % options.threads
+            print("Starting %i reworker threads" % options.threads)
 
         for i in range(options.threads):
             t = Process(target=process_reworker,
@@ -955,7 +957,7 @@ def main():
             try:
                 work_queue.get_nowait()
                 work_queue.task_done()
-            except Queue.Empty:
+            except queue.Empty:
                 break
 
         reader_thread.join()
