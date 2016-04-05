@@ -180,13 +180,15 @@ def es_worker(insert_queue, options):
     while 1:
         try:
             request = insert_queue.get_nowait()
-            if request['type'] == 'insert':
+            if request['type'] == 'create':
                 command = {"create": {
                                        "_index": request['_index'],
                                        "_type": request['_type']
                                      }
                           }
-                data = request['insert']
+                if '_id' in request:
+                    command['create']['_id'] = request['_id']
+                data = request['create']
                 bulk_request.append(command)
                 bulk_request.append(data)
                 bulk_counter += 1
@@ -404,19 +406,22 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
 
                 # Put it into a previousVersion-d index so it doesn't potentially create
                 # a bunch of indexes that will need to be cleaned up later
-                insert_queue.put({'type': 'insert',
+                insert_queue.put({'type': 'create',
                                   '_index': "%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                  '_id': current_id,
                                   '_type': current_type,
-                                  'insert': current_entry
+                                  'create': current_entry
                                 })
 
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
             entry[UNIQUE_KEY] = entry_id
-            insert_queue.put({'type': 'insert', 
+            (domain_name_only, tld) = parse_domain(domainName)
+            insert_queue.put({'type': 'create',
                               '_index': index_name,
-                              '_type': parse_tld(domainName), 
-                              'insert':entry
+                              '_id':  domain_name_only,
+                              '_type': tld,
+                              'create':entry
                              })
         else:
             stats_queue.put('unchanged')
@@ -438,13 +443,15 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             sys.stdout.write("%s: New\n" % domainName)
         entry_id = generate_id(domainName, options.identifier)
         entry[UNIQUE_KEY] = entry_id
+        (domain_name_only, tld) = parse_domain(domainName)
         index_name = "%s-%s" % (options.index_prefix, options.identifier)
         if options.enable_delta_indexes:
             index_name += "-o"
-        insert_queue.put({'type': 'insert', 
+        insert_queue.put({'type': 'create',
                           '_index': index_name,
-                          '_type': parse_tld(domainName), 
-                          'insert':entry
+                          '_id': domain_name_only,
+                          '_type': tld,
+                          'create': entry
                          })
 
 def generate_id(domainName, identifier):
@@ -452,34 +459,29 @@ def generate_id(domainName, identifier):
     return dhash
 
 def parse_tld(domainName):
-    parts = domainName.split('.')
+    parts = domainName.rsplit('.', 1)
     return parts[-1]
+
+def parse_domain(domainName):
+    parts = domainName.rsplit('.', 1)
+    return (parts[0], parts[1])
     
 
 def find_entry(es, domainName, options):
     try:
-        index_name = "%s-*" % options.index_prefix
-        if options.enable_delta_indexes:
-            index_name += "-o"
+        (domain_name_only, tld) = parse_domain(domainName)
+        docs = []
+        for index_name in options.INDEX_LIST:
+            getdoc = {'_index': index_name, '_type': tld, '_id': domain_name_only}
+            docs.append(getdoc)
 
-        result = es.search(index= index_name,
-                          body = { "query":{
-                                        "term": { 'domainName': domainName}
-                                    },
-                                    "sort": [
-                                        {
-                                         VERSION_KEY: {"order": "desc",
-                                                       "unmapped_type": "long"
-                                                      }
-                                        }
-                                    ],
-                                    "size": 1
-                                 })
+        result = es.mget(body = {"docs": docs})
 
-        if result['hits']['total'] == 0:
-            return None
+        for res in result['docs']:
+            if res['found']:
+                return res
 
-        return result['hits']['hits'][0]
+        return None
     except Exception as e:
         print "Unable to find %s, %s" % (domainName, str(e))
         return None
@@ -618,7 +620,7 @@ def main():
     options.firstImport = False
 
     threads = []
-    work_queue = jmpQueue(maxsize=options.bulk_size)
+    work_queue = jmpQueue(maxsize=options.bulk_size * options.threads)
     insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_threads)
     stats_queue = mpQueue()
 
@@ -741,6 +743,24 @@ def main():
 
     # Change Index settings to better suit bulk indexing
     optimizeIndexes(es, options)
+
+    index_list = es.search(index=meta_index_name,
+                           body = { "query": {
+                                        "match_all": {}
+                                    },
+                                    "_source": "metadata",
+                                    "sort":[
+                                        {"metadata": {"order": "desc"}}
+                                    ]
+                                  })
+
+    index_list = [entry['_source']['metadata'] for entry in index_list['hits']['hits'][:-1]]
+    options.INDEX_LIST = []
+    for index_name in index_list:
+        if options.enable_delta_indexes:
+            options.INDEX_LIST.append('%s-%s-o' % (options.index_prefix, index_name))
+        else:
+            options.INDEX_LIST.append('%s-%s' % (options.index_prefix, index_name))
 
     if options.redo is False:
         if options.exclude != "":
