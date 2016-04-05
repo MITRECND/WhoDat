@@ -349,6 +349,8 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
     domainName = entry['domainName']
     details = entry['details']
     global CHANGEDCT
+    api_commands = []
+
     if current_entry_raw is not None:
         current_index = current_entry_raw['_index']
         current_id = current_entry_raw['_id']
@@ -400,45 +402,45 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             if options.enable_delta_indexes:
                 index_name += "-o"
                 # Delete old entry, put into a 'diff' index
-                insert_queue.put({'type': 'delete',
-                                  '_index': current_index,
-                                  '_id': current_id,
-                                  '_type': current_type
-                                 })
+                api_commands.append({'type': 'delete',
+                                     '_index': current_index,
+                                     '_id': current_id,
+                                     '_type': current_type
+                                    })
 
                 # Put it into a previousVersion-d index so it doesn't potentially create
                 # a bunch of indexes that will need to be cleaned up later
-                insert_queue.put({'type': 'create',
-                                  '_index': "%s-%s-d" % (options.index_prefix, options.previousVersion),
-                                  '_id': current_id,
-                                  '_type': current_type,
-                                  'create': current_entry
-                                })
+                api_commands.append({'type': 'create',
+                                     '_index': "%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                     '_id': current_id,
+                                     '_type': current_type,
+                                     'create': current_entry
+                                    })
 
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
             entry[UNIQUE_KEY] = entry_id
             (domain_name_only, tld) = parse_domain(domainName)
-            insert_queue.put({'type': 'create',
-                              '_index': index_name,
-                              '_id':  domain_name_only,
-                              '_type': tld,
-                              'create':entry
-                             })
+            api_commands.append({'type': 'create',
+                                 '_index': index_name,
+                                 '_id':  domain_name_only,
+                                 '_type': tld,
+                                 'create':entry
+                                 })
         else:
             stats_queue.put('unchanged')
             if options.vverbose:
                 sys.stdout.write("%s: Unchanged\n" % domainName)
-            insert_queue.put({'type': 'update', 
-                              '_id': current_id, 
-                              '_index': current_index,
-                              '_type': current_type,
-                              'update': {'doc': {
-                                                 VERSION_KEY: options.identifier,
-                                                'details': details 
-                                                }
-                                        }
-                             })
+            api_commands.append({'type': 'update',
+                                  '_id': current_id,
+                                  '_index': current_index,
+                                  '_type': current_type,
+                                  'update': {'doc': {
+                                                     VERSION_KEY: options.identifier,
+                                                    'details': details
+                                                    }
+                                            }
+                                 })
     else:
         stats_queue.put('new')
         if options.vverbose:
@@ -449,12 +451,15 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         index_name = "%s-%s" % (options.index_prefix, options.identifier)
         if options.enable_delta_indexes:
             index_name += "-o"
-        insert_queue.put({'type': 'create',
-                          '_index': index_name,
-                          '_id': domain_name_only,
-                          '_type': tld,
-                          'create': entry
-                         })
+        api_commands.append({'type': 'create',
+                             '_index': index_name,
+                             '_id': domain_name_only,
+                             '_type': tld,
+                             'create': entry
+                            })
+
+    for command in api_commands:
+        insert_queue.put(command)
 
 def generate_id(domainName, identifier):
     dhash = hashlib.md5(domainName.encode('utf-8')).hexdigest() + str(identifier)
