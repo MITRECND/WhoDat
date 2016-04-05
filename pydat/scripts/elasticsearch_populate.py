@@ -15,7 +15,7 @@ from pprint import pprint
 import json
 import traceback
 import uuid
-from io import StringIO
+from io import BytesIO
 
 from HTMLParser import HTMLParser
 import Queue as queue
@@ -127,14 +127,14 @@ def es_bulk_thread(bulk_request_queue, options):
                 if 'errors' in resp and resp['errors']:
                     twoliners = ['create', 'update', 'index']
                     original_request_position = 0
-                    bulkOut = StringIO()
+                    bulkOut = BytesIO()
 
                     for item in resp['items']:
                         key = item.keys()[0]
                         if not str(item[key]['status']).startswith('2') and item[key]['status'] not in [404, 409]:
-                            bulkOut.write(json.dumps(bulk_request[original_request_position]) + "\n")
+                            bulkOut.write('%s\n' % json.dumps(bulk_request[original_request_position]))
                             if key in twoliners:
-                                bulkOut.write(json.dumps(bulk_request[original_request_position + 1]) + "\n")
+                                bulkOut.write("%s\n" % json.dumps(bulk_request[original_request_position + 1]))
 
                         if key in twoliners:
                             original_request_position += 2
@@ -154,7 +154,7 @@ def es_bulk_thread(bulk_request_queue, options):
                     bulkOut.close()
 
             except Exception as e:
-                sys.stdout.write("Unhandled Exception attempting to handle error from bulk import: %s\n" % str(e))
+                sys.stdout.write("Unhandled Exception attempting to handle error from bulk import: %s %s\n" % (str(e), traceback.format_exc()))
             #sys.stdout.write("Bulk request Complete\n")
         except Exception as e:
             sys.stdout.write("Exception making bulk request: %s" % str(e))
