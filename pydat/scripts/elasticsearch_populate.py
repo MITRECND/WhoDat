@@ -45,7 +45,8 @@ def connectElastic(uri):
                        max_retries=100,
                        retry_on_timeout=True,
                        sniff_on_connection_fail=True,
-                       sniff_timeout=1000)
+                       sniff_timeout=1000,
+                       timeout=100)
 
     return es
 
@@ -130,7 +131,7 @@ def es_bulk_thread(bulk_request_queue, options):
                     bulkOut = BytesIO()
 
                     for item in resp['items']:
-                        key = item.keys()[0]
+                        key = list(item.keys())[0]
                         if not str(item[key]['status']).startswith('2') and item[key]['status'] not in [404, 409]:
                             bulkOut.write('%s\n' % json.dumps(bulk_request[original_request_position]))
                             if key in twoliners:
@@ -173,49 +174,21 @@ def es_worker(insert_queue, options):
     bulk_request = []
 
     # Allow the queue to back up a bit
-    bulk_request_queue = queue.Queue(maxsize = 2)
+    bulk_request_queue = queue.Queue(maxsize = 2 * options.bulk_threads)
 
-    bulkThread = Thread(target = es_bulk_thread, args = (bulk_request_queue, options))
-    bulkThread.daemon = True
-    bulkThread.start()
+    for i in range(options.bulk_threads):
+        bulkThread = Thread(target = es_bulk_thread, args = (bulk_request_queue, options))
+        bulkThread.daemon = True
+        bulkThread.start()
 
     while 1:
         try:
             request = insert_queue.get_nowait()
-            if request['type'] == 'create':
-                command = {"create": {
-                                       "_index": request['_index'],
-                                       "_type": request['_type']
-                                     }
-                          }
-                if '_id' in request:
-                    command['create']['_id'] = request['_id']
-                data = request['create']
-                bulk_request.append(command)
-                bulk_request.append(data)
-                bulk_counter += 1
-            elif request['type'] == 'update':
-                command = {"update": {
-                                       "_id": request['_id'],
-                                       "_index": request['_index'],
-                                       "_type": request['_type']
-                                     }
-                          }
-                data = request['update']
-                bulk_request.append(command)
-                bulk_request.append(data)
-                bulk_counter += 1
-            elif request['type'] == 'delete':
-                command = {"delete": {
-                                        "_id": request['_id'],
-                                        "_index": request['_index'],
-                                        "_type": request['_type']
-                                     }
-                          }
-                bulk_request.append(command)
-                bulk_counter += 1
-            else:
-                print("Unrecognized")
+
+            for msg in request:
+                bulk_request.append(msg)
+
+            bulk_counter += 1
 
             if bulk_counter >= options.bulk_size:
                 bulk_request_queue.put(bulk_request)
@@ -278,7 +251,7 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
             except queue.Empty as e:
                 if finished_event.is_set():
                     break
-                time.sleep(.01)
+                time.sleep(.0001)
             except Exception as e:
                 sys.stdout.write("Unhandled Exception: %s, %s\n" % (str(e), traceback.format_exc()))
     except Exception as e:
@@ -344,6 +317,35 @@ def parse_entry(input_entry, header, options):
 
     return entry
 
+def process_command(request, index, _id, _type, entry = None):
+    if request == 'create':
+        command = {"create": {
+                               "_index": index,
+                               "_type": _type
+                             }
+                  }
+        if _id is not None:
+            command['create']['_id'] = _id
+        return (command, entry)
+    elif request == 'update':
+        command = {"update": {
+                               "_index": index,
+                               "_id": _id,
+                               "_type": _type,
+                             }
+                  }
+        return (command, entry)
+    elif request == 'delete':
+        command = {"delete": {
+                                "_index": index,
+                                "_id": _id,
+                                "_type": _type,
+                             }
+                  }
+        return (command,)
+
+    return None #TODO raise instead?
+
 
 def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, options):
     domainName = entry['domainName']
@@ -402,45 +404,49 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             if options.enable_delta_indexes:
                 index_name += "-o"
                 # Delete old entry, put into a 'diff' index
-                api_commands.append({'type': 'delete',
-                                     '_index': current_index,
-                                     '_id': current_id,
-                                     '_type': current_type
-                                    })
+                api_commands.append(process_command(
+                                                    'delete',
+                                                    current_index,
+                                                    current_id,
+                                                    current_type
+                                    ))
 
                 # Put it into a previousVersion-d index so it doesn't potentially create
                 # a bunch of indexes that will need to be cleaned up later
-                api_commands.append({'type': 'create',
-                                     '_index': "%s-%s-d" % (options.index_prefix, options.previousVersion),
-                                     '_id': current_id,
-                                     '_type': current_type,
-                                     'create': current_entry
-                                    })
+                api_commands.append(process_command(
+                                                    'create',
+                                                    "%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                                    current_id,
+                                                    current_type,
+                                                    current_entry
+                                    ))
 
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
             entry[UNIQUE_KEY] = entry_id
             (domain_name_only, tld) = parse_domain(domainName)
-            api_commands.append({'type': 'create',
-                                 '_index': index_name,
-                                 '_id':  domain_name_only,
-                                 '_type': tld,
-                                 'create':entry
-                                 })
+            api_commands.append(process_command(
+                                                 'create',
+                                                 index_name,
+                                                 domain_name_only,
+                                                 tld,
+                                                 entry
+                                 ))
         else:
             stats_queue.put('unchanged')
             if options.vverbose:
                 sys.stdout.write("%s: Unchanged\n" % domainName)
-            api_commands.append({'type': 'update',
-                                  '_id': current_id,
-                                  '_index': current_index,
-                                  '_type': current_type,
-                                  'update': {'doc': {
-                                                     VERSION_KEY: options.identifier,
-                                                    'details': details
-                                                    }
-                                            }
-                                 })
+            api_commands.append(process_command(
+                                                 'update',
+                                                 current_index,
+                                                 current_id,
+                                                 current_type,
+                                                 {'doc': {
+                                                             VERSION_KEY: options.identifier,
+                                                            'details': details
+                                                         }
+                                                 }
+                                 ))
     else:
         stats_queue.put('new')
         if options.vverbose:
@@ -451,12 +457,13 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         index_name = "%s-%s" % (options.index_prefix, options.identifier)
         if options.enable_delta_indexes:
             index_name += "-o"
-        api_commands.append({'type': 'create',
-                             '_index': index_name,
-                             '_id': domain_name_only,
-                             '_type': tld,
-                             'create': entry
-                            })
+        api_commands.append(process_command(
+                                            'create',
+                                            index_name,
+                                            domain_name_only,
+                                            tld,
+                                            entry
+                            ))
 
     for command in api_commands:
         insert_queue.put(command)
@@ -614,8 +621,10 @@ def main():
 
     parser.add_argument("-t", "--threads", action="store", dest="threads", type=int,
         default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster")
+    parser.add_argument("--bulk-procs", action="store", dest="bulk_procs", type=int,
+        default=1, help="How many processes to spawn to handle ES messages. Increase this if your messaging rate is maxing out your per-core cpu utilization")
     parser.add_argument("--bulk-threads", action="store", dest="bulk_threads", type=int,
-        default=1, help="How many threads to use for making bulk requests to ES")
+        default=1, help="How many threads per bulk process to use for making bulk requests to ES. Increase this if your cluster can handle more simultaneous requests")
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue")
 
@@ -628,7 +637,7 @@ def main():
 
     threads = []
     work_queue = jmpQueue(maxsize=options.bulk_size * options.threads)
-    insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_threads)
+    insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_procs * options.bulk_threads)
     stats_queue = mpQueue()
 
     meta_index_name = '@' + options.index_prefix + "_meta"
@@ -868,7 +877,7 @@ def main():
 
     #Start up the Elasticsearch Bulk Processors
     es_workers = []
-    for i in range(options.bulk_threads):
+    for i in range(options.bulk_procs):
         es_worker_thread = Process(target=es_worker, args=(insert_queue, options))
         es_worker_thread.daemon = True
         es_worker_thread.start()
