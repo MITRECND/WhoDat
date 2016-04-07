@@ -510,14 +510,15 @@ def unOptimizeIndexes(es, template, options):
         index_name += "-o"
 
         try:
-            es.indices.put_settings(index="%s-%s-d" % (options.index_prefix, options.previousVersion),
-                                body = {"settings": {
-                                            "index": {
-                                                "number_of_replicas": template['settings']['number_of_replicas'],
-                                                "refresh_interval": template['settings']["refresh_interval"]
+            if options.previousVersion != 0:
+                es.indices.put_settings(index="%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                    body = {"settings": {
+                                                "index": {
+                                                    "number_of_replicas": template['settings']['number_of_replicas'],
+                                                    "refresh_interval": template['settings']["refresh_interval"]
+                                                }
                                             }
-                                        }
-                                })
+                                    })
         except Exception as e:
             pass
 
@@ -543,14 +544,15 @@ def optimizeIndexes(es, options):
         index_name += "-o"
 
         try:
-            es.indices.put_settings(index= "%s-%s-d" % (options.index_prefix, options.previousVersion),
-                                body = {"settings": {
-                                            "index": {
-                                                "number_of_replicas": 0,
-                                                "refresh_interval": "300s"
+            if options.previousVersion != 0:
+                es.indices.put_settings(index= "%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                    body = {"settings": {
+                                                "index": {
+                                                    "number_of_replicas": 0,
+                                                    "refresh_interval": "300s"
+                                                }
                                             }
-                                        }
-                                })
+                                    })
         except Exception as e:
             pass
 
