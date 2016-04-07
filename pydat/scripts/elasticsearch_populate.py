@@ -649,13 +649,10 @@ def main():
 
     if options.identifier is None and options.redo is False:
         print("Identifier required\n")
-        optparser.parse_args(['-h'])
+        argparse.parse_args(['-h'])
     elif options.identifier is not None and options.redo is True:
         print("Redo requested and Identifier Specified. Please choose one or the other\n")
-        optparser.parse_args(['-h'])
-    elif options.exclude != "" and options.include != "":
-        print("Options include and exclude are mutually exclusive, choose only one\n")
-        optparser.parse_args(['-h'])
+        argparse.parse_args(['-h'])
 
     es = connectElastic(options.es_uri)
     metadata = None
