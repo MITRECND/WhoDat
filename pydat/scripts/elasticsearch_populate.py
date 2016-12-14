@@ -22,6 +22,8 @@ import Queue as queue
 
 from elasticsearch import Elasticsearch
 
+import PydatQueue
+
 STATS = {'total': 0,
          'new': 0,
          'updated': 0,
@@ -649,6 +651,9 @@ def main():
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
 
+    parser.add_argument("--redis", action="store", dest="redis", default=None,
+     help="If enabled, script will use a redis instance for interprocess communication. Must provide a unix domain socket (e.g. /path/to/socket.sock ) OR network socket ( e.g. 127.0.0.1:6379/database ) ")
+
     options = parser.parse_args()
 
     if options.vverbose:
@@ -656,11 +661,39 @@ def main():
 
     options.firstImport = False
 
-    threads = []
-    work_queue = jmpQueue(maxsize=options.bulk_size * options.threads)
-    insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_threads)
-    bulk_request_queue = jmpQueue(maxsize = 2 * options.bulk_threads)
-    stats_queue = mpQueue()
+    threads= []
+
+    #setup redis lists or python queues as interprocess communication method
+    if options.redis not None:
+        redis_info = {}
+        '''TODO: is this hacky if-statement stable?'''
+        if ".sock" in options.redis and ":" not in options.redis:
+            redis_info['address'] = { 'unix_socket_path' : options.redis}
+            redis_info['type'] = "redis_list_unix"
+        else if ":" in options.redis:
+            redis_info['address'] = {
+                "host": options.redis.split(":")[0],
+                "port": options.redis.split(":")[1].split("/")[0],
+                "db": options.redis.split(":")[1].split("/")[1],
+            }
+            redis_info['type'] = "redis_list_tcp"
+        else:
+            print("Dont recognize argument for redis connection. Please check required format")
+            parser.parse_args(['-h'])
+
+        #create queues that are actually redis lists underneath
+        work_queue = PydatQueue(redis_info['type'], redis_info['address'])
+        insert_queue = PydatQueue(redis_info['type'], redis_info['address'])
+        bulk_request_queue = PydatQueue(redis_info['type'], redis_info['address'])
+        stats_queue = PydatQueue(redis_info['type'], redis_info['address'])
+
+    #if redis is not specified, default to python multiprocessing queues
+    else:
+        work_queue = PydatQueue("python_joinable", {'maxsize' : options.bulk_size * options.threads})
+        insert_queue = PydatQueue("python_joinable", {'maxsize' : options.bulk_size * options.bulk_threads})
+        bulk_request_queue = PydatQueue("python_joinable", {'maxsize' = 2 * options.bulk_threads})
+        stats_queue = PydatQueue("python", {'size': 0 }) 
+
 
     meta_index_name = '@' + options.index_prefix + "_meta"
 
@@ -671,10 +704,10 @@ def main():
 
     if options.identifier is None and options.redo is False:
         print("Identifier required\n")
-        argparse.parse_args(['-h'])
+        parser.parse_args(['-h'])
     elif options.identifier is not None and options.redo is True:
         print("Redo requested and Identifier Specified. Please choose one or the other\n")
-        argparse.parse_args(['-h'])
+        parser.parse_args(['-h'])
 
     es = connectElastic(options.es_uri)
     metadata = None
