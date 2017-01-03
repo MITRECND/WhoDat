@@ -9,7 +9,7 @@ REDIS_LIST_ID_MAX = 100000000000
 
 class PydatQueue:
 	
-	def factory(type, args):
+	def factory(type, args = None):
 		if type == "python-queue":
 			return Queue()
 		if type == "python-joinable-queue":
@@ -45,7 +45,7 @@ class RedisQueue:
 		self.serialize = args['serialize']
 		if 'host' in args and "port" in args and "db" in args:
 			self.queue = redis.StrictRedis(host= args['host'], port= args['port'], db=args['db'])
-		else if 'unix_socket_path' in args:
+		elif 'unix_socket_path' in args:
 			self.queue = redis.StrictRedis(unix_socket_path= args['unix_socket_path'])
 		else:
 			err = "Could not create Redis queue, not enough arguments"
@@ -86,15 +86,13 @@ class RedisQueue:
 			raise queue.Empty   
 		else:
 			#deserialize item if need be, as script is expecting string, dict or list
-			try:
 			if self.serialize:
 				item = json.loads(item)
 			return item
 
-
-    '''blocking join call'''
+	'''blocking join call'''
 	def join(self):
-	'''TODO: this is a crude polling hack to mimic join() for redis, try to make better'''
+		'''TODO: this is a crude polling hack to mimic join() for redis, try to make better'''
 		while self.redis_instance.llen(self.redis_list_id) != 0:
 			pass
 		return

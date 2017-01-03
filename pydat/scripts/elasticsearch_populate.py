@@ -485,7 +485,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             form an ES update action that would have no effect - as version IDs
             would quickly become converted to the most recent version ID
             '''
-            if options.identifier != current_entry[VERSION_KEY]  
+            if options.identifier != current_entry[VERSION_KEY]:
                 api_commands.append(process_command(
                                                      'update',
                                                      current_index,
@@ -695,7 +695,7 @@ def main():
 
     options.firstImport = False
 
-     if options.identifier is None and options.redo is False:
+    if options.identifier is None and options.redo is False and options.update is False:
         print("Identifier required\n")
         parser.parse_args(['-h'])
     elif options.identifier is not None and options.redo is True:
@@ -717,13 +717,13 @@ def main():
     threads= []
 
     #setup redis lists or python queues as interprocess communication method
-    if options.redis not None:
+    if options.redis:
         redis_info = {}
         redis_info['serialize'] = True
         '''TODO: is this hacky if-statement stable?'''
-        if ".sock" in options.redis and ":" not in options.redis
-            redis_info['unix_socket_path'] = options.redisst
-        else if ":" in options.redis:
+        if ".sock" in options.redis and ":" not in options.redis:
+            redis_info['unix_socket_path'] = options.redis
+        elif":" in options.redis:
             redis_info['host'] =  options.redis.split(":")[0],
             redis_info['port'] =  options.redis.split(":")[1].split("/")[0]
             redis_info['db'] =  options.redis.split(":")[1].split("/")[1]
@@ -732,17 +732,17 @@ def main():
             parser.parse_args(['-h'])
 
         #create queues that are actually redis lists underneath
-        work_queue = PydatQueue.factory("redis",redis_info)
-        insert_queue = PydatQueue.factory("redis",redis_info)
-        bulk_request_queue = PydatQueue.factory("redis",redis_info)
-        stats_queue = PydatQueue.factory("redis", redis_info)
+        work_queue = PydatQueue.PydatQueue.factory("redis",redis_info)
+        insert_queue = PydatQueue.PydatQueue.factory("redis",redis_info)
+        bulk_request_queue = PydatQueue.PydatQueue.factory("redis",redis_info)
+        stats_queue = PydatQueue.PydatQueue.factory("redis", redis_info)
 
     #if redis is not specified, default to python multiprocessing queues
     else:
-        work_queue = PydatQueue.factory("python-joinable-queue", {'maxsize' : options.bulk_size * options.threads})
-        insert_queue = PydatQueue.factory("python-joinable-queue", {'maxsize' : options.bulk_size * options.bulk_threads})
-        bulk_request_queue = PydatQueue.factory("python-joinable-queue", {'maxsize' : 2 * options.bulk_threads})
-        stats_queue = PydatQueue.factory("python-queue") 
+        work_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", {'maxsize' : options.bulk_size * options.threads})
+        insert_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", {'maxsize' : options.bulk_size * options.bulk_threads})
+        bulk_request_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", {'maxsize' : 2 * options.bulk_threads})
+        stats_queue = PydatQueue.PydatQueue.factory("python-queue") 
 
 
     meta_index_name = '@' + options.index_prefix + "_meta"
@@ -763,7 +763,7 @@ def main():
             print("Cannot redo when no initial data exists")
             sys.exit(1)
         ##############NEW ###########################
-        else if options.update:
+        elif options.update:
             print("Cannot update when no initial data exists")
             sys.exit(1)
         ############# NEw END#############################

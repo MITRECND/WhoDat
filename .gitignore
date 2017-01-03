@@ -1,3 +1,4 @@
 pydat/pydat/custom_settings.py
+pydat/scripts/TEST_es_populate/
 *.pyc
 *.swp
