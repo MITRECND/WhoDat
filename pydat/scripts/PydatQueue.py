@@ -4,18 +4,26 @@ import Queue as queue   #required for queue.empty exception
 import random
 import redis
 import sys
+from time import sleep
+
+#testing
+import logging
+logging.basicConfig(filename='es_script_testing.log', level = logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 REDIS_LIST_ID_MAX = 100000000000
 
 class PydatQueue:
 	
-	def factory(type, args = None):
+	def factory(type, name= None,  args = None):
+		#Testing
+		#logger.debug("creating %s queue" % type)
 		if type == "python-queue":
 			return Queue()
 		if type == "python-joinable-queue":
 			return JoinableQueue(maxsize= args['maxsize'])
 		if type == "redis":
-			return redisQueue(args)
+			return RedisQueue(name, **args)
 		assert 0, "Bad queue creation: " + type
 
 	factory = staticmethod(factory)
@@ -40,13 +48,13 @@ Arguments are passed via a dictionary. They are:
 
 '''
 class RedisQueue:
-	def __init__(args):
+	def __init__(self, name = None,  db=0, host='127.0.0.1', port='6379', redis_con_type = 'unix', unix_socket_path = None):
 		self.redis_list_id = random.randint(0, REDIS_LIST_ID_MAX)
-		self.serialize = args['serialize']
-		if 'host' in args and "port" in args and "db" in args:
-			self.queue = redis.StrictRedis(host= args['host'], port= args['port'], db=args['db'])
-		elif 'unix_socket_path' in args:
-			self.queue = redis.StrictRedis(unix_socket_path= args['unix_socket_path'])
+		self.name  = name
+		if redis_con_type =='host':
+			self.redis_instance = redis.StrictRedis(host=host, port= port, db=db)
+		elif redis_con_type == 'unix':
+			self.redis_instance = redis.StrictRedis(unix_socket_path= unix_socket_path)
 		else:
 			err = "Could not create Redis queue, not enough arguments"
 			sys.stdout.write(err)
@@ -62,47 +70,66 @@ class RedisQueue:
 
 	'''check if queue is empty'''
 	def empty(self):
-		return True if self.queue.llen(self.redis_list_id)==0 else False
+		#Testing
+		#logger.debug("calling redis empty()")
+		return True if self.redis_instance.llen(self.redis_list_id)==0 else False
 
 
 	'''blocking queue get call'''
 	def get(self, block = True, timeout = 0):
-		item = self.redis_instance.brpop(self.redis_list_id, timeout = timeout)
-		if item == "nil":
+		item = self.redis_instance.brpop([self.redis_list_id], timeout = timeout)
+		#Testing
+		#logger.debug("Queue %s - %s: get() call:", self.name, self.redis_list_id)
+		if item == None:
 			#if queue is empty, raise exception that the script is expecting if condition occurs
 			raise queue.Empty   
 		else:
+			#brpop returns a tuple (list_key, item), grab the item
+			item= item[1]
 			#deserialize item if need be, as script is expecting string, dict or list
-			if self.serialize:
+			try:
+				#Testing
+				#logger.debug("   -get() - item returned is of type %s and is: %s", type(item), item)
 				item = json.loads(item)
+			except ValueError:
+				pass
 			return item
 
 
 	'''non-blocking queue get call'''
 	def get_nowait(self):	
 		item = self.redis_instance.rpop(self.redis_list_id)
-		if item == "nil":
+		
+		#Testing
+		#logger.debug("Queue %s-%s: item getting back from get_nowait(): %s ", self.name, self.redis_list_id, item)
+		
+		if item == None:
 			#if queue is empty, raise exception that the script is expecting if condition occurs
 			raise queue.Empty   
 		else:
 			#deserialize item if need be, as script is expecting string, dict or list
-			if self.serialize:
+			try:
 				item = json.loads(item)
+			except ValueError:
+				pass
 			return item
 
 	'''blocking join call'''
 	def join(self):
 		'''TODO: this is a crude polling hack to mimic join() for redis, try to make better'''
 		while self.redis_instance.llen(self.redis_list_id) != 0:
-			pass
+			sleep(.1)
 		return
 
 
 	'''blocking queue put call'''
 	def put(self, item):
+		#Testing
+		#logger.debug("Queue %s - %s: put item " , self.name, self.redis_list_id)
+		
 		#make all items(inserted into queue) a serialized string
-		if self.serialize:
-			item = json.dumps(str)
+		if type(item) is not str:
+			item = json.dumps(item)
 		return self.redis_instance.lpush(self.redis_list_id, item)
 
 

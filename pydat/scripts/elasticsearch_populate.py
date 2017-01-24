@@ -24,6 +24,11 @@ from elasticsearch import Elasticsearch
 
 import PydatQueue
 
+#TEST - logging used to test 1)update mode functionality and 2) redis functionality
+import logging
+logging.basicConfig(filename='es_script_testing.log', level = logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 STATS = {'total': 0,
          'new': 0,
          'updated': 0,
@@ -54,6 +59,8 @@ def connectElastic(uri):
 
 ######## READER THREAD ######
 def reader_worker(work_queue, options):
+    #Testing
+    #logger.debug("reader worker started")
     if options.directory:
         scan_directory(work_queue, options.directory, options)
     elif options.file:
@@ -102,6 +109,8 @@ def parse_csv(work_queue, filename, options):
         for row in dnsreader:
             if shutdown_event.is_set():
                 break
+            #Testing
+            #logger.debug("reader worker inserting entry into work queue")
             work_queue.put({'header': header, 'row': row})
     except unicodecsv.Error as e:
         sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
@@ -126,6 +135,8 @@ def es_bulk_shipper_proc(bulk_request_queue, position, options):
     es = connectElastic(options.es_uri[position % len(options.es_uri)])
     while 1:
         try:
+            #testing
+            #logger.debug("bulk shipper call .get()")
             bulk_request = bulk_request_queue.get()
             #sys.stdout.write("Making bulk request\n")
 
@@ -201,7 +212,6 @@ def es_serializer_proc(insert_queue, bulk_request_queue, options):
     bulk_counter = 0
     finishup = False
     bulk_request = []
-
     while 1:
         try:
             request = insert_queue.get_nowait()
@@ -424,9 +434,9 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             if options.vverbose:
                 sys.stdout.write("%s: Updated\n" % domainName)
 
-            ################################################################################
-            ##### Update mode: options.identifier will be set to last version at this point,no changes required #####
-            ################################################################################
+            ##############################################################################################################################
+            ##### Update mode: options.identifier will be set to last version , options.previous_version will be set correctly as well #####
+            ###############################################################################################################################
             index_name = "%s-%s" % (options.index_prefix, options.identifier)
             if options.enable_delta_indexes:
                 index_name += "-o"
@@ -450,14 +460,19 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             #################################################################
             ### Update mode: delete old entry if one in most recent index ####
             ##################################################################
-            #if in update mode and existing entry in current recent index, delete old one bc inserting new/updated entry
-            if options.update and current_index == index_name:
-                api_commands.append(process_command(
-                                                    'delete',
-                                                    current_index,
-                                                    current_id,
-                                                    current_type
-                                    ))
+            else:
+                #if not in delta mode, but in update mode, there is a possibility that 
+                #a modified entry exists in the latest index, thus you have to delete it
+                #before inserting the new corresponding entry
+                if options.update and current_index == index_name:
+                    api_commands.append(process_command(
+                                                        'delete',
+                                                        current_index,
+                                                        current_id,
+                                                        current_type
+                                        ))
+                    #TEST
+                    #logger.debug('[--------ES Record Action------] process_entry(), update_mode= True, comparison diff = True, current_index(from current raw entry): %s , index_name(i.e.of new entry which is set to most recent index version):%s  - creating ES delete request for old entry(id: %s)',current_index, index_name, current_id) 
 
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
@@ -470,22 +485,24 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                  tld,
                                                  entry
                                  ))
+            #TEST
+            #logger.debug('[--------ES Record Action------] process_entry(), update_mode=True, conparison diff = True - creating new entry(domain_name = %s) in index_name: %s',domain_name_only,index_name)
 
         else:
             ################################################################################
-            ##### Update mode- will only change entry version ID if it is an older ID, otherwise no operation #####
+            ##### Update mode- dont need to update the verion ID of an unchanged doc#####
             ################################################################################
             stats_queue.put('unchanged')
             if options.vverbose:
                 sys.stdout.write("%s: Unchanged\n" % domainName)
             '''
-            update only required if entry has older version key.
-            this check saves numerous useless ES operations that come about with 
-            having daily updates - as all unchanged entries would land here and 
-            form an ES update action that would have no effect - as version IDs
-            would quickly become converted to the most recent version ID
+            modification to the document's version ID is not required if
+            in update mode. As update mode does not add a new index, and thus
+            a new version. All entries added within update mode get the most
+            recent version ID. Thus if an entry is unchanged it will already 
+            have the most recent version ID.
             '''
-            if options.identifier != current_entry[VERSION_KEY]:
+            if not options.update:
                 api_commands.append(process_command(
                                                      'update',
                                                      current_index,
@@ -497,6 +514,8 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                              }
                                                      }
                                      ))
+                #TEST
+                #logger.debug('[--------ES Record Action------] process_entry(), comparison diff= False - an update ES action has been triggered for the purposes of updating the ID version of the current entry to that of the most recent index version. For entry id: %s  - current index: %s  - entry version key (new): %s ', current_id, current_index, options.identifier) 
     else:
         stats_queue.put('new')
         if options.vverbose:
@@ -517,6 +536,8 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                             tld,
                                             entry
                             ))
+        #TEST
+        #logger.debug("[--------ES Record Action------] process_entry(), complete new entry -> ES create request - index_name:%s   id/domain: %s   version ID: %s", str(index_name), domain_name_only, str(options.identifier))
 
     for command in api_commands:
         insert_queue.put(command)
@@ -634,7 +655,7 @@ def main():
     global shutdown_event
     global finished_event
     global bulkError_event
-
+    
     parser = argparse.ArgumentParser()
 
 
@@ -646,10 +667,12 @@ def main():
     parser.add_argument("-e", "--extension", action="store", dest="extension",
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
 
-    parser.add_argument("-r", "--redo", action="store_true", dest="redo",
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("-r", "--redo", action="store_true", dest="redo",
         default=False, help="Attempt to re-import a failed import or import more data, uses stored metadata from previous import (-o, -n, and -x not required and will be ignored!!)")
-    parser.add_argument("-z", "--update", action= "store_true", dest="update",
-        default = False, help = "Run the script in update mode. Intended for taking daily whois data and adding new data to the current existing index in ES. No new index or delta index will be created. All changes added to most recent index")
+    mode.add_argument("-z", "--update", action= "store_true", dest="update",
+        default = False, help = "Run the script in update mode. Intended for taking daily whois data and adding new data to the current existing index in ES. No new indexss created. If delta-indexes are also enabled, a delta index will only be created when an entry has been modified and has a previously existing entry.")
+    
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     parser.add_argument("--vverbose", action="store_true", dest="vverbose",
@@ -685,10 +708,12 @@ def main():
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
 
-    parser.add_argument("--redis", action="store", dest="redis", default=None,
+    parser.add_argument("--redis", action="store", dest="redis",
      help="If enabled, script will use a redis instance for interprocess communication. Must provide a unix domain socket (e.g. /path/to/socket.sock ) OR network socket ( e.g. 127.0.0.1:6379/database ) ")
 
     options = parser.parse_args()
+
+    #/var/run/redis/redis.sock
 
     if options.vverbose:
         options.verbose = True
@@ -703,14 +728,12 @@ def main():
         parser.parse_args(['-h'])
 
     ###########  NEW  ###############################
-    if options.update and options.enable_delta_indexes:
-        print("Update mode requested and delta indexes also specified - currently script does not support the creation of delta indexes for update mode.")
-        parser.parse_args(['-h'])
-    elif options.update and options.redo:
+    #shoudnt need this check, but just to be sure
+    if options.update and options.redo:
         print("Update mode requested and redo mode also specified. Please choose one or the other.")
         parser.parse_args(['-h'])
     elif options.update and options.identifier is not None:
-        print("Update mode requested and Identifier also specified. Please choose one or the other; currently script - when put into update mode - automatically uses most recent index version as the identifier")
+        print("Update mode requested and Identifier also specified. Please choose one or the other;when put into update mode - automatically uses most recent index version as the identifier")
         parser.parse_args(['-h'])
     ################################################
 
@@ -719,11 +742,12 @@ def main():
     #setup redis lists or python queues as interprocess communication method
     if options.redis:
         redis_info = {}
-        redis_info['serialize'] = True
         '''TODO: is this hacky if-statement stable?'''
         if ".sock" in options.redis and ":" not in options.redis:
+            redis_info['redis_con_type']='unix'
             redis_info['unix_socket_path'] = options.redis
         elif":" in options.redis:
+            redis_info['redis_con_type'] =='host'
             redis_info['host'] =  options.redis.split(":")[0],
             redis_info['port'] =  options.redis.split(":")[1].split("/")[0]
             redis_info['db'] =  options.redis.split(":")[1].split("/")[1]
@@ -732,16 +756,16 @@ def main():
             parser.parse_args(['-h'])
 
         #create queues that are actually redis lists underneath
-        work_queue = PydatQueue.PydatQueue.factory("redis",redis_info)
-        insert_queue = PydatQueue.PydatQueue.factory("redis",redis_info)
-        bulk_request_queue = PydatQueue.PydatQueue.factory("redis",redis_info)
-        stats_queue = PydatQueue.PydatQueue.factory("redis", redis_info)
+        work_queue = PydatQueue.PydatQueue.factory("redis","work", redis_info)
+        insert_queue = PydatQueue.PydatQueue.factory("redis","insert",redis_info)
+        bulk_request_queue = PydatQueue.PydatQueue.factory("redis","bulk_request",redis_info)
+        stats_queue = PydatQueue.PydatQueue.factory("redis","stats", redis_info)
 
     #if redis is not specified, default to python multiprocessing queues
     else:
-        work_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", {'maxsize' : options.bulk_size * options.threads})
-        insert_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", {'maxsize' : options.bulk_size * options.bulk_threads})
-        bulk_request_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", {'maxsize' : 2 * options.bulk_threads})
+        work_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", "work", {'maxsize' : options.bulk_size * options.threads})
+        insert_queue = PydatQueue.PydatQueue.factory("python-joinable-queue","insert", {'maxsize' : options.bulk_size * options.bulk_threads})
+        bulk_request_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", "bulk_request", {'maxsize' : 2 * options.bulk_threads})
         stats_queue = PydatQueue.PydatQueue.factory("python-queue") 
 
 
@@ -820,35 +844,9 @@ def main():
             print("Error fetching metadata from index")
             sys.exit(1)
 
-        if options.redo is False: #Identifier is auto-pulled from db, no need to check
-            ###############  NEW  ##########################
-            if not options.update:
-                # Pre-emptively create index
-                index_name = "%s-%s" % (options.index_prefix, options.identifier)
-                if options.enable_delta_indexes:
-                    index_name += "-o"
-                es.indices.create(index=index_name)
-
-                if options.identifier < 1:
-                    print("Identifier must be greater than 0")
-                    sys.exit(1)
-                if metadata['lastVersion'] >= options.identifier:
-                    print("Identifier must be 'greater than' previous identifier")
-                    sys.exit(1)
-
-                previousVersion = metadata['lastVersion']
-
-                # Pre-emptively create delta index
-                if options.enable_delta_indexes and previousVersion > 0:
-                    index_name = "%s-%s-d" % (options.index_prefix, previousVersion)
-                    es.indices.create(index=index_name)
-            else:
-                #if update mode is specified
-                #dont need this variable for "update" mode, just setting as to not break existing code
-                previousVersion = None
-
-            #################End NEW #####################################
-        else:
+        #################### NEW ########################################################
+        #Redo Mode
+        if options.redo and not options.update:
             result = es.search(index=meta_index_name,
                                body = { "query": {
                                             "match_all": {}
@@ -863,6 +861,56 @@ def main():
                 sys.exit(1)
 
             previousVersion = result['hits']['hits'][-2]['_id']
+
+        #Update Mode
+        elif options.update and not options.redo:
+            #update mode   -currently, same logic as options.redo in grabbing the previous index
+            result = es.search(index=meta_index_name,
+                               body = { "query": {
+                                            "match_all": {}
+                                        },
+                                        "sort":[
+                                            {"metadata": {"order": "asc"}}
+                                        ]
+                                      })
+
+            if result['hits']['total'] == 0:
+                print("Unable to fetch entries from metadata index")
+                sys.exit(1)
+
+            previousVersion = result['hits']['hits'][-2]['_id']
+
+            #TEST
+            logger.debug("main() - update mode specifed")
+
+        #Normal Mode
+        elif not options.redo and not options.update:
+            # Pre-emptively create index
+            index_name = "%s-%s" % (options.index_prefix, options.identifier)
+            if options.enable_delta_indexes:
+                index_name += "-o"
+            es.indices.create(index=index_name)
+
+            if options.identifier < 1:
+                print("Identifier must be greater than 0")
+                sys.exit(1)
+            if metadata['lastVersion'] >= options.identifier:
+                print("Identifier must be 'greater than' previous identifier")
+                sys.exit(1)
+
+            previousVersion = metadata['lastVersion']
+
+            # Pre-emptively create delta index
+            if options.enable_delta_indexes and previousVersion > 0:
+                index_name = "%s-%s-d" % (options.index_prefix, previousVersion)
+                es.indices.create(index=index_name)
+
+        #mode not allowed
+        else:
+            # redo = True and update = True is not a valid combination of options  
+            print("Critical Error: reached state where options.redo = True and options.update=True, this is not supported")
+            sys.exit(1)
+    ########################End New##########################################################
 
     options.previousVersion = previousVersion
 
@@ -888,111 +936,10 @@ def main():
         else:
             options.INDEX_LIST.append('%s-%s' % (options.index_prefix, index_name))
 
-    if options.redo is False:
-        if options.exclude != "":
-            options.exclude = options.exclude.split(',')
-        else:
-            options.exclude = None
 
-        if options.include != "":
-            options.include = options.include.split(',')
-        else:
-            options.include = None
-
-        #Start worker threads
-        if options.verbose:
-            print("Starting %i worker threads" % options.threads)
-
-        ############## NEW ##############################
-        if not options.update:
-            for i in range(options.threads):
-                t = Process(target=process_worker,
-                            args=(work_queue, 
-                                  insert_queue, 
-                                  stats_queue,
-                                  options), 
-                            name='Worker %i' % i)
-                t.daemon = True
-                t.start()
-                threads.append(t)
-
-            #Update the lastVersion in the metadata
-            es.update(index=meta_index_name, id=0, doc_type='meta', body = {'doc': {'lastVersion': options.identifier}} )
-
-            #Create the entry for this import
-            meta_struct = {  
-                            'metadata': options.identifier,
-                            'comment' : options.comment,
-                            'total' : 0,
-                            'new' : 0,
-                            'updated' : 0,
-                            'unchanged' : 0,
-                            'duplicates': 0,
-                            'changed_stats': {} 
-                           }
-
-            if options.exclude != None:
-                meta_struct['excluded_keys'] = options.exclude
-            elif options.include != None:
-                meta_struct['included_keys'] = options.include
-                
-            es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
-
-        else:  #options.update == True
-            #update mode will use lastVersion ID as the index ID and doc ID for all entries modified
-            options.identifier = int(metadata['lastVersion'])
-            
-            try:
-                update_record = es.get(index=meta_index_name, id=options.identifier)['_source']
-            except:
-               print("Unable to retrieve information for last import")
-               sys.exit(1) 
-
-            if 'excluded_keys' in update_record:
-                options.exclude = update_record['excluded_keys']
-            else:
-                options.exclude = None
-
-            if 'included_keys' in update_record:
-                options.include = update_record['included_keys']
-            else:
-                options.include = None
-
-            #for update mode use process_worker() - CANNOT use process_reworker() as it call update_required() which will innoculate any attempts of updating
-            
-            for i in range(options.threads):
-                t = Process(target=process_worker,
-                            args=(work_queue, 
-                                  insert_queue, 
-                                  stats_queue,
-                                  options), 
-                            name='Worker %i' % i)
-                t.daemon = True
-                t.start()
-                threads.append(t)
-            
-
-            #pull existing stats for the current index, then will add to them as the index goes through update
-            options.comment = update_record['comment']
-            STATS['total'] = int(update_record['total'])
-            STATS['new'] = int(update_record['new'])
-            STATS['updated'] = int(update_record['updated'])
-            STATS['unchanged'] = int(update_record['unchanged'])
-            STATS['duplicates'] = int(update_record['duplicates'])
-            CHANGEDCT = update_record['changed_stats']
-
-            if options.verbose:
-                print("Updating for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
-
-            for ch in CHANGEDCT.keys():
-                CHANGEDCT[ch] = int(CHANGEDCT[ch])
-
-            #no changes required to meta_index or new meta entry required since doing update
-
-
-        #############End NEW ############################
-
-    else: #redo is True
+    ########################### New ##########################################################
+    #Redo Mode
+    if options.redo and not options.update:
         #Get the record for the attempted import
         options.identifier = int(metadata['lastVersion'])
         try:
@@ -1041,6 +988,134 @@ def main():
             threads.append(t)
         #No need to update lastVersion or create metadata entry
 
+    #Update Mode
+    elif options.update and not options.redo:
+        if options.exclude != "":
+            options.exclude = options.exclude.split(',')
+        else:
+            options.exclude = None
+
+        if options.include != "":
+            options.include = options.include.split(',')
+        else:
+            options.include = None
+
+        #Start worker threads
+        if options.verbose:
+            print("Starting %i worker threads" % options.threads)
+
+        #update mode will use lastVersion ID as the index ID and doc ID for all entries modified
+        options.identifier = int(metadata['lastVersion'])
+
+        #TEST
+        #logger.debug("[main() - update mode = True - for update mode options.identifier is set to 'lastVersion' field of entry 0 in meta_data_struct - options.identifier=%s", options.identifier)
+
+        try:
+            update_record = es.get(index=meta_index_name, id=options.identifier)['_source']
+        except:
+           print("Unable to retrieve information for last import")
+           sys.exit(1) 
+
+        if 'excluded_keys' in update_record:
+            options.exclude = update_record['excluded_keys']
+        else:
+            options.exclude = None
+
+        if 'included_keys' in update_record:
+            options.include = update_record['included_keys']
+        else:
+            options.include = None
+
+        #for update mode use process_worker() - CANNOT use process_reworker() as it call update_required() which will innoculate any attempts of updating
+        
+        for i in range(options.threads):
+            t = Process(target=process_worker,
+                        args=(work_queue, 
+                              insert_queue, 
+                              stats_queue,
+                              options), 
+                        name='Worker %i' % i)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+        
+
+        #pull existing stats for the current index, then will add to them as the index goes through update
+        options.comment = update_record['comment']
+        STATS['total'] = int(update_record['total'])
+        STATS['new'] = int(update_record['new'])
+        STATS['updated'] = int(update_record['updated'])
+        STATS['unchanged'] = int(update_record['unchanged'])
+        STATS['duplicates'] = int(update_record['duplicates'])
+        CHANGEDCT = update_record['changed_stats']
+
+        if options.verbose:
+            print("Updating for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
+
+        for ch in CHANGEDCT.keys():
+            CHANGEDCT[ch] = int(CHANGEDCT[ch])
+
+        #no changes required to meta_index or new meta entry required since doing update
+
+
+    #Normal Mode
+    elif not options.update and not options.redo:
+        if options.exclude != "":
+            options.exclude = options.exclude.split(',')
+        else:
+            options.exclude = None
+
+        if options.include != "":
+            options.include = options.include.split(',')
+        else:
+            options.include = None
+
+        #Start worker threads
+        if options.verbose:
+            print("Starting %i worker threads" % options.threads)
+
+        for i in range(options.threads):
+            t = Process(target=process_worker,
+                        args=(work_queue, 
+                              insert_queue, 
+                              stats_queue,
+                              options), 
+                        name='Worker %i' % i)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+
+        #Update the lastVersion in the metadata
+        es.update(index=meta_index_name, id=0, doc_type='meta', body = {'doc': {'lastVersion': options.identifier}} )
+
+        #Create the entry for this import
+        meta_struct = {  
+                        'metadata': options.identifier,
+                        'comment' : options.comment,
+                        'total' : 0,
+                        'new' : 0,
+                        'updated' : 0,
+                        'unchanged' : 0,
+                        'duplicates': 0,
+                        'changed_stats': {} 
+                       }
+
+        if options.exclude != None:
+            meta_struct['excluded_keys'] = options.exclude
+        elif options.include != None:
+            meta_struct['included_keys'] = options.include
+            
+        es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
+
+
+    #mode not allowed
+    else:
+        # redo = True and update = True is not a valid combination of options  
+        print("Critical Error: reached state where options.redo = True and options.update=True, this is not supported")
+        sys.exit(1)
+
+    ######################################End New ######################################
+
     # Start up the Elasticsearch Bulk Serializers
     # Its job is just to combine work into bulk-sized chunks to be sent to the bulk API
     # One serializer should be enough for a lot of workers, but anyone with a super large cluster might
@@ -1063,6 +1138,9 @@ def main():
     stats_worker_thread = Thread(target=stats_worker, args=(stats_queue,), name = 'Stats')
     stats_worker_thread.daemon = True
     stats_worker_thread.start()
+
+    #Preformance Testing
+    start_time = time.time()
 
     #Start up Reader Thread
     reader_thread = Thread(target=reader_worker, args=(work_queue, options), name='Reader')
@@ -1130,6 +1208,8 @@ def main():
                 sys.stdout.write("Error attempting to update stats: %s\n" % str(e))
         except KeyboardInterrupt:
             pass
+
+        print("Run time: {0} seconds").format(time.time() - start_time)
 
         if options.verbose:
             sys.stdout.write("Done ...\n\n")
