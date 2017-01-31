@@ -22,11 +22,9 @@ import Queue as queue
 
 from elasticsearch import Elasticsearch
 
-import PydatQueue
-
-#TEST - logging used to test 1)update mode functionality and 2) redis functionality
+#TEST - logging 
 import logging
-logging.basicConfig(filename='es_script_testing.log', level = logging.DEBUG)
+logging.basicConfig(filename='debug.log', filemode='w+',  level = logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 STATS = {'total': 0,
@@ -135,8 +133,7 @@ def es_bulk_shipper_proc(bulk_request_queue, position, options):
     es = connectElastic(options.es_uri[position % len(options.es_uri)])
     while 1:
         try:
-            #testing
-            #logger.debug("bulk shipper call .get()")
+
             bulk_request = bulk_request_queue.get()
             #sys.stdout.write("Making bulk request\n")
 
@@ -461,7 +458,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             ### Update mode: delete old entry if one in most recent index ####
             ##################################################################
             else:
-                #if not in delta mode, but in update mode, there is a possibility that 
+                #if not in delta mode, but in update mode
                 #a modified entry exists in the latest index, thus you have to delete it
                 #before inserting the new corresponding entry
                 if options.update and current_index == index_name:
@@ -708,12 +705,7 @@ def main():
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
 
-    parser.add_argument("--redis", action="store", dest="redis",
-     help="If enabled, script will use a redis instance for interprocess communication. Must provide a unix domain socket (e.g. /path/to/socket.sock ) OR network socket ( e.g. 127.0.0.1:6379/database ) ")
-
     options = parser.parse_args()
-
-    #/var/run/redis/redis.sock
 
     if options.vverbose:
         options.verbose = True
@@ -739,35 +731,10 @@ def main():
 
     threads= []
 
-    #setup redis lists or python queues as interprocess communication method
-    if options.redis:
-        redis_info = {}
-        '''TODO: is this hacky if-statement stable?'''
-        if ".sock" in options.redis and ":" not in options.redis:
-            redis_info['redis_con_type']='unix'
-            redis_info['unix_socket_path'] = options.redis
-        elif":" in options.redis:
-            redis_info['redis_con_type'] =='host'
-            redis_info['host'] =  options.redis.split(":")[0],
-            redis_info['port'] =  options.redis.split(":")[1].split("/")[0]
-            redis_info['db'] =  options.redis.split(":")[1].split("/")[1]
-        else:
-            print("Dont recognize argument for redis connection. Please check required format")
-            parser.parse_args(['-h'])
-
-        #create queues that are actually redis lists underneath
-        work_queue = PydatQueue.PydatQueue.factory("redis","work", redis_info)
-        insert_queue = PydatQueue.PydatQueue.factory("redis","insert",redis_info)
-        bulk_request_queue = PydatQueue.PydatQueue.factory("redis","bulk_request",redis_info)
-        stats_queue = PydatQueue.PydatQueue.factory("redis","stats", redis_info)
-
-    #if redis is not specified, default to python multiprocessing queues
-    else:
-        work_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", "work", {'maxsize' : options.bulk_size * options.threads})
-        insert_queue = PydatQueue.PydatQueue.factory("python-joinable-queue","insert", {'maxsize' : options.bulk_size * options.bulk_threads})
-        bulk_request_queue = PydatQueue.PydatQueue.factory("python-joinable-queue", "bulk_request", {'maxsize' : 2 * options.bulk_threads})
-        stats_queue = PydatQueue.PydatQueue.factory("python-queue") 
-
+    work_queue = jmpQueue(maxsize=options.bulk_size * options.threads)
+    insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_threads)
+    bulk_request_queue = jmpQueue(maxsize= 2 * options.bulk_threads)
+    stats_queue = mpQueue() 
 
     meta_index_name = '@' + options.index_prefix + "_meta"
 
