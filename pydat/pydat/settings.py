@@ -10,8 +10,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 DEBUG = False
 
-TEMPLATE_DEBUG = DEBUG
-
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
 HANDLER = 'mongo'
@@ -135,56 +133,65 @@ STATIC_ROOT = os.path.join(SITE_ROOT, '../extras/www/static')
 STATIC_URL = '/static/'
 
 # Additional locations of static files
-STATICFILES_DIRS = (
+STATICFILES_DIRS = [
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
     os.path.join(SITE_ROOT, 'static'),
-)
+]
 
 # List of finder classes that know how to find static files in
 # various locations.
-STATICFILES_FINDERS = (
+STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 #    'django.contrib.staticfiles.finders.DefaultStorageFinder',
-)
+]
 
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = 'o=skwv+igf2%#6n&p!nd##w(a*wqugkcq4-2=wugz0(715*!l#'
 
-# List of callables that know how to import templates from various sources.
-TEMPLATE_LOADERS = (
-    'django.template.loaders.filesystem.Loader',
-    'django.template.loaders.app_directories.Loader',
-#     'django.template.loaders.eggs.Loader',
-)
-
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
-MIDDLEWARE_CLASSES = (
+MIDDLEWARE_CLASSES = [
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    #'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     # Uncomment the next line for simple clickjacking protection:
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
-)
+]
 
 ROOT_URLCONF = 'pydat.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'pydat.wsgi.application'
 
-TEMPLATE_DIRS = (
-    # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
-    # Always use forward slashes, even on Windows.
-    # Don't forget to use absolute paths, not relative paths.
-    os.path.join(SITE_ROOT, 'templates'),
-)
 
-INSTALLED_APPS = (
+_TEMPLATE_DIRS_ =[os.path.join(SITE_ROOT, 'templates')]
+TEMPLATES = [
+        {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": _TEMPLATE_DIRS_,
+        "OPTIONS":{
+                "context_processors":[
+                            'django.contrib.auth.context_processors.auth',
+                            'django.template.context_processors.debug',
+                            'django.template.context_processors.i18n',
+                            'django.template.context_processors.media',
+                            'django.template.context_processors.static',
+                            'django.template.context_processors.tz',
+                            'django.contrib.messages.context_processors.messages',
+                            'django.template.context_processors.csrf'
+                ],
+                'debug': DEBUG,
+            },
+
+        },
+]
+
+INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -196,7 +203,7 @@ INSTALLED_APPS = (
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     'pydat',
-)
+]
 
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to

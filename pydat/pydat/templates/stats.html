@@ -1,7 +1,8 @@
 {% extends 'nosearchbase.html' %}
+{% load static %}
 
 {% block css %}
-		<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}/css/stats.css">
+		<link rel="stylesheet" type="text/css" href="{% static '/css/stats.css' %}">
 {% endblock %}
 
 {% block js_constants %}
@@ -62,8 +63,8 @@
 {% endblock %}
 
 {% block js %}
-    <script type="text/javascript" src="{{STATIC_URL}}/js/Chart.js"></script>
-    <script type="text/javascript" src="{{STATIC_URL}}/js/stats.js"></script>
+    <script type="text/javascript" src="{% static '/js/Chart.js' %}"></script>
+    <script type="text/javascript" src="{% static '/js/stats.js' %}"></script>
 {% endblock %}
 
 {% block page %}
