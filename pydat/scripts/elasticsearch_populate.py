@@ -20,7 +20,7 @@ from io import BytesIO
 from HTMLParser import HTMLParser
 import Queue as queue
 
-from elasticsearch import Elasticsearch
+import elasticsearch
 
 STATS = {'total': 0,
          'new': 0,
@@ -40,13 +40,13 @@ finished_event = multiprocessing.Event()
 bulkError_event = multiprocessing.Event()
 
 def connectElastic(uri):
-    es = Elasticsearch(uri,
-                       sniff_on_start=True,
-                       max_retries=100,
-                       retry_on_timeout=True,
-                       sniff_on_connection_fail=True,
-                       sniff_timeout=1000,
-                       timeout=100)
+    es = elasticsearch.Elasticsearch(uri,
+                                     sniff_on_start=True,
+                                     max_retries=100,
+                                     retry_on_timeout=True,
+                                     sniff_on_connection_fail=True,
+                                     sniff_timeout=1000,
+                                     timeout=100)
 
     return es
 
@@ -588,6 +588,10 @@ def optimizeIndexes(es, options):
         pass
 
 
+def configTemplate(es, data_template, index_prefix):
+    if data_template is not None:
+        data_template["template"] = "%s-*" % index_prefix
+        es.indices.put_template(name='%s-template' % index_prefix, body = data_template)
 
 
 
@@ -649,6 +653,11 @@ def main():
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
 
+    parser.add_argument("--es5", action="store_true", dest="es5", default=False,
+                        help="If enabled, will use template made for ElasticSearch 5 -- only needs to be set on the first run of the system")
+    parser.add_argument("--config-template-only", action="store_true", default=False, dest="config_template_only",
+                        help="Configure the ElasticSearch template and then exits")
+
     options = parser.parse_args()
 
     if options.vverbose:
@@ -666,8 +675,26 @@ def main():
 
     data_template = None
     template_path = os.path.dirname(os.path.realpath(__file__))
-    with open("%s/es_templates/data.template" % template_path, 'r') as dtemplate:
-        data_template = json.loads(dtemplate.read())
+    if options.es5:
+        major = elasticsearch.VERSION[0]
+        if major != 5:
+            print("Python ElasticSearch library version must coorespond to version of ElasticSearch being used -- Library major version: %d" % (major))
+            sys.exit(1)
+
+        with open("%s/es_templates/data.template.5" % template_path, 'r') as dtemplate:
+            data_template = json.loads(dtemplate.read())
+    else:
+        with open("%s/es_templates/data.template" % template_path, 'r') as dtemplate:
+            data_template = json.loads(dtemplate.read())
+
+    try:
+        es = connectElastic(options.es_uri)
+    except elasticsearch.exceptions.TransportError as e:
+        print("Unable to connect to ElasticSearch ... %s" % (str(e)))
+        sys.exit(1)
+
+    if options.config_template_only:
+        configTemplate(es, data_template, options.index_prefix)
 
     if options.identifier is None and options.redo is False:
         print("Identifier required\n")
@@ -676,7 +703,6 @@ def main():
         print("Redo requested and Identifier Specified. Please choose one or the other\n")
         argparse.parse_args(['-h'])
 
-    es = connectElastic(options.es_uri)
     metadata = None
     previousVersion = 0
 
@@ -686,9 +712,7 @@ def main():
             print("Cannot redo when no initial data exists")
             sys.exit(1)
 
-        if data_template is not None:
-            data_template["template"] = "%s-*" % options.index_prefix
-            es.indices.put_template(name='%s-template' % options.index_prefix, body = data_template)
+        configTemplate(es, data_template, options.index_prefix)
 
         #Create the metadata index with only 1 shard, even with thousands of imports
         #This index shouldn't warrant multiple shards
