@@ -847,9 +847,6 @@ def main():
 
             previousVersion = result['hits']['hits'][-2]['_id']
 
-            #TEST
-            logger.debug("main() - update mode specifed")
-
         #Normal Mode
         elif not options.redo and not options.update:
             # Pre-emptively create index
@@ -973,9 +970,6 @@ def main():
 
         #update mode will use lastVersion ID as the index ID and doc ID for all entries modified
         options.identifier = int(metadata['lastVersion'])
-
-        #TEST
-        #logger.debug("[main() - update mode = True - for update mode options.identifier is set to 'lastVersion' field of entry 0 in meta_data_struct - options.identifier=%s", options.identifier)
 
         try:
             update_record = es.get(index=meta_index_name, id=options.identifier)['_source']
