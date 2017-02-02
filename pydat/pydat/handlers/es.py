@@ -320,12 +320,15 @@ def __createAdvancedQuery__(query, skip, size, unique):
                     }
         }
 
+        if settings.ES_PAINLESS:
+            q['aggs']['domains']['aggs']['max_score']['max']['script'] = "_score"
+
     return q
 
 
 
 def advDataTableSearch(query, skip, pagesize, unique = False):
-    if not settings.ES_SCRIPTING_ENABLED:
+    if not (settings.ES_SCRIPTING_ENABLED or settings.ES_PAINLESS):
         unique = False
 
     results = {'success': False}
@@ -483,7 +486,7 @@ def test_query(search_string):
     return None
 
 def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO XXX versions, dates, etc
-    if not settings.ES_SCRIPTING_ENABLED:
+    if not (settings.ES_SCRIPTING_ENABLED or settings.ES_PAINLESS):
         unique = False
 
     results = {'success': False}

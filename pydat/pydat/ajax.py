@@ -79,10 +79,7 @@ def advDataTable(request):
         sortcols = int(request.GET.get('iSortingCols', 0))
         sEcho = request.GET.get('sEcho')
         sSearch = request.GET.get('sSearch', '')
-        if settings.ES_SCRIPTING_ENABLED:
-            unique = request.GET.get('unique', 'false')
-        else:
-            unique = 'false'
+        unique = request.GET.get('unique', 'false')
         sort = []
     else:
         return __renderErrorJSON__('Unsupported Method')
@@ -106,10 +103,7 @@ def advanced_search(request):
         search_string = urllib.unquote(request.GET.get('query', None))
         size = int(request.GET.get('size', 20))
         page = int(request.GET.get('page', 1)) 
-        if settings.ES_SCRIPTING_ENABLED:
-            unique = request.GET.get('unique', 'false')
-        else:
-            unique = 'false'
+        unique = request.GET.get('unique', 'false')
     else:
         return __renderErrorJSON__('Unsupported Method')
 
