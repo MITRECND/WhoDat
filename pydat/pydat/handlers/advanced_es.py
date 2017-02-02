@@ -119,7 +119,6 @@ class String(object):
 
     def __repr__(self):
         return self.string
-    
 
 no_parts = [ 
                 'details.registrant_fax',
@@ -254,113 +253,40 @@ def p_query_group(t):
 def p_query_not(t):
     'query : NOT query'
 
-    query = { "bool": { "must_not": [] }}
-    filt = {'not': {}}
-
-    q = t[2]
-
-    #Negate the query if it exists
-    qq = q['query']['filtered']['query']
-    if 'match_all' not in qq:
-        query["bool"]["must_not"].append(qq)
-
-    #Negate the filter if it exists
-    qf = q['query']['filtered']['filter']
-    if 'match_all' not in qf:
-        keys = qf.keys()
-        if len(keys) > 1:
-            #As far as I can tell, this should never have more than one key ...
-            raise NotImplementedError("This condition was not accounted for, please forward what sort of query you were using to the developer")
-        elif len(keys) == 1:
-            filt['not'][keys[0]] = qf[keys[0]]
-
-    if len(filt['not'].keys()) == 0:
-        filt = {'match_all': {}}
-
-    if len(query['bool']['must_not']) == 0:
-        query = {'match_all': {}}
-
-
     t[0] = {
         "query": {
-            "filtered": {
-                "query": query,
-                "filter": filt
+            "bool": {
+                "must_not" : [{'bool': t[2]['query']['bool']}],
             }
         }
     }
 
-def create_combined_and(queries):
-    query = { "bool": { "must": [] }}
-    filt = {'and': []}
-
-    for q in queries:
-        qq = q['query']['filtered']['query']
-        if 'match_all' not in qq:
-            query["bool"]["must"].append(qq)
-        qf = q['query']['filtered']['filter']
-        if 'match_all' not in qf:
-            filt['and'].append(qf)
-
-    if len(filt['and']) == 0:
-        filt = {'match_all': {}}
-    elif len(filt['and']) == 1:
-        filt = filt['and'][0]
-
-    if len(query['bool']['must']) == 0:
-        query = {'match_all': {}}
-    elif len(query['bool']['must']) == 1:
-        query = query['bool']['must'][0]
-    
-
+def create_combined_and(query1, query2):
     return {
         "query": {
-            "filtered": {
-                "query": query,
-                "filter": filt
+            "bool": {
+                "must": [{'bool': query1['query']['bool']}, {'bool': query2['query']['bool']}]
             }
         }
     }
 
 def p_query_query(t):
     'query : query query %prec AND'
-    t[0] = create_combined_and((t[1], t[2]))
+    t[0] = create_combined_and(t[1], t[2])
 
 def p_query_and_query(t):
     'query : query AND query'
-    t[0] = create_combined_and((t[1], t[3]))
+    t[0] = create_combined_and(t[1], t[3])
 
 
 def p_query_or_query(t):
     'query : query OR query'
 
-    query = {"bool": {"should": [], "disable_coord": "true"}}
-    filt = {"or": []}
-
-    #If both queries are lacking a 'query' field combine the filters
-    if ('match_all' in t[1]['query']['filtered']['query'] and 'match_all' in t[3]['query']['filtered']['query']):
-        query = {'match_all': {}}
-        for q in (t[1], t[3]):
-            qf = q['query']['filtered']['filter']
-            filt['or'].append(qf)
-    #If both queries are lacking a filter, combine the queries
-    elif ('match_all' in t[1]['query']['filtered']['filter'] and 'match_all' in t[3]['query']['filtered']['filter']):
-        filt = {'match_all': {}}
-        for q in (t[1], t[3]):
-            qq = q['query']['filtered']['query']
-            query['bool']['should'].append(qq)
-    #Otherwise we need to combine queries under a larger query
-    else:
-        filt = {"match_all": {}}
-        for q in (t[1], t[3]):
-            query['bool']['should'].append(q['query'])
-        
-
     t[0] = {
         "query": {
-            "filtered": {
-                "query": query,
-                "filter": filt
+            "bool": {
+                "should": [{'bool': t[1]['query']['bool']}, {'bool': t[3]['query']['bool']}],
+                "disable_coord": "true"
             }
         }
     }
@@ -418,7 +344,7 @@ def p_specific_fuzzy_word(t):
     sub_query = create_specific_word_subquery(key, value)
     sub_query['multi_match']['fuzziness'] = fuzzy
 
-    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': sub_query}}}
+    t[0] = {'query': {'bool': {'must': [sub_query]}}}
 
 def p_specific_word(t):
     'specific : WORD COLON WORD'
@@ -429,7 +355,7 @@ def p_specific_word(t):
 
     sub_query = create_specific_word_subquery(key, value)
 
-    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': sub_query}}}
+    t[0] = {'query': {'bool': {'must': [sub_query]}}}
 
 def p_specific_fuzzy_quoted(t):
     'specific : FUZZY WORD COLON QUOTED'
@@ -473,7 +399,7 @@ def p_specific_fuzzy_quoted(t):
         }
     }
 
-    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+    t[0] = {'query': {'bool': {'must': [q]}}}
 
 
 def p_specific_quoted(t):
@@ -530,9 +456,9 @@ def p_specific_quoted(t):
         q['dis_max'] = {'queries': shds}
 
     if 'query' not in q:
-        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+        t[0] = {'query': {'bool': {'must': [q]}}}
     else:  
-        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
+        t[0] = {'query': {'bool': {'must': [q['query']]}}}
 
 def create_wildreg_query(key, value, qtype):
     fields1 = []
@@ -572,9 +498,9 @@ def create_wildreg_query(key, value, qtype):
         q['dis_max'] = {'queries': shds}
 
     if 'query' not in q:
-        return {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+        return {'query': {'bool': {'must': [q]}}}
     else:  
-        return {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
+        return {'query': {'bool': {'must': [q['query']]}}}
 
 
 def p_specific_wildcard(t):
@@ -600,7 +526,7 @@ def create_daterange_query(key, start, end):
     key = date_keywords[key]
     qf = {
     'query':{
-        'filtered': {
+        'bool': {
             'filter': { 
                 'range': {
                     key: {
@@ -608,8 +534,7 @@ def create_daterange_query(key, start, end):
                         'lt': end.strftime('%Y-%m-%d %H:%M:%S'),
                     }
                 }
-            },
-            'query': {'match_all': {}},
+            }
             }
         }
     }
@@ -687,7 +612,7 @@ def p_termquery_quoted(t):
 
         query = {'dis_max': {'queries': queries}}
 
-    t[0] = {"query": {"filtered": {"query": query, "filter": {"match_all":{}}}}}
+    t[0] = {"query": {"bool": {"must": [query]}}}
 
 def p_termquery_word(t):
     '''termquery : WORD'''
@@ -715,7 +640,7 @@ def p_termquery_word(t):
             }
         }
 
-    t[0] = {"query": {"filtered": {"query": query, "filter": {"match_all":{}}}}}
+    t[0] = {"query": {"bool": {"must": [query]}}}
 
 
 def remove_escapes(t):

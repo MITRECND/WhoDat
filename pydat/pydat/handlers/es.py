@@ -202,11 +202,11 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
                 pass 
 
     if version_filter is not None:
-        final_filter = { "and": [query_filter, version_filter] }
+        final_filter = [query_filter, version_filter]
     else:
         final_filter = query_filter
 
-    qquery = {"match_all": {}}
+    qquery = None
 
     if sfilter is not None:
         try:
@@ -236,18 +236,20 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
                 shoulds.append(exp)
 
-            qquery = { "bool": { "should": shoulds}}
+            qquery = {"should": shoulds}
 
     query = { 
         "query": {
-            "filtered": {
-                "filter": final_filter,
-                "query": qquery
+            "bool": {
+                "filter": final_filter
             },
         },
         "from": skip,
         "size": pagesize,
     }
+
+    if qquery is not None:
+        query['query']['bool'].update(qquery)
 
     if len(sortset) > 0:
         sorter = []
@@ -303,7 +305,7 @@ def __createAdvancedQuery__(query, skip, size, unique):
                         },
                         "aggs": {
                             "max_score": {
-                                "max": {"script": {"file": "_score"}}
+                                "max": {"script":  {"file": "_score"}}
                             },
                             "top_domains":{
                                 "top_hits":{
@@ -429,15 +431,14 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
                 pass 
 
     if version_filter is not None:
-        final_filter = { "and": [query_filter, version_filter] }
+        final_filter = [query_filter, version_filter]
     else:
         final_filter = query_filter
 
     query = { 
         "query": {
-            "filtered": {
-                "filter": final_filter,
-                "query": {"match_all": {}}
+            "bool": {
+                "filter": final_filter
             },
         },
         "size": limit,
