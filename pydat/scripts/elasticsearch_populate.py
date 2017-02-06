@@ -613,6 +613,9 @@ def main():
         default=None, help="Input CSV file")
     dataSource.add_argument("-d", "--directory", action="store", dest="directory",
         default=None, help="Directory to recursively search for CSV files -- mutually exclusive to '-f' option")
+    dataSource.add_argument("--config-template-only", action="store_true", default=False, dest="config_template_only",
+                        help="Configure the ElasticSearch template and then exit")
+
     parser.add_argument("-e", "--extension", action="store", dest="extension",
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
 
@@ -655,8 +658,6 @@ def main():
 
     parser.add_argument("--es5", action="store_true", dest="es5", default=False,
                         help="If enabled, will use template made for ElasticSearch 5 -- only needs to be set on the first run of the system")
-    parser.add_argument("--config-template-only", action="store_true", default=False, dest="config_template_only",
-                        help="Configure the ElasticSearch template and then exits")
 
     options = parser.parse_args()
 
@@ -695,6 +696,7 @@ def main():
 
     if options.config_template_only:
         configTemplate(es, data_template, options.index_prefix)
+        sys.exit(0)
 
     if options.identifier is None and options.redo is False:
         print("Identifier required\n")
