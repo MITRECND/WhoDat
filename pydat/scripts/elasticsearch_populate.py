@@ -22,7 +22,6 @@ import Queue as queue
 
 from elasticsearch import Elasticsearch
 
-
 STATS = {'total': 0,
          'new': 0,
          'updated': 0,
@@ -125,7 +124,6 @@ def es_bulk_shipper_proc(bulk_request_queue, position, options):
     es = connectElastic(options.es_uri[position % len(options.es_uri)])
     while 1:
         try:
-
             bulk_request = bulk_request_queue.get()
             #sys.stdout.write("Making bulk request\n")
 
@@ -504,7 +502,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                             tld,
                                             entry
                             ))
-        
     for command in api_commands:
         insert_queue.put(command)
 
@@ -624,7 +621,6 @@ def main():
     
     parser = argparse.ArgumentParser()
 
-
     dataSource = parser.add_mutually_exclusive_group(required=True)
     dataSource.add_argument("-f", "--file", action="store", dest="file",
         default=None, help="Input CSV file")
@@ -703,12 +699,11 @@ def main():
     stats_queue = mpQueue() 
 
     meta_index_name = '@' + options.index_prefix + "_meta"
-
+    
     data_template = None
     template_path = os.path.dirname(os.path.realpath(__file__))
     with open("%s/es_templates/data.template" % template_path, 'r') as dtemplate:
         data_template = json.loads(dtemplate.read())
-
 
     es = connectElastic(options.es_uri)
     metadata = None
@@ -1056,9 +1051,6 @@ def main():
     stats_worker_thread.daemon = True
     stats_worker_thread.start()
 
-    #Preformance Testing
-    start_time = time.time()
-
     #Start up Reader Thread
     reader_thread = Thread(target=reader_worker, args=(work_queue, options), name='Reader')
     reader_thread.daemon = True
@@ -1125,8 +1117,6 @@ def main():
                 sys.stdout.write("Error attempting to update stats: %s\n" % str(e))
         except KeyboardInterrupt:
             pass
-
-        print("Run time: {0} seconds").format(time.time() - start_time)
 
         if options.verbose:
             sys.stdout.write("Done ...\n\n")
