@@ -942,7 +942,6 @@ def main():
 
 
         #update mode must use process_worker (and not process_reworker as it uses the update_required() which will prevent any possible updating)
-        
         for i in range(options.threads):
             t = Process(target=process_worker,
                         args=(work_queue, 
