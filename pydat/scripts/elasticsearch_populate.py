@@ -618,7 +618,7 @@ def main():
     global shutdown_event
     global finished_event
     global bulkError_event
-    
+
     parser = argparse.ArgumentParser()
 
     dataSource = parser.add_mutually_exclusive_group(required=True)
@@ -699,7 +699,7 @@ def main():
     stats_queue = mpQueue() 
 
     meta_index_name = '@' + options.index_prefix + "_meta"
-    
+
     data_template = None
     template_path = os.path.dirname(os.path.realpath(__file__))
     with open("%s/es_templates/data.template" % template_path, 'r') as dtemplate:
