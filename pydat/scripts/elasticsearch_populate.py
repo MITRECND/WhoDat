@@ -466,13 +466,12 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             stats_queue.put('unchanged')
             if options.vverbose:
                 sys.stdout.write("%s: Unchanged\n" % domainName)
-            '''
-            modification to the document's version ID is not required if
-            in update mode. As update mode does not add a new index, and thus
-            a new version. All entries added within update mode get the most
-            recent version ID. Thus if an entry is unchanged it will already 
-            have the most recent version ID.
-            '''
+            
+            #modification to the document's version ID is not required if
+            #in update mode. As update mode does not add a new index, and thus
+            #a new version. All entries added within update mode get the most
+            #recent version ID. Thus if an entry is unchanged it will already 
+            #have the most recent version ID.
             if not options.update:
                 api_commands.append(process_command(
                                                      'update',
