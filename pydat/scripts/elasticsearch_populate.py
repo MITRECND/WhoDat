@@ -22,10 +22,6 @@ import Queue as queue
 
 from elasticsearch import Elasticsearch
 
-#TEST - logging 
-import logging
-logging.basicConfig(filename='debug.log', filemode='w+',  level = logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 STATS = {'total': 0,
          'new': 0,
@@ -57,8 +53,6 @@ def connectElastic(uri):
 
 ######## READER THREAD ######
 def reader_worker(work_queue, options):
-    #Testing
-    #logger.debug("reader worker started")
     if options.directory:
         scan_directory(work_queue, options.directory, options)
     elif options.file:
@@ -107,8 +101,6 @@ def parse_csv(work_queue, filename, options):
         for row in dnsreader:
             if shutdown_event.is_set():
                 break
-            #Testing
-            #logger.debug("reader worker inserting entry into work queue")
             work_queue.put({'header': header, 'row': row})
     except unicodecsv.Error as e:
         sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
@@ -387,9 +379,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         current_type = current_entry_raw['_type']
         current_entry = current_entry_raw['_source']
 
-        ################################################################################
-        ##### Update mode: dont do duplicate check as using most recent version ID #####
-        ################################################################################
         if not options.update and (current_entry[VERSION_KEY] == options.identifier): # duplicate entry in source csv's?
             stats_queue.put('duplicates')
             return
@@ -431,9 +420,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             if options.vverbose:
                 sys.stdout.write("%s: Updated\n" % domainName)
 
-            ##############################################################################################################################
-            ##### Update mode: options.identifier will be set to last version , options.previous_version will be set correctly as well #####
-            ###############################################################################################################################
             index_name = "%s-%s" % (options.index_prefix, options.identifier)
             if options.enable_delta_indexes:
                 index_name += "-o"
@@ -454,9 +440,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                     current_type,
                                                     current_entry
                                     ))
-            #################################################################
-            ### Update mode: delete old entry if one in most recent index ####
-            ##################################################################
             else:
                 #if not in delta mode, but in update mode
                 #a modified entry exists in the latest index, thus you have to delete it
@@ -468,9 +451,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                         current_id,
                                                         current_type
                                         ))
-                    #TEST
-                    #logger.debug('[--------ES Record Action------] process_entry(), update_mode= True, comparison diff = True, current_index(from current raw entry): %s , index_name(i.e.of new entry which is set to most recent index version):%s  - creating ES delete request for old entry(id: %s)',current_index, index_name, current_id) 
-
+            
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
             entry[UNIQUE_KEY] = entry_id
@@ -482,13 +463,8 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                  tld,
                                                  entry
                                  ))
-            #TEST
-            #logger.debug('[--------ES Record Action------] process_entry(), update_mode=True, conparison diff = True - creating new entry(domain_name = %s) in index_name: %s',domain_name_only,index_name)
-
+        
         else:
-            ################################################################################
-            ##### Update mode- dont need to update the verion ID of an unchanged doc#####
-            ################################################################################
             stats_queue.put('unchanged')
             if options.vverbose:
                 sys.stdout.write("%s: Unchanged\n" % domainName)
@@ -511,8 +487,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                              }
                                                      }
                                      ))
-                #TEST
-                #logger.debug('[--------ES Record Action------] process_entry(), comparison diff= False - an update ES action has been triggered for the purposes of updating the ID version of the current entry to that of the most recent index version. For entry id: %s  - current index: %s  - entry version key (new): %s ', current_id, current_index, options.identifier) 
     else:
         stats_queue.put('new')
         if options.vverbose:
@@ -520,9 +494,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         entry_id = generate_id(domainName, options.identifier)
         entry[UNIQUE_KEY] = entry_id
         (domain_name_only, tld) = parse_domain(domainName)
-        ################################################################################
-        ##### Update Mode: No changes required as options.identifier is already appropriately set by this point #####
-        ################################################################################
         index_name = "%s-%s" % (options.index_prefix, options.identifier)
         if options.enable_delta_indexes:
             index_name += "-o"
@@ -533,9 +504,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                             tld,
                                             entry
                             ))
-        #TEST
-        #logger.debug("[--------ES Record Action------] process_entry(), complete new entry -> ES create request - index_name:%s   id/domain: %s   version ID: %s", str(index_name), domain_name_only, str(options.identifier))
-
+        
     for command in api_commands:
         insert_queue.put(command)
 
@@ -719,15 +688,12 @@ def main():
         print("Redo requested and Identifier Specified. Please choose one or the other\n")
         parser.parse_args(['-h'])
 
-    ###########  NEW  ###############################
-    #shoudnt need this check, but just to be sure
-    if options.update and options.redo:
+    if options.update is True and options.redo is True:
         print("Update mode requested and redo mode also specified. Please choose one or the other.")
         parser.parse_args(['-h'])
-    elif options.update and options.identifier is not None:
+    elif options.update is True and options.identifier is not None:
         print("Update mode requested and Identifier also specified. Please choose one or the other;when put into update mode - automatically uses most recent index version as the identifier")
         parser.parse_args(['-h'])
-    ################################################
 
     threads= []
 
@@ -753,11 +719,9 @@ def main():
         if options.redo:
             print("Cannot redo when no initial data exists")
             sys.exit(1)
-        ##############NEW ###########################
         elif options.update:
             print("Cannot update when no initial data exists")
             sys.exit(1)
-        ############# NEw END#############################
 
         if data_template is not None:
             data_template["template"] = "%s-*" % options.index_prefix
@@ -811,7 +775,6 @@ def main():
             print("Error fetching metadata from index")
             sys.exit(1)
 
-        #################### NEW ########################################################
         #Redo Mode
         if options.redo and not options.update:
             result = es.search(index=meta_index_name,
@@ -831,7 +794,6 @@ def main():
 
         #Update Mode
         elif options.update and not options.redo:
-            #update mode   -currently, same logic as options.redo in grabbing the previous index
             result = es.search(index=meta_index_name,
                                body = { "query": {
                                             "match_all": {}
@@ -846,9 +808,6 @@ def main():
                 sys.exit(1)
 
             previousVersion = result['hits']['hits'][-2]['_id']
-
-            #TEST
-            logger.debug("main() - update mode specifed")
 
         #Normal Mode
         elif not options.redo and not options.update:
@@ -872,12 +831,10 @@ def main():
                 index_name = "%s-%s-d" % (options.index_prefix, previousVersion)
                 es.indices.create(index=index_name)
 
-        #mode not allowed
-        else:
-            # redo = True and update = True is not a valid combination of options  
+        #Non-valid Mode
+        else: 
             print("Critical Error: reached state where options.redo = True and options.update=True, this is not supported")
             sys.exit(1)
-    ########################End New##########################################################
 
     options.previousVersion = previousVersion
 
@@ -904,7 +861,6 @@ def main():
             options.INDEX_LIST.append('%s-%s' % (options.index_prefix, index_name))
 
 
-    ########################### New ##########################################################
     #Redo Mode
     if options.redo and not options.update:
         #Get the record for the attempted import
@@ -974,9 +930,6 @@ def main():
         #update mode will use lastVersion ID as the index ID and doc ID for all entries modified
         options.identifier = int(metadata['lastVersion'])
 
-        #TEST
-        #logger.debug("[main() - update mode = True - for update mode options.identifier is set to 'lastVersion' field of entry 0 in meta_data_struct - options.identifier=%s", options.identifier)
-
         try:
             update_record = es.get(index=meta_index_name, id=options.identifier)['_source']
         except:
@@ -993,7 +946,8 @@ def main():
         else:
             options.include = None
 
-        #for update mode use process_worker() - CANNOT use process_reworker() as it call update_required() which will innoculate any attempts of updating
+
+        #update mode must use process_worker (and not process_reworker as it uses the update_required() which will prevent any possible updating)
         
         for i in range(options.threads):
             t = Process(target=process_worker,
@@ -1023,7 +977,6 @@ def main():
             CHANGEDCT[ch] = int(CHANGEDCT[ch])
 
         #no changes required to meta_index or new meta entry required since doing update
-
 
     #Normal Mode
     elif not options.update and not options.redo:
@@ -1075,13 +1028,10 @@ def main():
         es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
 
 
-    #mode not allowed
+    #Non-valid Mode
     else:
-        # redo = True and update = True is not a valid combination of options  
         print("Critical Error: reached state where options.redo = True and options.update=True, this is not supported")
         sys.exit(1)
-
-    ######################################End New ######################################
 
     # Start up the Elasticsearch Bulk Serializers
     # Its job is just to combine work into bulk-sized chunks to be sent to the bulk API
