@@ -64,8 +64,10 @@ t_ignore = " \t\n"
 #    t.lexer.lineno += t.value.count("\n")
 
 def t_error(t):
-    raise ValueError("Illegal sequence: %s" % t.value)
-    #t.lexer.skip(1)
+    if t is not None:
+        raise ValueError("Unexpected character(s)/sequence at position %d: %s" % (t.lexpos, t.value))
+    else:
+        raise ValueError("Unable to parse input")
 
 # Build the lexer
 import ply.lex as lex
@@ -658,7 +660,7 @@ def remove_escapes(t):
 
 def p_error(t):
     if t is not None:
-        raise ValueError("Syntax error at '%s'" % t)
+        raise ValueError("Syntax error at position %d: %s" % (t.lexpos, t.value))
     else:
         raise ValueError("Syntax error")
 
