@@ -257,7 +257,7 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
 
                     domainName = entry['domainName']
 
-                    if options.firstImport:
+                    if options.firstImport or options.update:
                         current_entry_raw = None
                     else:
                         current_entry_raw = find_entry(es, domainName, options)
@@ -316,6 +316,8 @@ def parse_entry(input_entry, header, options):
     details = {}
     domainName = ''
     for i,item in enumerate(input_entry):
+        if header[i] in options.ignore_fields:
+            continue
         if header[i] == 'domainName':
             if options.vverbose:
                 sys.stdout.write("Processing domain: %s\n" % item)
@@ -361,6 +363,14 @@ def process_command(request, index, _id, _type, entry = None):
                              }
                   }
         return (command,)
+    elif request =='index':
+        command = {"index": {
+                                "_index": index,
+                                "_id": _id, 
+                                "_type": _type,
+                            }
+                  }
+        return (command, entry)
 
     return None #TODO raise instead?
 
@@ -377,7 +387,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         current_type = current_entry_raw['_type']
         current_entry = current_entry_raw['_source']
 
-        if not options.update and (current_entry[VERSION_KEY] == options.identifier): # duplicate entry in source csv's?
+        if current_entry[VERSION_KEY] == options.identifier: # duplicate entry in source csv's?
             stats_queue.put('duplicates')
             return
 
@@ -438,17 +448,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                     current_type,
                                                     current_entry
                                     ))
-            else:
-                #if not in delta mode, but in update mode
-                #a modified entry exists in the latest index, thus you have to delete it
-                #before inserting the new corresponding entry
-                if options.update and current_index == index_name:
-                    api_commands.append(process_command(
-                                                        'delete',
-                                                        current_index,
-                                                        current_id,
-                                                        current_type
-                                        ))
             
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
@@ -466,25 +465,17 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             stats_queue.put('unchanged')
             if options.vverbose:
                 sys.stdout.write("%s: Unchanged\n" % domainName)
-            '''
-            modification to the document's version ID is not required if
-            in update mode. As update mode does not add a new index, and thus
-            a new version. All entries added within update mode get the most
-            recent version ID. Thus if an entry is unchanged it will already 
-            have the most recent version ID.
-            '''
-            if not options.update:
-                api_commands.append(process_command(
-                                                     'update',
-                                                     current_index,
-                                                     current_id,
-                                                     current_type,
-                                                     {'doc': {
-                                                                 VERSION_KEY: options.identifier,
-                                                                'details': details
-                                                             }
-                                                     }
-                                     ))
+            api_commands.append(process_command(
+                                                 'update',
+                                                 current_index,
+                                                 current_id,
+                                                 current_type,
+                                                 {'doc': {
+                                                             VERSION_KEY: options.identifier,
+                                                            'details': details
+                                                         }
+                                                 }
+                                 ))
     else:
         stats_queue.put('new')
         if options.vverbose:
@@ -495,13 +486,22 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         index_name = "%s-%s" % (options.index_prefix, options.identifier)
         if options.enable_delta_indexes:
             index_name += "-o"
-        api_commands.append(process_command(
-                                            'create',
-                                            index_name,
-                                            domain_name_only,
-                                            tld,
-                                            entry
-                            ))
+        if options.update:
+            api_commands.append(process_command(
+                                                'index',
+                                                index_name,
+                                                domain_name_only,
+                                                tld,
+                                                entry
+                                ))
+        else:
+            api_commands.append(process_command(
+                                                'create',
+                                                index_name,
+                                                domain_name_only,
+                                                tld,
+                                                entry
+                                ))
     for command in api_commands:
         insert_queue.put(command)
 
@@ -630,11 +630,13 @@ def main():
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
 
     mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("-I", "--insert", action="store_true", dest="insert",
+        default=False, help = "Run the script in insert(normal) mode. Currently intended for quarterly whois data.")
     mode.add_argument("-r", "--redo", action="store_true", dest="redo",
         default=False, help="Attempt to re-import a failed import or import more data, uses stored metadata from previous import (-o, -n, and -x not required and will be ignored!!)")
     mode.add_argument("-z", "--update", action= "store_true", dest="update",
-        default = False, help = "Run the script in update mode. Intended for taking daily whois data and adding new data to the current existing index in ES. No new indexss created. If delta-indexes are also enabled, a delta index will only be created when an entry has been modified and has a previously existing entry.")
-    
+        default=False, help = "Run the script in update mode. Intended for taking daily whois data and adding new domains to the current existing index in ES. No new indexss created. If delta-indexes are also enabled, a delta index will only be created when an entry has been modified and has a previously existing entry.")
+
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     parser.add_argument("--vverbose", action="store_true", dest="vverbose",
@@ -669,27 +671,30 @@ def main():
         default=1, help="How many threads to spawn to send bulk ES messages. The larger your cluster, the more you can increase this")
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
-
+    parser.add_argument("--ignore-field-prefixes", nargs='*',dest="ignore_fields", type=str,
+        default=['zoneContact','billingContact','technicalContact'], help="list of fields (in whois data) to ignore for extracting and inserting into ElasticSearch")
+    
     options = parser.parse_args()
+
 
     if options.vverbose:
         options.verbose = True
 
     options.firstImport = False
 
-    if options.identifier is None and options.redo is False and options.update is False:
-        print("Identifier required\n")
-        parser.parse_args(['-h'])
-    elif options.identifier is not None and options.redo is True:
-        print("Redo requested and Identifier Specified. Please choose one or the other\n")
-        parser.parse_args(['-h'])
+    if not (options.insert or options.redo or options.update):
+        print("Please select a script mode: Insert , Redo, or Update")
+        parser.parse_args(["-h"])
 
-    if options.update is True and options.redo is True:
-        print("Update mode requested and redo mode also specified. Please choose one or the other.")
-        parser.parse_args(['-h'])
-    elif options.update is True and options.identifier is not None:
-        print("Update mode requested and Identifier also specified. Please choose one or the other;when put into update mode - automatically uses most recent index version as the identifier")
-        parser.parse_args(['-h'])
+    if options.insert is True:
+        if options.identifier is None:
+            print("Identifier required if Insert mode specified\n")
+            parser.parse_args(['-h'])
+    else:
+        if options.identifier is not None:
+            print("Identifier specified but not in Insert mode. Please clarify: Insert mode requires an identifier, Redo and Update modes do not.")
+            parser.parse_args(["-h"])
+   
 
     threads= []
 
@@ -711,11 +716,8 @@ def main():
 
     #Create the metadata index if it doesn't exist
     if not es.indices.exists(meta_index_name):
-        if options.redo:
-            print("Cannot redo when no initial data exists")
-            sys.exit(1)
-        elif options.update:
-            print("Cannot update when no initial data exists")
+        if options.redo or options.update:
+            print("Script cannot conduct a redo or update when no initial data exists")
             sys.exit(1)
 
         if data_template is not None:
@@ -770,8 +772,8 @@ def main():
             print("Error fetching metadata from index")
             sys.exit(1)
 
-        #Redo Mode
-        if options.redo and not options.update:
+        #Redo or Update Mode
+        if options.redo or options.update:
             result = es.search(index=meta_index_name,
                                body = { "query": {
                                             "match_all": {}
@@ -787,25 +789,8 @@ def main():
 
             previousVersion = result['hits']['hits'][-2]['_id']
 
-        #Update Mode
-        elif options.update and not options.redo:
-            result = es.search(index=meta_index_name,
-                               body = { "query": {
-                                            "match_all": {}
-                                        },
-                                        "sort":[
-                                            {"metadata": {"order": "asc"}}
-                                        ]
-                                      })
-
-            if result['hits']['total'] == 0:
-                print("Unable to fetch entries from metadata index")
-                sys.exit(1)
-
-            previousVersion = result['hits']['hits'][-2]['_id']
-
-        #Normal Mode
-        elif not options.redo and not options.update:
+        #Insert (normal) Mode
+        elif options.insert:
             # Pre-emptively create index
             index_name = "%s-%s" % (options.index_prefix, options.identifier)
             if options.enable_delta_indexes:
@@ -825,11 +810,6 @@ def main():
             if options.enable_delta_indexes and previousVersion > 0:
                 index_name = "%s-%s-d" % (options.index_prefix, previousVersion)
                 es.indices.create(index=index_name)
-
-        #Non-valid Mode
-        else: 
-            print("Critical Error: reached state where options.redo = True and options.update=True, this is not supported")
-            sys.exit(1)
 
     options.previousVersion = previousVersion
 
@@ -857,7 +837,7 @@ def main():
 
 
     #Redo Mode
-    if options.redo and not options.update:
+    if options.redo:
         #Get the record for the attempted import
         options.identifier = int(metadata['lastVersion'])
         try:
@@ -907,7 +887,7 @@ def main():
         #No need to update lastVersion or create metadata entry
 
     #Update Mode
-    elif options.update and not options.redo:
+    elif options.update:
         if options.exclude != "":
             options.exclude = options.exclude.split(',')
         else:
@@ -943,7 +923,6 @@ def main():
 
 
         #update mode must use process_worker (and not process_reworker as it uses the update_required() which will prevent any possible updating)
-        
         for i in range(options.threads):
             t = Process(target=process_worker,
                         args=(work_queue, 
@@ -974,7 +953,7 @@ def main():
         #no changes required to meta_index or new meta entry required since doing update
 
     #Normal Mode
-    elif not options.update and not options.redo:
+    elif options.insert:
         if options.exclude != "":
             options.exclude = options.exclude.split(',')
         else:
@@ -1022,11 +1001,6 @@ def main():
             
         es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
 
-
-    #Non-valid Mode
-    else:
-        print("Critical Error: reached state where options.redo = True and options.update=True, this is not supported")
-        sys.exit(1)
 
     # Start up the Elasticsearch Bulk Serializers
     # Its job is just to combine work into bulk-sized chunks to be sent to the bulk API
