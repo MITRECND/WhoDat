@@ -476,6 +476,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                          }
                                                  }
                                  ))
+            
     else:
         stats_queue.put('new')
         if options.vverbose:
