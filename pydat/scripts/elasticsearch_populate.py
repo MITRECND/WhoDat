@@ -316,7 +316,7 @@ def parse_entry(input_entry, header, options):
     details = {}
     domainName = ''
     for i,item in enumerate(input_entry):
-        if header[i] in options.ignore_fields:
+        if any(s in header[i] for s in options.ignore_fields):
             continue
         if header[i] == 'domainName':
             if options.vverbose:
@@ -672,16 +672,16 @@ def main():
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
     parser.add_argument("--ignore-field-prefixes", nargs='*',dest="ignore_fields", type=str,
-        default=['zoneContact','billingContact','technicalContact'], help="list of fields (in whois data) to ignore for extracting and inserting into ElasticSearch")
+        default=['zoneContact','billingContact','technicalContact'], help="list of fields (in whois data) to ignore when extracting and inserting into ElasticSearch")
     
     options = parser.parse_args()
-
 
     if options.vverbose:
         options.verbose = True
 
     options.firstImport = False
 
+    #as these are crafted as optional args, but are really a required mutually exclusive group, must check that one is specified
     if not (options.insert or options.redo or options.update):
         print("Please select a script mode: Insert , Redo, or Update")
         parser.parse_args(["-h"])
@@ -952,7 +952,7 @@ def main():
 
         #no changes required to meta_index or new meta entry required since doing update
 
-    #Normal Mode
+    #Insert(normal) Mode
     elif options.insert:
         if options.exclude != "":
             options.exclude = options.exclude.split(',')
