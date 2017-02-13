@@ -316,7 +316,7 @@ def parse_entry(input_entry, header, options):
     details = {}
     domainName = ''
     for i,item in enumerate(input_entry):
-        if any(s in header[i] for s in options.ignore_fields):
+        if any(header[i].startswith(s) for s in options.ignore_field_prefixes):
             continue
         if header[i] == 'domainName':
             if options.vverbose:
@@ -631,8 +631,8 @@ def main():
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
 
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("-I", "--insert", action="store_true", dest="insert",
-        default=False, help = "Run the script in insert(normal) mode. Currently intended for quarterly whois data.")
+    mode.add_argument("-i", "--insert", action="store", dest="identifier",
+        default=-1, help = "Run the script in insert(normal) mode. Currently intended for quarterly whois data. Provide identifier as an argument")
     mode.add_argument("-r", "--redo", action="store_true", dest="redo",
         default=False, help="Attempt to re-import a failed import or import more data, uses stored metadata from previous import (-o, -n, and -x not required and will be ignored!!)")
     mode.add_argument("-z", "--update", action= "store_true", dest="update",
@@ -657,8 +657,6 @@ def main():
         default=['localhost:9200'], help="Location(s) of ElasticSearch Server (e.g., foo.server.com:9200) Can take multiple endpoints")
     parser.add_argument("-p", "--index-prefix", action="store", dest="index_prefix",
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
-    parser.add_argument("-i", "--identifier", action="store", dest="identifier", type=int,
-        default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
     parser.add_argument("-B", "--bulk-size", action="store", dest="bulk_size", type=int,
         default=5000, help="Size of Bulk Elasticsearch Requests")
     parser.add_argument("--optimize-import", action="store_true", dest="optimize_import",
@@ -672,7 +670,7 @@ def main():
         default=1, help="How many threads to spawn to send bulk ES messages. The larger your cluster, the more you can increase this")
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
-    parser.add_argument("--ignore-field-prefixes", nargs='*',dest="ignore_fields", type=str,
+    parser.add_argument("--ignore-field-prefixes", nargs='*',dest="ignore_field_prefixes", type=str,
         default=['zoneContact','billingContact','technicalContact'], help="list of fields (in whois data) to ignore when extracting and inserting into ElasticSearch")
     
     options = parser.parse_args()
@@ -680,22 +678,17 @@ def main():
     if options.vverbose:
         options.verbose = True
 
+    if options.identifier != -1:
+        options.insert = True
+    else:
+        options.insert = False
+
     options.firstImport = False
 
     #as these are crafted as optional args, but are really a required mutually exclusive group, must check that one is specified
     if not (options.insert or options.redo or options.update):
         print("Please select a script mode: Insert , Redo, or Update")
         parser.parse_args(["-h"])
-
-    if options.insert is True:
-        if options.identifier is None:
-            print("Identifier required if Insert mode specified\n")
-            parser.parse_args(['-h'])
-    else:
-        if options.identifier is not None:
-            print("Identifier specified but not in Insert mode. Please clarify: Insert mode requires an identifier, Redo and Update modes do not.")
-            parser.parse_args(["-h"])
-   
 
     threads= []
 
