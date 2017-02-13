@@ -199,7 +199,6 @@ def es_serializer_proc(insert_queue, bulk_request_queue, options):
     bulk_counter = 0
     finishup = False
     bulk_request = []
-
     while 1:
         try:
             request = insert_queue.get_nowait()
@@ -258,7 +257,7 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
 
                     domainName = entry['domainName']
 
-                    if options.firstImport:
+                    if options.firstImport or options.update:
                         current_entry_raw = None
                     else:
                         current_entry_raw = find_entry(es, domainName, options)
@@ -317,6 +316,8 @@ def parse_entry(input_entry, header, options):
     details = {}
     domainName = ''
     for i,item in enumerate(input_entry):
+        if any(header[i].startswith(s) for s in options.ignore_field_prefixes):
+            continue
         if header[i] == 'domainName':
             if options.vverbose:
                 sys.stdout.write("Processing domain: %s\n" % item)
@@ -362,6 +363,14 @@ def process_command(request, index, _id, _type, entry = None):
                              }
                   }
         return (command,)
+    elif request =='index':
+        command = {"index": {
+                                "_index": index,
+                                "_id": _id, 
+                                "_type": _type,
+                            }
+                  }
+        return (command, entry)
 
     return None #TODO raise instead?
 
@@ -439,7 +448,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                     current_type,
                                                     current_entry
                                     ))
-
+            
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
             entry[UNIQUE_KEY] = entry_id
@@ -451,6 +460,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                  tld,
                                                  entry
                                  ))
+        
         else:
             stats_queue.put('unchanged')
             if options.vverbose:
@@ -466,6 +476,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                          }
                                                  }
                                  ))
+            
     else:
         stats_queue.put('new')
         if options.vverbose:
@@ -476,14 +487,22 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         index_name = "%s-%s" % (options.index_prefix, options.identifier)
         if options.enable_delta_indexes:
             index_name += "-o"
-        api_commands.append(process_command(
-                                            'create',
-                                            index_name,
-                                            domain_name_only,
-                                            tld,
-                                            entry
-                            ))
-
+        if options.update:
+            api_commands.append(process_command(
+                                                'index',
+                                                index_name,
+                                                domain_name_only,
+                                                tld,
+                                                entry
+                                ))
+        else:
+            api_commands.append(process_command(
+                                                'create',
+                                                index_name,
+                                                domain_name_only,
+                                                tld,
+                                                entry
+                                ))
     for command in api_commands:
         insert_queue.put(command)
 
@@ -603,7 +622,6 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-
     dataSource = parser.add_mutually_exclusive_group(required=True)
     dataSource.add_argument("-f", "--file", action="store", dest="file",
         default=None, help="Input CSV file")
@@ -612,8 +630,14 @@ def main():
     parser.add_argument("-e", "--extension", action="store", dest="extension",
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
 
-    parser.add_argument("-r", "--redo", action="store_true", dest="redo",
-        default=False, help="Attempt to re-import a failed import or import more data, uses stored metatdata from previous import (-o, -n, and -x not required and will be ignored!!)")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("-i", "--insert", action="store", dest="identifier",
+        default=-1, help = "Run the script in insert(normal) mode. Currently intended for quarterly whois data. Provide identifier as an argument")
+    mode.add_argument("-r", "--redo", action="store_true", dest="redo",
+        default=False, help="Attempt to re-import a failed import or import more data, uses stored metadata from previous import (-o, -n, and -x not required and will be ignored!!)")
+    mode.add_argument("-z", "--update", action= "store_true", dest="update",
+        default=False, help = "Run the script in update mode. Intended for taking daily whois data and adding new domains to the current existing index in ES. No new indexss created. If delta-indexes are also enabled, a delta index will only be created when an entry has been modified and has a previously existing entry.")
+
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
     parser.add_argument("--vverbose", action="store_true", dest="vverbose",
@@ -633,8 +657,6 @@ def main():
         default=['localhost:9200'], help="Location(s) of ElasticSearch Server (e.g., foo.server.com:9200) Can take multiple endpoints")
     parser.add_argument("-p", "--index-prefix", action="store", dest="index_prefix",
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
-    parser.add_argument("-i", "--identifier", action="store", dest="identifier", type=int,
-        default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
     parser.add_argument("-B", "--bulk-size", action="store", dest="bulk_size", type=int,
         default=5000, help="Size of Bulk Elasticsearch Requests")
     parser.add_argument("--optimize-import", action="store_true", dest="optimize_import",
@@ -648,19 +670,32 @@ def main():
         default=1, help="How many threads to spawn to send bulk ES messages. The larger your cluster, the more you can increase this")
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
-
+    parser.add_argument("--ignore-field-prefixes", nargs='*',dest="ignore_field_prefixes", type=str,
+        default=['zoneContact','billingContact','technicalContact'], help="list of fields (in whois data) to ignore when extracting and inserting into ElasticSearch")
+    
     options = parser.parse_args()
 
     if options.vverbose:
         options.verbose = True
 
+    if options.identifier != -1:
+        options.insert = True
+    else:
+        options.insert = False
+
     options.firstImport = False
 
-    threads = []
+    #as these are crafted as optional args, but are really a required mutually exclusive group, must check that one is specified
+    if not (options.insert or options.redo or options.update):
+        print("Please select a script mode: Insert , Redo, or Update")
+        parser.parse_args(["-h"])
+
+    threads= []
+
     work_queue = jmpQueue(maxsize=options.bulk_size * options.threads)
     insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_threads)
-    bulk_request_queue = jmpQueue(maxsize = 2 * options.bulk_threads)
-    stats_queue = mpQueue()
+    bulk_request_queue = jmpQueue(maxsize= 2 * options.bulk_threads)
+    stats_queue = mpQueue() 
 
     meta_index_name = '@' + options.index_prefix + "_meta"
 
@@ -669,21 +704,14 @@ def main():
     with open("%s/es_templates/data.template" % template_path, 'r') as dtemplate:
         data_template = json.loads(dtemplate.read())
 
-    if options.identifier is None and options.redo is False:
-        print("Identifier required\n")
-        argparse.parse_args(['-h'])
-    elif options.identifier is not None and options.redo is True:
-        print("Redo requested and Identifier Specified. Please choose one or the other\n")
-        argparse.parse_args(['-h'])
-
     es = connectElastic(options.es_uri)
     metadata = None
     previousVersion = 0
 
     #Create the metadata index if it doesn't exist
     if not es.indices.exists(meta_index_name):
-        if options.redo:
-            print("Cannot redo when no initial data exists")
+        if options.redo or options.update:
+            print("Script cannot conduct a redo or update when no initial data exists")
             sys.exit(1)
 
         if data_template is not None:
@@ -738,7 +766,25 @@ def main():
             print("Error fetching metadata from index")
             sys.exit(1)
 
-        if options.redo is False: #Identifier is auto-pulled from db, no need to check
+        #Redo or Update Mode
+        if options.redo or options.update:
+            result = es.search(index=meta_index_name,
+                               body = { "query": {
+                                            "match_all": {}
+                                        },
+                                        "sort":[
+                                            {"metadata": {"order": "asc"}}
+                                        ]
+                                      })
+
+            if result['hits']['total'] == 0:
+                print("Unable to fetch entries from metadata index")
+                sys.exit(1)
+
+            previousVersion = result['hits']['hits'][-2]['_id']
+
+        #Insert (normal) Mode
+        elif options.insert:
             # Pre-emptively create index
             index_name = "%s-%s" % (options.index_prefix, options.identifier)
             if options.enable_delta_indexes:
@@ -758,21 +804,6 @@ def main():
             if options.enable_delta_indexes and previousVersion > 0:
                 index_name = "%s-%s-d" % (options.index_prefix, previousVersion)
                 es.indices.create(index=index_name)
-        else:
-            result = es.search(index=meta_index_name,
-                               body = { "query": {
-                                            "match_all": {}
-                                        },
-                                        "sort":[
-                                            {"metadata": {"order": "asc"}}
-                                        ]
-                                      })
-
-            if result['hits']['total'] == 0:
-                print("Unable to fetch entries from metadata index")
-                sys.exit(1)
-
-            previousVersion = result['hits']['hits'][-2]['_id']
 
     options.previousVersion = previousVersion
 
@@ -791,61 +822,16 @@ def main():
 
     index_list = [entry['_source']['metadata'] for entry in index_list['hits']['hits'][:-1]]
     options.INDEX_LIST = []
+
     for index_name in index_list:
         if options.enable_delta_indexes:
             options.INDEX_LIST.append('%s-%s-o' % (options.index_prefix, index_name))
         else:
             options.INDEX_LIST.append('%s-%s' % (options.index_prefix, index_name))
 
-    if options.redo is False:
-        if options.exclude != "":
-            options.exclude = options.exclude.split(',')
-        else:
-            options.exclude = None
 
-        if options.include != "":
-            options.include = options.include.split(',')
-        else:
-            options.include = None
-
-        #Start worker threads
-        if options.verbose:
-            print("Starting %i worker threads" % options.threads)
-
-        for i in range(options.threads):
-            t = Process(target=process_worker,
-                        args=(work_queue, 
-                              insert_queue, 
-                              stats_queue,
-                              options), 
-                        name='Worker %i' % i)
-            t.daemon = True
-            t.start()
-            threads.append(t)
-
-        #Upate the lastVersion in the metadata
-        es.update(index=meta_index_name, id=0, doc_type='meta', body = {'doc': {'lastVersion': options.identifier}} )
-
-        #Create the entry for this import
-        meta_struct = {  
-                        'metadata': options.identifier,
-                        'comment' : options.comment,
-                        'total' : 0,
-                        'new' : 0,
-                        'updated' : 0,
-                        'unchanged' : 0,
-                        'duplicates': 0,
-                        'changed_stats': {} 
-                       }
-
-        if options.exclude != None:
-            meta_struct['excluded_keys'] = options.exclude
-        elif options.include != None:
-            meta_struct['included_keys'] = options.include
-            
-        es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
-
-    else: #redo is True
+    #Redo Mode
+    if options.redo:
         #Get the record for the attempted import
         options.identifier = int(metadata['lastVersion'])
         try:
@@ -893,6 +879,122 @@ def main():
             t.start()
             threads.append(t)
         #No need to update lastVersion or create metadata entry
+
+    #Update Mode
+    elif options.update:
+        if options.exclude != "":
+            options.exclude = options.exclude.split(',')
+        else:
+            options.exclude = None
+
+        if options.include != "":
+            options.include = options.include.split(',')
+        else:
+            options.include = None
+
+        #Start worker threads
+        if options.verbose:
+            print("Starting %i worker threads" % options.threads)
+
+        #update mode will use lastVersion ID as the index ID and doc ID for all entries modified
+        options.identifier = int(metadata['lastVersion'])
+
+        try:
+            update_record = es.get(index=meta_index_name, id=options.identifier)['_source']
+        except:
+           print("Unable to retrieve information for last import")
+           sys.exit(1) 
+
+        if 'excluded_keys' in update_record:
+            options.exclude = update_record['excluded_keys']
+        else:
+            options.exclude = None
+
+        if 'included_keys' in update_record:
+            options.include = update_record['included_keys']
+        else:
+            options.include = None
+
+
+        #update mode must use process_worker (and not process_reworker as it uses the update_required() which will prevent any possible updating)
+        for i in range(options.threads):
+            t = Process(target=process_worker,
+                        args=(work_queue, 
+                              insert_queue, 
+                              stats_queue,
+                              options), 
+                        name='Worker %i' % i)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+        
+
+        #pull existing stats for the current index, then will add to them as the index goes through update
+        options.comment = update_record['comment']
+        STATS['total'] = int(update_record['total'])
+        STATS['new'] = int(update_record['new'])
+        STATS['updated'] = int(update_record['updated'])
+        STATS['unchanged'] = int(update_record['unchanged'])
+        STATS['duplicates'] = int(update_record['duplicates'])
+        CHANGEDCT = update_record['changed_stats']
+
+        if options.verbose:
+            print("Updating for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
+
+        for ch in CHANGEDCT.keys():
+            CHANGEDCT[ch] = int(CHANGEDCT[ch])
+
+        #no changes required to meta_index or new meta entry required since doing update
+
+    #Insert(normal) Mode
+    elif options.insert:
+        if options.exclude != "":
+            options.exclude = options.exclude.split(',')
+        else:
+            options.exclude = None
+
+        if options.include != "":
+            options.include = options.include.split(',')
+        else:
+            options.include = None
+
+        #Start worker threads
+        if options.verbose:
+            print("Starting %i worker threads" % options.threads)
+
+        for i in range(options.threads):
+            t = Process(target=process_worker,
+                        args=(work_queue, 
+                              insert_queue, 
+                              stats_queue,
+                              options), 
+                        name='Worker %i' % i)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+
+        #Update the lastVersion in the metadata
+        es.update(index=meta_index_name, id=0, doc_type='meta', body = {'doc': {'lastVersion': options.identifier}} )
+
+        #Create the entry for this import
+        meta_struct = {  
+                        'metadata': options.identifier,
+                        'comment' : options.comment,
+                        'total' : 0,
+                        'new' : 0,
+                        'updated' : 0,
+                        'unchanged' : 0,
+                        'duplicates': 0,
+                        'changed_stats': {} 
+                       }
+
+        if options.exclude != None:
+            meta_struct['excluded_keys'] = options.exclude
+        elif options.include != None:
+            meta_struct['included_keys'] = options.include
+            
+        es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
+
 
     # Start up the Elasticsearch Bulk Serializers
     # Its job is just to combine work into bulk-sized chunks to be sent to the bulk API
