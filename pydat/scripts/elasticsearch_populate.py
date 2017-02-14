@@ -136,12 +136,13 @@ def es_bulk_shipper_proc(insert_queue, position, options):
     es = connectElastic(options.es_uri[position % len(options.es_uri)])
     try:
         for (ok, response) in helpers.streaming_bulk(es, bulkIter(), raise_on_error=False):
-            if not ok and response['status'] not in [404, 409]:
+            resp = response[response.keys()[0]]
+            if not ok and resp['status'] not in [404, 409]:
                     if not bulkError_event.is_set():
                         bulkError_event.set()
-                    sys.stderr.write("Error making bulk request, received error reason: %s\n" % (response['error']['reason']))
+                    sys.stderr.write("Error making bulk request, received error reason: %s\n" % (resp['error']['reason']))
     except Exception as e:
-        sys.stderr.write("Unexpected error processing bulk commands: %s\n%s\n" % (str(e)), traceback.format_exc())
+        sys.stderr.write("Unexpected error processing bulk commands: %s\n%s\n" % (str(e), traceback.format_exc()))
         if not bulkError_event.is_set():
             bulkError_event.set()
 
