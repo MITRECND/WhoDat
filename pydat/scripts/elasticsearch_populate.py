@@ -631,8 +631,8 @@ def main():
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
 
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("-i", "--insert", action="store", dest="identifier",
-        default=-1, help = "Run the script in insert(normal) mode. Currently intended for quarterly whois data. Provide identifier as an argument")
+    mode.add_argument("-i", "--identifier", action="store", dest="identifier", type=int,
+        default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
     mode.add_argument("-r", "--redo", action="store_true", dest="redo",
         default=False, help="Attempt to re-import a failed import or import more data, uses stored metadata from previous import (-o, -n, and -x not required and will be ignored!!)")
     mode.add_argument("-z", "--update", action= "store_true", dest="update",
@@ -678,15 +678,10 @@ def main():
     if options.vverbose:
         options.verbose = True
 
-    if options.identifier != -1:
-        options.insert = True
-    else:
-        options.insert = False
-
     options.firstImport = False
 
     #as these are crafted as optional args, but are really a required mutually exclusive group, must check that one is specified
-    if not (options.insert or options.redo or options.update):
+    if not (options.identifier or options.redo or options.update):
         print("Please select a script mode: Insert , Redo, or Update")
         parser.parse_args(["-h"])
 
@@ -784,7 +779,7 @@ def main():
             previousVersion = result['hits']['hits'][-2]['_id']
 
         #Insert (normal) Mode
-        elif options.insert:
+        else:
             # Pre-emptively create index
             index_name = "%s-%s" % (options.index_prefix, options.identifier)
             if options.enable_delta_indexes:
@@ -830,46 +825,54 @@ def main():
             options.INDEX_LIST.append('%s-%s' % (options.index_prefix, index_name))
 
 
-    #Redo Mode
-    if options.redo:
-        #Get the record for the attempted import
+    # Redo or Update Mode
+    if options.redo or options.update:
+        # Get the record for the attempted import
         options.identifier = int(metadata['lastVersion'])
         try:
-            redo_record = es.get(index=meta_index_name, id=options.identifier)['_source']
+            previous_record = es.get(index=meta_index_name, id=options.identifier)['_source']
         except:
            print("Unable to retrieve information for last import")
            sys.exit(1) 
 
-        if 'excluded_keys' in redo_record:
-            options.exclude = redo_record['excluded_keys']
+        if 'excluded_keys' in previous_record:
+            options.exclude = previous_record['excluded_keys']
         else:
             options.exclude = None
 
-        if 'included_keys' in redo_record:
-            options.include = redo_record['included_keys']
+        if 'included_keys' in previous_record:
+            options.include = previous_record['included_keys']
         else:
             options.include = None
 
-        options.comment = redo_record['comment']
-        STATS['total'] = int(redo_record['total'])
-        STATS['new'] = int(redo_record['new'])
-        STATS['updated'] = int(redo_record['updated'])
-        STATS['unchanged'] = int(redo_record['unchanged'])
-        STATS['duplicates'] = int(redo_record['duplicates'])
-        CHANGEDCT = redo_record['changed_stats']
+        options.comment = previous_record['comment']
+        STATS['total'] = int(previous_record['total'])
+        STATS['new'] = int(previous_record['new'])
+        STATS['updated'] = int(previous_record['updated'])
+        STATS['unchanged'] = int(previous_record['unchanged'])
+        STATS['duplicates'] = int(previous_record['duplicates'])
+        CHANGEDCT = previous_record['changed_stats']
 
         if options.verbose:
-            print("Re-importing for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
+            if options.redo:
+                print("Re-importing for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
+            else:
+                print("Updating for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
 
         for ch in CHANGEDCT.keys():
             CHANGEDCT[ch] = int(CHANGEDCT[ch])
 
         #Start the reworker threads
         if options.verbose:
-            print("Starting %i reworker threads" % options.threads)
+            print("Starting %i %s threads" % (options.threads, "reworker" if options.redo else "update"))
+
+        if options.redo:
+            target = process_reworker
+        else:
+            target = process_worker
 
         for i in range(options.threads):
-            t = Process(target=process_reworker,
+            t = Process(target=target,
                         args=(work_queue, 
                               insert_queue, 
                               stats_queue,
@@ -880,74 +883,8 @@ def main():
             threads.append(t)
         #No need to update lastVersion or create metadata entry
 
-    #Update Mode
-    elif options.update:
-        if options.exclude != "":
-            options.exclude = options.exclude.split(',')
-        else:
-            options.exclude = None
-
-        if options.include != "":
-            options.include = options.include.split(',')
-        else:
-            options.include = None
-
-        #Start worker threads
-        if options.verbose:
-            print("Starting %i worker threads" % options.threads)
-
-        #update mode will use lastVersion ID as the index ID and doc ID for all entries modified
-        options.identifier = int(metadata['lastVersion'])
-
-        try:
-            update_record = es.get(index=meta_index_name, id=options.identifier)['_source']
-        except:
-           print("Unable to retrieve information for last import")
-           sys.exit(1) 
-
-        if 'excluded_keys' in update_record:
-            options.exclude = update_record['excluded_keys']
-        else:
-            options.exclude = None
-
-        if 'included_keys' in update_record:
-            options.include = update_record['included_keys']
-        else:
-            options.include = None
-
-
-        #update mode must use process_worker (and not process_reworker as it uses the update_required() which will prevent any possible updating)
-        for i in range(options.threads):
-            t = Process(target=process_worker,
-                        args=(work_queue, 
-                              insert_queue, 
-                              stats_queue,
-                              options), 
-                        name='Worker %i' % i)
-            t.daemon = True
-            t.start()
-            threads.append(t)
-        
-
-        #pull existing stats for the current index, then will add to them as the index goes through update
-        options.comment = update_record['comment']
-        STATS['total'] = int(update_record['total'])
-        STATS['new'] = int(update_record['new'])
-        STATS['updated'] = int(update_record['updated'])
-        STATS['unchanged'] = int(update_record['unchanged'])
-        STATS['duplicates'] = int(update_record['duplicates'])
-        CHANGEDCT = update_record['changed_stats']
-
-        if options.verbose:
-            print("Updating for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
-
-        for ch in CHANGEDCT.keys():
-            CHANGEDCT[ch] = int(CHANGEDCT[ch])
-
-        #no changes required to meta_index or new meta entry required since doing update
-
     #Insert(normal) Mode
-    elif options.insert:
+    else:
         if options.exclude != "":
             options.exclude = options.exclude.split(',')
         else:
