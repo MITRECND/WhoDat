@@ -996,9 +996,6 @@ def main():
         sys.stdout.write("\tWaiting for ElasticSearch bulk uploads to finish ... \n")
         finished_event.set()
 
-        # Wait for shippers to send all bulk requests, otherwise ES might be left in an inconsistent state
-        bulk_request_queue.join()
-
         #Attempt to update the stats
         #XXX
         try:
