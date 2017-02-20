@@ -562,7 +562,7 @@ def main():
     mode.add_argument("-r", "--redo", action="store_true", dest="redo",
         default=False, help="Attempt to re-import a failed import or import more data, uses stored metadata from previous import (-o, -n, and -x not required and will be ignored!!)")
     mode.add_argument("-z", "--update", action= "store_true", dest="update",
-        default=False, help = "Run the script in update mode. Intended for taking daily whois data and adding new domains to the current existing index in ES. No new indexss created. If delta-indexes are also enabled, a delta index will only be created when an entry has been modified and has a previously existing entry.")
+        default=False, help = "Run the script in update mode. Intended for taking daily whois data and adding new domains to the current existing index in ES.")
 
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
