@@ -117,7 +117,7 @@ def stats_worker(stats_queue):
 
 ###### ELASTICSEARCH PROCESS ######
 
-def es_bulk_shipper_proc(insert_queue, position, options):
+def es_bulk_shipper_proc(insert_queue, options):
     os.setpgrp()
 
     global bulkError_event
@@ -133,9 +133,9 @@ def es_bulk_shipper_proc(insert_queue, position, options):
 
             yield req
 
-    es = connectElastic(options.es_uri[position % len(options.es_uri)])
+    es = connectElastic(options.es_uri)
     try:
-        for (ok, response) in helpers.streaming_bulk(es, bulkIter(), raise_on_error=False):
+        for (ok, response) in helpers.parallel_bulk(es, bulkIter(), raise_on_error=False, thread_count=options.bulk_threads, chunk_size=options.bulk_size):
             resp = response[response.keys()[0]]
             if not ok and resp['status'] not in [404, 409]:
                     if not bulkError_event.is_set():
@@ -584,7 +584,7 @@ def main():
     parser.add_argument("-p", "--index-prefix", action="store", dest="index_prefix",
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
     parser.add_argument("-B", "--bulk-size", action="store", dest="bulk_size", type=int,
-        default=5000, help="Size of Bulk Elasticsearch Requests")
+        default=1000, help="Size of Bulk Elasticsearch Requests")
     parser.add_argument("--optimize-import", action="store_true", dest="optimize_import",
         default=False, help="If enabled, will change ES index settings to speed up bulk imports, but if the cluster has a failure, data might be lost permanently!")
 
@@ -613,8 +613,8 @@ def main():
 
     threads = []
 
-    work_queue = jmpQueue(maxsize=options.bulk_size * options.threads)
-    insert_queue = jmpQueue(maxsize=options.bulk_size * options.bulk_threads)
+    work_queue = jmpQueue(maxsize=10000)
+    insert_queue = jmpQueue(maxsize=10000)
     stats_queue = mpQueue()
 
     meta_index_name = '@' + options.index_prefix + "_meta"
@@ -875,14 +875,8 @@ def main():
         es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
 
 
-    # Start up ES Bulk Shippers, each in their own process
-    # As far as I can tell there's an issue (bug? feature?) that causes every request made to ES to hinder the entire process even if it's in a separate python thread
-    # not sure if this is GIL related or not, but instead of debugging how the elasticsearch library or urllib does things
-    # its easier to just spawn a separate process for every connection being made to ES
-    for i in range(options.bulk_threads):
-        es_bulk_shipper = Process(target=es_bulk_shipper_proc, args=(insert_queue, i, options))
-        es_bulk_shipper.daemon = True
-        es_bulk_shipper.start()
+    es_bulk_shipper = Thread(target=es_bulk_shipper_proc, args=(insert_queue, options))
+    es_bulk_shipper.start()
 
     stats_worker_thread = Thread(target=stats_worker, args=(stats_queue,), name = 'Stats')
     stats_worker_thread.daemon = True
@@ -919,8 +913,8 @@ def main():
             # Since this is the shutdown section, ignore Keyboard Interrupts
             # especially since the interrupt code (below) does effectively the same thing
             insert_queue.join()
-
             finished_event.set()
+            es_bulk_shipper.join()
             for t in threads:
                 t.join()
 
@@ -995,6 +989,7 @@ def main():
 
         sys.stdout.write("\tWaiting for ElasticSearch bulk uploads to finish ... \n")
         finished_event.set()
+        es_bulk_shipper.join()
 
         #Attempt to update the stats
         #XXX
