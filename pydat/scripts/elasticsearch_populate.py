@@ -63,9 +63,9 @@ def reader_worker(work_queue, options):
 def scan_directory(work_queue, directory, options):
     for root, subdirs, filenames in os.walk(directory):
         if len(subdirs):
-            for subdir in subdirs:
+            for subdir in sorted(subdirs):
                 scan_directory(work_queue, subdir, options)
-        for filename in filenames:
+        for filename in sorted(filenames):
             if shutdown_event.is_set():
                 return
             if options.extension != '':
