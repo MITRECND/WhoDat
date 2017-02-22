@@ -167,22 +167,7 @@ def main():
     # Initialize template in destination cluster
     configTemplate(dest_es, data_template, options.dest_index_prefix)
 
-    # Create Metadata Index
-    dest_es.indices.create(index=WHOIS_META, body = {"settings" : {
-                                                            "index" : {
-                                                                "number_of_shards" : 1,
-                                                                "analysis" : {
-                                                                    "analyzer" : {
-                                                                        "default" : {
-                                                                            "type" : "keyword"
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    })
-
-    if options.ugprade:
+    if options.upgrade:
         alias_actions = []
         res = source_es.search(index="@%s_meta" % (options.index_prefix), body={"query": {"match_all": {}}, "sort": "metadata", "size": "10000"})
         try:
@@ -202,8 +187,8 @@ def main():
 
                             if version != lastVersion:
                                 source_delta_index = "%s-%d-d" % (options.index_prefix, version)
-                                actions.append({"add": {"index": source_delta_index, "alias": WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
-                                               {"add": {"index": source_delta_index, "alias": WHOIS_SEARCH}})
+                                actions.extend([{"add": {"index": source_delta_index, "alias": WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
+                                               {"add": {"index": source_delta_index, "alias": WHOIS_SEARCH}}])
                         else:
                             source_index = "%s-%d" % (options.index_prefix, version)
                             actions = [{"add": {"index": source_index, "alias": WHOIS_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
@@ -212,12 +197,26 @@ def main():
                         alias_actions.extend(actions)
 
                 alias_actions.append({"add": {"index": "@%s_meta" % (options.index_prefix), "alias": WHOIS_META}})
-                print(alias_actions)
-                #dest_es.indices.update_aliases(body=alias_actions)
+                dest_es.indices.update_aliases(body={"actions": alias_actions})
         except KeyboardInterrupt as e:
             pass
 
     else:
+        # Create Metadata Index
+        dest_es.indices.create(index=WHOIS_META, body = {"settings" : {
+                                                                "index" : {
+                                                                    "number_of_shards" : 1,
+                                                                    "analysis" : {
+                                                                        "analyzer" : {
+                                                                            "default" : {
+                                                                                "type" : "keyword"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        })
+
         global read_docs
         scanFinished = Event()
         stop = Event()
@@ -279,7 +278,7 @@ def main():
                                                 }}
                         dest_es.indices.create(index=dest_index, body=body)
                         optimizeIndex(dest_es, dest_index, 0)
-                        scanIndex(source_es, source_index, dest_orig_index, bulkRequestQueue, scan_options)
+                        scanIndex(source_es, source_index, dest_index, bulkRequestQueue, scan_options)
 
 
                     bulkRequest = {
