@@ -47,7 +47,6 @@ def __createRequestContext__(request, data = None):
         ctx_var['health'] = handler.cluster_health().capitalize()
         ctx_var['record_count'] = handler.record_count()
         ctx_var['last_import'] = handler.lastVersion()
-        ctx_var['scripting'] = settings.ES_SCRIPTING_ENABLED or settings.ES_PAINLESS
 
     if data is not None:
         ctx_var.update(data)

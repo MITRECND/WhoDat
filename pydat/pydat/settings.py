@@ -21,8 +21,6 @@ COLL_WHOIS = 'whois'
 
 ES_URI = 'localhost:9200'
 ES_INDEX_PREFIX = 'whois'
-ES_SCRIPTING_ENABLED = False
-ES_PAINLESS = False
 
 PROXIES = {}
 

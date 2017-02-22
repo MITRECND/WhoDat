@@ -5,6 +5,9 @@ from handlers.advanced_es import yacc
 from datetime import date
 import collections
 
+SEARCH_INDEX = "%s-search" % (settings.ES_INDEX_PREFIX)
+META_INDEX = ".%s-meta" % (settings.ES_INDEX_PREFIX)
+
 class ElasticsearchError(Exception):
     pass
 
@@ -23,7 +26,7 @@ def record_count():
     except:
         raise
 
-    records = es.cat.count(index='%s-*' % settings.ES_INDEX_PREFIX, h="count")
+    records = es.cat.count(index=SEARCH_INDEX, h="count")
 
     return int(records)
 
@@ -61,7 +64,7 @@ def cluster_stats():
             }
     #TODO XXX need to cache this but query_cache doesn't seem to be a parameter to this function
     #Might need to set query cache in the mapping instead
-    results = es.search(index = '%s-*' % settings.ES_INDEX_PREFIX, body = query)
+    results = es.search(index=SEARCH_INDEX, body = query)
 
     stats = {
             'domainStats': {},
@@ -99,7 +102,7 @@ def cluster_health():
 def lastVersion():
     try:
         es = es_connector()
-        result = es.get(index='@%s_meta' % settings.ES_INDEX_PREFIX, id=0)
+        result = es.get(index=META_INDEX, id=0)
         if result['found']:
             return result['_source']['lastVersion']
         else:
@@ -112,13 +115,12 @@ def metadata(version = None):
     results = {'success': False}
     try:
         es = es_connector()
-        index = '@%s_meta' % settings.ES_INDEX_PREFIX
     except ElasticsearchError as e:
         results['message'] = str(e)
         return results
 
     if version is None:
-        res = es.search(index=index, body={"query": {"match_all": {}},"sort": "metadata"})
+        res = es.search(index=META_INDEX, body={"query": {"match_all": {}},"sort": "metadata"})
         if res['hits']['total'] > 0:
             newres = []
             for r in res['hits']['hits']:
@@ -128,7 +130,7 @@ def metadata(version = None):
             res = []
     else:
         version = int(version)
-        res = es.get(index=index, id=version)
+        res = es.get(index=META_INDEX, id=version)
         if res['found']:
             res = [res['_source']]
         else:
@@ -173,7 +175,6 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     results = {'success': False}
     try:
         es = es_connector()
-        index = '%s-*' % settings.ES_INDEX_PREFIX
     except ElasticsearchError as e:
         results['message'] = str(e)
         return results
@@ -262,7 +263,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     if settings.DEBUG:
         sys.stdout.write("%s\n" % str(query))
 
-    domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
+    domains = es.search(index=SEARCH_INDEX, body = query)
 
     results['aaData'] = []
     #Total Records in all indices 
@@ -328,15 +329,11 @@ def __createAdvancedQuery__(query, skip, size, unique):
 
 
 def advDataTableSearch(query, skip, pagesize, unique = False):
-    if not (settings.ES_SCRIPTING_ENABLED or settings.ES_PAINLESS):
-        unique = False
-
     results = {'success': False}
     results['aaData'] = []
 
     try:
         es = es_connector()
-        index = '%s-*' % settings.ES_INDEX_PREFIX
     except ElasticsearchError as e:
         results['message'] = str(e)
         return results
@@ -350,8 +347,9 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
     if settings.DEBUG:
         import json
         sys.stdout.write(json.dumps(q))
+
     try:
-        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q, search_type = 'dfs_query_then_fetch')
+        domains = es.search(index=SEARCH_INDEX, body = q, search_type = 'dfs_query_then_fetch')
     except Exception as e:
         results['message'] = str(e)
         return results    
@@ -455,7 +453,7 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     #XXX DEBUG CODE
     import sys
     sys.stdout.write("%s\n" % str(query))
-    domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
+    domains = es.search(index=SEARCH_INDEX, body = query)
 
     results['total'] = domains['hits']['total']
     results['data'] = []
@@ -486,13 +484,9 @@ def test_query(search_string):
     return None
 
 def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO XXX versions, dates, etc
-    if not (settings.ES_SCRIPTING_ENABLED or settings.ES_PAINLESS):
-        unique = False
-
     results = {'success': False}
     try:
         es = es_connector()
-        index = '%s-*' % settings.ES_INDEX_PREFIX
     except ElasticsearchError as e:
         results['message'] = str(e)
         return results
@@ -504,7 +498,7 @@ def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO X
         return results
 
     try:
-        domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query, search_type='dfs_query_then_fetch')
+        domains = es.search(index=SEARCH_INDEX, body = query, search_type='dfs_query_then_fetch')
     except Exception as e:
         results['message'] = str(e)
         return results

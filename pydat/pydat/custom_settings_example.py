@@ -35,14 +35,6 @@ ALLOWED_HOSTS = ['*']
 #ES_URI = 'localhost:9200'
 #ES_INDEX_PREFIX = 'whois'
 
-# If using ES 2.x a script needs to be installed or groovy needs to be enabled to enable some features
-# Set this to True once those conditions are met. If using ES 5.x or greater, use the ES_PAINLESS setting
-# instead
-#ES_SCRIPTING_ENABLED = False
-# If using ES 5.x or greater, use the built in 'painless' scripting to accomplish some features that
-# were done via groovy before. If using >=5.x ignore ES_SCRIPTING_ENABLED and set this to True
-#ES_PAINLESS = False
-
 # If you need to use a proxy set it here.
 #PROXIES = {
 #  "http": "http://127.0.0.1",

@@ -40,6 +40,16 @@ shutdown_event = multiprocessing.Event()
 finished_event = multiprocessing.Event()
 bulkError_event = multiprocessing.Event()
 
+WHOIS_WRITE_FORMAT_STRING = "%s-%d"
+WHOIS_ORIG_WRITE_FORMAT_STRING = "%s-orig-%d"
+WHOIS_DELTA_WRITE_FORMAT_STRING = "%s-delta-%d"
+
+WHOIS_SEARCH_FORMAT_STRING = "%s-search"
+WHOIS_META_FORMAT_STRING = ".%s-meta"
+
+WHOIS_SEARCH = None
+WHOIS_META = None
+
 def connectElastic(uri):
     es = elasticsearch.Elasticsearch(uri,
                                      sniff_on_start=True,
@@ -349,9 +359,8 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             if options.vverbose:
                 sys.stdout.write("%s: Updated\n" % domainName)
 
-            index_name = "%s-%s" % (options.index_prefix, options.identifier)
             if options.enable_delta_indexes:
-                index_name += "-o"
+                index_name = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
                 # Delete old entry, put into a 'diff' index
                 api_commands.append(process_command(
                                                     'delete',
@@ -360,15 +369,18 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                     current_type
                                     ))
 
-                # Put it into a previousVersion-d index so it doesn't potentially create
+                # Put it into a previousVersion delta index so it doesn't potentially create
                 # a bunch of indexes that will need to be cleaned up later
                 api_commands.append(process_command(
                                                     'create',
-                                                    "%s-%s-d" % (options.index_prefix, options.previousVersion),
+                                                    WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion),
                                                     current_id,
                                                     current_type,
                                                     current_entry
                                     ))
+
+            else:
+                index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
 
             entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
             entry_id = generate_id(domainName, options.identifier)
@@ -403,9 +415,12 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         entry_id = generate_id(domainName, options.identifier)
         entry[UNIQUE_KEY] = entry_id
         (domain_name_only, tld) = parse_domain(domainName)
-        index_name = "%s-%s" % (options.index_prefix, options.identifier)
+
         if options.enable_delta_indexes:
-            index_name += "-o"
+            index_name = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+        else:
+            index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
         if options.update:
             api_commands.append(process_command(
                                                 'index',
@@ -458,29 +473,9 @@ def find_entry(es, domainName, options):
         return None
 
 
-def unOptimizeIndexes(es, template, options):
-    if not options.optimize_import:
-        return
-
-    index_name = "%s-%s" % (options.index_prefix, options.identifier)
-    if options.enable_delta_indexes:
-        index_name += "-o"
-
-        try:
-            if options.previousVersion != 0:
-                es.indices.put_settings(index="%s-%s-d" % (options.index_prefix, options.previousVersion),
-                                    body = {"settings": {
-                                                "index": {
-                                                    "number_of_replicas": template['settings']['number_of_replicas'],
-                                                    "refresh_interval": template['settings']["refresh_interval"]
-                                                }
-                                            }
-                                    })
-        except Exception as e:
-            pass
-
+def unOptimizeIndex(es, index, template):
     try:
-        es.indices.put_settings(index=index_name,
+        es.indices.put_settings(index=index,
                             body = {"settings": {
                                         "index": {
                                             "number_of_replicas": template['settings']['number_of_replicas'],
@@ -491,34 +486,13 @@ def unOptimizeIndexes(es, template, options):
     except Exception as e:
         pass
 
-def optimizeIndexes(es, options):
-    if not options.optimize_import:
-        return
-
-    # Update the Index(es) with altered settings to help with bulk import
-    index_name = "%s-%s" % (options.index_prefix, options.identifier)
-    if options.enable_delta_indexes:
-        index_name += "-o"
-
-        try:
-            if options.previousVersion != 0:
-                es.indices.put_settings(index= "%s-%s-d" % (options.index_prefix, options.previousVersion),
-                                    body = {"settings": {
-                                                "index": {
-                                                    "number_of_replicas": 0,
-                                                    "refresh_interval": "300s"
-                                                }
-                                            }
-                                    })
-        except Exception as e:
-            pass
-
+def optimizeIndex(es, index, refresh_interval="300s"):
     try:
-        es.indices.put_settings(index=index_name,
+        es.indices.put_settings(index=index,
                             body = {"settings": {
                                         "index": {
                                             "number_of_replicas": 0,
-                                            "refresh_interval": "300s"
+                                            "refresh_interval": refresh_interval
                                         }
                                     }
                             })
@@ -617,27 +591,40 @@ def main():
     insert_queue = jmpQueue(maxsize=10000)
     stats_queue = mpQueue()
 
-    meta_index_name = '@' + options.index_prefix + "_meta"
+    global WHOIS_META, WHOIS_SEARCH
+    # Process Index/Alias Format Strings
+    WHOIS_META          = WHOIS_META_FORMAT_STRING % (options.index_prefix)
+    WHOIS_SEARCH        = WHOIS_SEARCH_FORMAT_STRING % (options.index_prefix)
 
     data_template = None
     template_path = os.path.dirname(os.path.realpath(__file__))
-    if options.es5:
-        major = elasticsearch.VERSION[0]
-        if major != 5:
-            print("Python ElasticSearch library version must coorespond to version of ElasticSearch being used -- Library major version: %d" % (major))
-            sys.exit(1)
+    major = elasticsearch.VERSION[0]
+    if major != 5:
+        print("Python ElasticSearch library version must coorespond to version of ElasticSearch being used -- Library major version: %d" % (major))
+        sys.exit(1)
 
-        with open("%s/es_templates/data.template.5" % template_path, 'r') as dtemplate:
-            data_template = json.loads(dtemplate.read())
-    else:
-        with open("%s/es_templates/data.template" % template_path, 'r') as dtemplate:
-            data_template = json.loads(dtemplate.read())
+    with open("%s/es_templates/data.template" % template_path, 'r') as dtemplate:
+        data_template = json.loads(dtemplate.read())
 
     try:
         es = connectElastic(options.es_uri)
     except elasticsearch.exceptions.TransportError as e:
         print("Unable to connect to ElasticSearch ... %s" % (str(e)))
         sys.exit(1)
+
+    try:
+        es_versions = []
+        for version in es.cat.nodes(h='version').strip().split('\n'):
+            es_versions.append([int(i) for i in version.split('.')])
+    except Exception as e:
+        sys.stderr.write("Unable to retrieve destination ElasticSearch version ... %s\n" % (str(e)))
+        sys.exit(1)
+
+    for version in es_versions:
+        if version[0] < 5 or (version[0] >= 5 and version[1] < 2):
+            sys.stderr.write("Destination ElasticSearch version must be 5.2 or greater\n")
+            sys.exit(1)
+
 
     if options.config_template_only:
         configTemplate(es, data_template, options.index_prefix)
@@ -648,7 +635,7 @@ def main():
     previousVersion = 0
 
     #Create the metadata index if it doesn't exist
-    if not es.indices.exists(meta_index_name):
+    if not es.indices.exists(WHOIS_META):
         if options.redo or options.update:
             print("Script cannot conduct a redo or update when no initial data exists")
             sys.exit(1)
@@ -658,7 +645,7 @@ def main():
         #Create the metadata index with only 1 shard, even with thousands of imports
         #This index shouldn't warrant multiple shards
         #Also use the keyword analyzer since string analsysis is not important
-        es.indices.create(index=meta_index_name, body = {"settings" : {
+        es.indices.create(index=WHOIS_META, body = {"settings" : {
                                                                 "index" : {
                                                                     "number_of_shards" : 1,
                                                                     "analysis" : {
@@ -671,19 +658,21 @@ def main():
                                                                 }
                                                          }
                                                         })
-        #Create the 0th metadata entry
+        # Create the 0th metadata entry
         metadata = { "metadata": 0,
                      "firstVersion": options.identifier,
                      "lastVersion": options.identifier,
                      "deltaIndexes": options.enable_delta_indexes,
                     }
-        es.create(index=meta_index_name, doc_type='meta', id = 0, body = metadata)
+        es.create(index=WHOIS_META, doc_type='meta', id = 0, body = metadata)
 
         #Specially create the first index to have 2x the shards than normal
         #since future indices should be diffs of the first index (ideally)
-        index_name = "%s-%s" % (options.index_prefix, options.identifier)
         if options.enable_delta_indexes:
-            index_name += "-o"
+            index_name = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+        else:
+            index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
         es.indices.create(index=index_name,
                             body = {"settings": { 
                                         "index": { 
@@ -694,7 +683,7 @@ def main():
         options.firstImport = True
     else:
         try:
-            result = es.get(index=meta_index_name, id=0)
+            result = es.get(index=WHOIS_META, id=0)
             if result['found']:
                 metadata = result['_source']
             else:
@@ -703,9 +692,31 @@ def main():
             print("Error fetching metadata from index")
             sys.exit(1)
 
-        #Redo or Update Mode
-        if options.redo or options.update:
-            result = es.search(index=meta_index_name,
+        if options.identifier is not None:
+            if options.identifier < 1:
+                print("Identifier must be greater than 0")
+                sys.exit(1)
+            if metadata['lastVersion'] >= options.identifier:
+                print("Identifier must be 'greater than' previous identifier")
+                sys.exit(1)
+
+            previousVersion = metadata['lastVersion']
+
+            # Pre-emptively create index
+            if options.enable_delta_indexes:
+                index_name = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+                # Pre-emptively create delta index
+                if previousVersion > 0:
+                    es.indices.create(index=WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, previousVersion))
+            else:
+                index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+            es.indices.create(index=index_name)
+
+
+        else: # redo or update
+            result = es.search(index=WHOIS_META,
                                body = { "query": {
                                             "match_all": {}
                                         },
@@ -720,34 +731,9 @@ def main():
 
             previousVersion = result['hits']['hits'][-2]['_id']
 
-        #Insert (normal) Mode
-        else:
-            # Pre-emptively create index
-            index_name = "%s-%s" % (options.index_prefix, options.identifier)
-            if options.enable_delta_indexes:
-                index_name += "-o"
-            es.indices.create(index=index_name)
-
-            if options.identifier < 1:
-                print("Identifier must be greater than 0")
-                sys.exit(1)
-            if metadata['lastVersion'] >= options.identifier:
-                print("Identifier must be 'greater than' previous identifier")
-                sys.exit(1)
-
-            previousVersion = metadata['lastVersion']
-
-            # Pre-emptively create delta index
-            if options.enable_delta_indexes and previousVersion > 0:
-                index_name = "%s-%s-d" % (options.index_prefix, previousVersion)
-                es.indices.create(index=index_name)
-
     options.previousVersion = previousVersion
 
-    # Change Index settings to better suit bulk indexing
-    optimizeIndexes(es, options)
-
-    index_list = es.search(index=meta_index_name,
+    index_list = es.search(index=WHOIS_META,
                            body = { "query": {
                                         "match_all": {}
                                     },
@@ -762,9 +748,23 @@ def main():
 
     for index_name in index_list:
         if options.enable_delta_indexes:
-            options.INDEX_LIST.append('%s-%s-o' % (options.index_prefix, index_name))
+            index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
         else:
-            options.INDEX_LIST.append('%s-%s' % (options.index_prefix, index_name))
+            index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+        options.INDEX_LIST.append(index)
+
+    # Change Index settings to better suit bulk indexing
+    if options.optimize_import:
+        if options.enable_delta_indexes:
+            index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+            if options.previousVersion != 0:
+                optimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion))
+        else:
+            index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+        optimizeIndex(es, index)
 
 
     # Redo or Update Mode
@@ -772,7 +772,7 @@ def main():
         # Get the record for the attempted import
         options.identifier = int(metadata['lastVersion'])
         try:
-            previous_record = es.get(index=meta_index_name, id=options.identifier)['_source']
+            previous_record = es.get(index=WHOIS_META, id=options.identifier)['_source']
         except:
            print("Unable to retrieve information for last import")
            sys.exit(1)
@@ -853,7 +853,7 @@ def main():
             threads.append(t)
 
         #Update the lastVersion in the metadata
-        es.update(index=meta_index_name, id=0, doc_type='meta', body = {'doc': {'lastVersion': options.identifier}} )
+        es.update(index=WHOIS_META, id=0, doc_type='meta', body = {'doc': {'lastVersion': options.identifier}} )
 
         #Create the entry for this import
         meta_struct = {  
@@ -872,7 +872,7 @@ def main():
         elif options.include != None:
             meta_struct['included_keys'] = options.include
             
-        es.create(index=meta_index_name, id=options.identifier, doc_type='meta',  body = meta_struct)
+        es.create(index=WHOIS_META, id=options.identifier, doc_type='meta',  body = meta_struct)
 
 
     es_bulk_shipper = Thread(target=es_bulk_shipper_proc, args=(insert_queue, options))
@@ -919,14 +919,23 @@ def main():
                 t.join()
 
             # Change settings back
-            unOptimizeIndexes(es, data_template, options)
+            if options.optimize_import:
+                if options.enable_delta_indexes:
+                    index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+                    if options.previousVersion != 0:
+                        unOptimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion), data_template)
+                else:
+                    index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+                unOptimizeIndex(es, index, data_template)
 
             stats_queue.put('finished')
             stats_worker_thread.join()
 
             #Update the stats
             try:
-                es.update(index=meta_index_name, id=options.identifier,
+                es.update(index=WHOIS_META, id=options.identifier,
                                                  doc_type='meta',
                                                  body = { 'doc': {
                                                           'total' : STATS['total'],
@@ -995,7 +1004,7 @@ def main():
         #XXX
         try:
             sys.stdout.write("\tFinalizing metadata\n")
-            es.update(index=meta_index_name, id=options.identifier,
+            es.update(index=WHOIS_META, id=options.identifier,
                                              body = { 'doc': {
                                                         'total' : STATS['total'],
                                                         'new' : STATS['new'],
@@ -1010,7 +1019,16 @@ def main():
 
         sys.stdout.write("\tFinalizing settings\n")
         # Make sure to de-optimize the indexes for import
-        unOptimizeIndexes(es, data_template, options)
+        if options.optimize_import:
+            if options.enable_delta_indexes:
+                index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+                if options.previousVersion != 0:
+                    unOptimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion), data_template)
+            else:
+                index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+
+            unOptimizeIndex(es, index, data_template)
 
         try:
             work_queue.close()
