@@ -1,4 +1,5 @@
 import sys
+import json
 from elasticsearch import Elasticsearch
 from django.conf import settings
 from handlers.advanced_es import yacc
@@ -187,24 +188,31 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     value = value.lower()
 
     query_filter = {"term": {key: value}}
+    final_filter = [query_filter]
     version_filter = None
+    lowUpdate = None
+
+    try:
+        (low, lowUpdate) = low.split('.')
+    except:
+        pass
 
     if low is not None:
         if low == high or high is None: # single version
             try:
-                version_filter = {"term": {'dataVersion': int(low)}}
+                version_filter = [{"term": {'dataVersion': int(low)}}]
             except: #TODO XXX
                 pass
+            if lowUpdate is not None:
+                version_filter.append({"term": {'updateVersion': int(lowUpdate)}})
         elif high is not None:
             try:
-                version_filter = {"range": {"dataVersion": {"gte": int(low), "lte": int(high)}}}
+                version_filter = [{"range": {"dataVersion": {"gte": int(low), "lte": int(high)}}}]
             except: #TODO XXX
                 pass 
 
     if version_filter is not None:
-        final_filter = [query_filter, version_filter]
-    else:
-        final_filter = query_filter
+        final_filter.extend(version_filter)
 
     qquery = None
 
@@ -260,7 +268,11 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
 
     if settings.DEBUG:
-        sys.stdout.write("%s\n" % str(query))
+        try:
+            sys.stdout.write("%s\n" % json.dumps(query))
+            sys.stdout.flush()
+        except:
+            pass
 
     domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
 
@@ -269,13 +281,19 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     results['iTotalRecords'] = record_count()
 
 
+
+
     if domains['hits']['total'] > 0:
         for domain in domains['hits']['hits']:
+            updateVersion = 0
+            if 'updateVersion' in domain['_source']:
+                updateVersion = domain['_source']['updateVersion']
+
             #First element is placeholder for expansion cell
             #TODO Make this configurable?
             details = domain['_source']['details']
             dom_arr = ["&nbsp;", domain['_source']['domainName'], details['registrant_name'], details['contactEmail'], 
-                        details['standardRegCreatedDate'], details['registrant_telephone'], domain['_source']['dataVersion']]
+                        details['standardRegCreatedDate'], details['registrant_telephone'], "%d.%d" % (domain['_source']['dataVersion'], updateVersion)]
             results['aaData'].append(dom_arr)
 
     #Number of Records after any sort of filtering/searching
@@ -290,7 +308,8 @@ def __createAdvancedQuery__(query, skip, size, unique):
         q['sort'] = [
                         {'_score': {'order': 'desc'}}, 
                         {'domainName': {'order': 'asc'}}, 
-                        {'dataVersion': {'order': 'desc'}}
+                        {'dataVersion': {'order': 'desc'}},
+                        {'updateVersion': {'order': 'desc'}}
                     ]
         q['size'] = size
         q['from'] = skip
@@ -313,6 +332,7 @@ def __createAdvancedQuery__(query, skip, size, unique):
                                     "sort": [
                                         {'_score': {'order': 'desc'}}, 
                                         {"dataVersion": {"order": "desc"}},
+                                        {"updateVersion": {"order": "desc"}}
                                     ]
                                 }
                             }
@@ -348,8 +368,11 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
         return results
 
     if settings.DEBUG:
-        import json
-        sys.stdout.write(json.dumps(q))
+        try:
+            sys.stdout.write(json.dumps(q) + "\n")
+            sys.stdout.flush()
+        except:
+            pass
     try:
         domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = q, search_type = 'dfs_query_then_fetch')
     except Exception as e:
@@ -368,11 +391,14 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
             for domain in domains['hits']['hits']:
                 pdomain = domain['_source']
                 details = pdomain['details']
+                updateVersion = 0
+                if 'updateVersion' in pdomain:
+                    updateVersion = pdomain['updateVersion']
                 # Take each key in details (if any) and stuff it in top level dict.
                 dom_arr = ["&nbsp;", pdomain['domainName'], 
                             details['registrant_name'], details['contactEmail'], 
                             details['standardRegCreatedDate'], details['registrant_telephone'], 
-                            pdomain['dataVersion'], "%.2f" % round(domain['_score'], 2)]
+                            "%d.%d" % (pdomain['dataVersion'], updateVersion), "%.2f" % round(domain['_score'], 2)]
                 results['aaData'].append(dom_arr)
 
         results['success'] = True
@@ -385,10 +411,13 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
             domain = bucket['top_domains']['hits']['hits'][0]
             pdomain = domain['_source']
             details = pdomain['details']
+            updateVersion = 0
+            if 'updateVersion' in pdomain:
+                updateVersion = pdomain['updateVersion']
             dom_arr = ["&nbsp;", pdomain['domainName'],
                         details['registrant_name'], details['contactEmail'],
                         details['standardRegCreatedDate'], details['registrant_telephone'],
-                        pdomain['dataVersion'], "%.2f" % round(domain['sort'][0], 2)] # For some reason the _score goes away in the aggregations if you sort by it
+                        "%d.%d" % (pdomain['dataVersion'], updateVersion) , "%.2f" % round(domain['sort'][0], 2)] # For some reason the _score goes away in the aggregations if you sort by it
             results['aaData'].append(dom_arr)
 
         results['success'] = True
@@ -419,24 +448,32 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
         es_source = ['details.' + filt]
 
     query_filter = {"term": {key: value}}
+    final_filter = [query_filter]
     version_filter = None
+
+    lowUpdate = None
+
+    try:
+        (low, lowUpdate) = low.split('.')
+    except Exception as e:
+        pass
 
     if low is not None:
         if low == high or high is None: # single version
             try:
-                version_filter = {"term": {'dataVersion': int(low)}}
+                version_filter = [{"term": {'dataVersion': int(low)}}]
+                if lowUpdate is not None:
+                    version_filter.append({"term": {'updateVersion': int(lowUpdate)}})
             except: #TODO XXX
                 pass
         elif high is not None:
             try:
-                version_filter = {"range": {"dataVersion": {"gte": int(low), "lte": int(high)}}}
+                version_filter = [{"range": {"dataVersion": {"gte": int(low), "lte": int(high)}}}]
             except: #TODO XXX
                 pass 
 
     if version_filter is not None:
-        final_filter = [query_filter, version_filter]
-    else:
-        final_filter = query_filter
+        final_filter.extend(version_filter)
 
     query = { 
         "query": {
@@ -448,13 +485,16 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     }
 
     if versionSort:
-        query["sort"] = [{"dataVersion": {"order": "asc"}}]
+        query["sort"] = [{"dataVersion": {"order": "asc"}}, {"updateVersion": {"order": "asc"}}]
     if es_source:
         query["_source"] = es_source
 
     #XXX DEBUG CODE
-    import sys
-    sys.stdout.write("%s\n" % str(query))
+    try:
+        sys.stdout.write("%s\n" % json.dumps(query))
+        sys.stdout.flush()
+    except:
+        pass
     domains = es.search(index='%s-*' % settings.ES_INDEX_PREFIX, body = query)
 
     results['total'] = domains['hits']['total']
@@ -470,6 +510,9 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
         if 'dataVersion' in pdomain:
             pdomain['Version'] = pdomain['dataVersion']
             del pdomain['dataVersion']
+        if 'updateVersion' in pdomain:
+            pdomain['UpdateVersion'] = pdomain['updateVersion']
+            del pdomain['updateVersion']
         results['data'].append(pdomain)
 
     results['avail'] = len(results['data'])
@@ -523,6 +566,9 @@ def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO X
             if 'dataVersion' in pdomain:
                 pdomain['Version'] = pdomain['dataVersion']
                 del pdomain['dataVersion']
+            if 'updateVersion' in pdomain:
+                pdomain['UpdateVersion'] = pdomain['updateVersion']
+                del pdomain['updateVersion']
             results['data'].append(pdomain)
 
         results['avail'] = len(results['data'])
@@ -545,6 +591,9 @@ def advanced_search(search_string, skip = 0, size = 20, unique = False): #TODO X
             if 'dataVersion' in pdomain:
                 pdomain['Version'] = pdomain['dataVersion']
                 del pdomain['dataVersion']
+            if 'updateVersion' in pdomain:
+                pdomain['UpdateVersion'] = pdomain['updateVersion']
+                del pdomain['updateVersion']
             results['data'].append(pdomain)
 
         results['avail'] = len(buckets)

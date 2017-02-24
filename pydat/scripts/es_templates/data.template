@@ -125,6 +125,10 @@
             "type" : "long",
             "include_in_all": "false"
           },
+          "updateVersion" : {
+            "type" : "long",
+            "include_in_all": "false"
+          },
           "dataUniqueID" : {
             "type" : "string",
             "index": "not_analyzed",
