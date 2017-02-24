@@ -306,7 +306,7 @@ def __createAdvancedQuery__(query, skip, size, unique):
                         },
                         "aggs": {
                             "max_score": {
-                                "max": {"script":  {"file": "_score"}}
+                                "max": {"script": "_score"}
                             },
                             "top_domains":{
                                 "top_hits":{
@@ -320,9 +320,6 @@ def __createAdvancedQuery__(query, skip, size, unique):
                         }
                     }
         }
-
-        if settings.ES_PAINLESS:
-            q['aggs']['domains']['aggs']['max_score']['max']['script'] = "_score"
 
     return q
 
