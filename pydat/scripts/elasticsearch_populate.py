@@ -741,6 +741,8 @@ def main():
             print("Error fetching metadata from index")
             sys.exit(1)
 
+        options.enable_delta_indexes = metadata['deltaIndexes']
+
         if options.identifier is not None:
             if options.identifier < 1:
                 print("Identifier must be greater than 0")
