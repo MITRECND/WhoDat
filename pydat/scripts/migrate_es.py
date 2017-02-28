@@ -198,6 +198,7 @@ def main():
 
         try:
             meta_count = source_es.count(index="@%s_meta" % (options.index_prefix))['count']
+            meta_count -= 1 # Remove the 0 entryt
         except:
             sys.stderr.write("Unable to get number of entries\n")
             sys.exit(1)
