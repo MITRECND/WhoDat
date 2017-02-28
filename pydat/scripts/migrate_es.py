@@ -223,6 +223,7 @@ def main():
             if res['hits']['total'] > 0:
                 lastVersion = res['hits']['hits'][0]['_source']['lastVersion']
                 for i, doc in enumerate(res['hits']['hits']):
+                    _index = doc['_index']
                     _id = doc['_id']
                     _type = doc['_type']
                     _source = doc['_source']
@@ -233,34 +234,40 @@ def main():
                             source_index = "%s-%d-o" % (options.index_prefix, version)
                             actions = [{"add": {"index": source_index, "alias": WHOIS_ORIG_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
                                        {"add": {"index": source_index, "alias":  WHOIS_SEARCH}}]
-
                             if version != lastVersion:
                                 source_delta_index = "%s-%d-d" % (options.index_prefix, version)
                                 actions.extend([{"add": {"index": source_delta_index, "alias": WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
                                                {"add": {"index": source_delta_index, "alias": WHOIS_SEARCH}}])
                         else:
+                            # Non delta indexes have the same format string so no need to alias individual index
+                            # Still need to alias search
                             source_index = "%s-%d" % (options.index_prefix, version)
-                            actions = [{"add": {"index": source_index, "alias": WHOIS_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
-                                       {"add": {"index": source_index, "alias":  WHOIS_SEARCH}}]
+                            actions = [{"add": {"index": source_index, "alias":  WHOIS_SEARCH}}]
 
                         alias_actions.extend(actions)
+                        updateIndex(source_es, source_index, bulkRequestQueue, scan_options)
 
-                        
+                        bulkRequest = {
+                            '_op_type': 'update',
+                            '_index': _index,
+                            '_type': _type,
+                            '_id': _id,
+                            'doc': {UPDATE_KEY: 0}
+                        }
 
-                    bulkRequest = {
-                        '_op_type': 'update',
-                        '_index': WHOIS_META,
-                        '_type': _type,
-                        '_id': _id,
-                        'doc': {UPDATE_KEY: 0}
-                    }
-
-                    bulkRequestQueue.put(bulkRequest)
+                        bulkRequestQueue.put(bulkRequest)
 
                 alias_actions.append({"add": {"index": "@%s_meta" % (options.index_prefix), "alias": WHOIS_META}})
                 dest_es.indices.update_aliases(body={"actions": alias_actions})
         except KeyboardInterrupt as e:
-            pass
+            scanFinished.set()
+            stop.set()
+
+        scanFinished.set()
+        bulk_thread.join()
+        stop.set()
+        progress_thread.join()
+
 
     else:
         # Create Metadata Index
