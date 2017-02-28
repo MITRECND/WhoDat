@@ -12,6 +12,7 @@ import elasticsearch
 from elasticsearch import helpers
 from elasticsearch_populate import connectElastic, configTemplate,\
                                    optimizeIndex, unOptimizeIndex,\
+                                   UPDATE_KEY,\
                                    WHOIS_META_FORMAT_STRING,\
                                    WHOIS_SEARCH_FORMAT_STRING,\
                                    WHOIS_WRITE_FORMAT_STRING,\
@@ -62,6 +63,8 @@ def scanIndex(source_es, source_index, dest_index, bulkRequestQueue, scanOpts):
         _type = doc['_type']
         _source = doc['_source']
 
+        _source[UPDATE_KEY] = 0
+
         bulkRequest = {
             '_op_type': 'index',
             '_index': dest_index,
@@ -72,6 +75,26 @@ def scanIndex(source_es, source_index, dest_index, bulkRequestQueue, scanOpts):
 
         read_docs += 1
         bulkRequestQueue.put(bulkRequest)
+
+
+def updateIndex(source_es, source_index, bulkRequestQueue, scanOpts):
+    global read_docs
+
+    for doc in helpers.scan(source_es, index=source_index, size=scanOpts['size']):
+        _id = doc['_id']
+        _type = doc['_type']
+
+        bulkRequest = {
+            '_op_type': 'index',
+            '_index': source_index,
+            '_type': _type,
+            '_id': _id,
+            'doc': {UPDATE_KEY: 0}
+        }
+
+        read_docs += 1
+        bulkRequestQueue.put(bulkRequest)
+
 
 def checkVersion(es):
     try:
@@ -168,6 +191,32 @@ def main():
     configTemplate(dest_es, data_template, options.dest_index_prefix)
 
     if options.upgrade:
+        global read_docs
+        scanFinished = Event()
+        stop = Event()
+        bulkRequestQueue = Queue.Queue(maxsize=10000)
+
+        try:
+            meta_count = source_es.count(index="@%s_meta" % (options.index_prefix))['count']
+        except:
+            sys.stderr.write("Unable to get number of entries\n")
+            sys.exit(1)
+
+        try:
+            doc_count = source_es.count(index="%s-*" % (options.index_prefix))['count']
+        except:
+            sys.stderr.write("Unable to get number of metadata entries\n")
+            sys.exit(1)
+
+        total_docs = meta_count + doc_count
+
+        progress_thread = threading.Thread(target=progressThread, args=(stop, total_docs))
+        progress_thread.start()
+
+        bulk_thread = threading.Thread(target=bulkThread, args=(scanFinished, dest_es, bulkRequestQueue, bulk_options))
+        bulk_thread.daemon=True
+        bulk_thread.start()
+
         alias_actions = []
         res = source_es.search(index="@%s_meta" % (options.index_prefix), body={"query": {"match_all": {}}, "sort": "metadata", "size": "10000"})
         try:
@@ -195,6 +244,18 @@ def main():
                                        {"add": {"index": source_index, "alias":  WHOIS_SEARCH}}]
 
                         alias_actions.extend(actions)
+
+                        
+
+                    bulkRequest = {
+                        '_op_type': 'update',
+                        '_index': WHOIS_META,
+                        '_type': _type,
+                        '_id': _id,
+                        'doc': {UPDATE_KEY: 0}
+                    }
+
+                    bulkRequestQueue.put(bulkRequest)
 
                 alias_actions.append({"add": {"index": "@%s_meta" % (options.index_prefix), "alias": WHOIS_META}})
                 dest_es.indices.update_aliases(body={"actions": alias_actions})
@@ -256,6 +317,8 @@ def main():
                     version = _source['metadata']
 
                     if version != 0:
+                        _source[UPDATE_KEY] = 0
+
                         if options.deltaIndexes:
                             source_index = "%s-%d-o" % (options.index_prefix, version)
                             dest_index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)

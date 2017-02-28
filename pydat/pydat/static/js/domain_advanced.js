@@ -172,7 +172,7 @@ function fnFormatDetails ( oTable, nTr )
 
 
     dTable +=   '<div class="domain_full">';
-    dTable +=   '<span class="link fullDetail" domainName="' + aData[1] + '">Click To Get Full Details</span>';
+    dTable +=   '<span class="link fullDetail" domainName="' + aData[1] + '" entry_version="' + aData[6] + '">Click To Get Full Details</span>';
     dTable +=   '</div>';
 
     dTable +=   '</div>'; //domain_details
@@ -384,13 +384,14 @@ function get_historical(domain, entry_version, target){
             for(var i = 0; i < result.length; i++){
                 var hrow = document.createElement('tr');
                 var tdclass = "";
+                var res_entry_version = result[i].Version + "." + result[i].UpdateVersion
 
-                if(+(result[i].Version) == +entry_version){
+                if(res_entry_version == entry_version){
                     tdclass = "bold";
                 }
                 var hcell = document.createElement('td');
                 $(hcell).addClass(tdclass);
-                $(hcell).html(result[i].Version);
+                $(hcell).html(res_entry_version);
                 $(hrow).append(hcell);
 
                 var hcell = document.createElement('td');
@@ -415,16 +416,31 @@ function get_historical(domain, entry_version, target){
 
                 var hcell = document.createElement('td');
                 $(hcell).addClass(tdclass);
-                if(+entry_version == result[i].Version){
+                if(entry_version == res_entry_version){
                     $(hcell).html('<span>&nbsp;</span>');
                 }else{
-                    $(hcell).html('<span class="link fullDetail" domainName="' + result[i].domainName + '">Click</span>');
+                    $(hcell).html('<span class="link fullDetail" domainName="'
+                                  + result[i].domainName
+                                  + '" entry_version="'
+                                  + res_entry_version
+                                  + '">Click</span>');
                 }
                 $(hrow).append(hcell);
 
                 var inner = "&nbsp;"
                 if (i != 0){
-                    inner = '<span class="link diff" domainName="' + result[i].domainName + '" version1="' + result[i - 1].Version + '" version2="' + result[i].Version + '">' + result[i - 1].Version + " > " + result[i].Version  + '</span>';
+                    previous_entry_version = result[i-1].Version + "." + result[i-1].UpdateVersion;
+                    inner = '<span class="link diff" domainName="'
+                            + result[i].domainName
+                            + '" version1="'
+                            + previous_entry_version
+                            + '" version2="'
+                            + res_entry_version
+                            +'">'
+                            + previous_entry_version
+                            + " > "
+                            + res_entry_version
+                            + '</span>';
                 }
 
                 var hcell = document.createElement('td');
@@ -440,7 +456,7 @@ function get_historical(domain, entry_version, target){
 
         var dTab = $(target).parents("tr").find(".detailTable");
         dTab.find(".fullDetail").on("click", function(){
-            full($(this).attr('domainName'), entry_version);
+            full($(this).attr('domainName'), $(this).attr('entry_version'));
         });
         dTab.find(".diff").on("click", function(){
             diff($(this).attr('domainName'), $(this).attr('version1'), $(this).attr('version2'));

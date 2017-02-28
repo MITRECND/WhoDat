@@ -181,8 +181,8 @@ def domain_diff(request, domainName = None, v1 = None, v2 = None):
             return __renderErrorJSON__('Required Parameters Missing')
         domainName = urllib.unquote(domainName)
 
-        v1_res = handler.search('domainName', domainName, filt=None, low = int(v1))
-        v2_res = handler.search('domainName', domainName, filt=None, low = int(v2))
+        v1_res = handler.search('domainName', domainName, filt=None, low = v1)
+        v2_res = handler.search('domainName', domainName, filt=None, low = v2)
 
         try:
             v1_res = v1_res['data'][0]
@@ -193,6 +193,7 @@ def domain_diff(request, domainName = None, v1 = None, v2 = None):
         keylist = set(v1_res.keys()).union(set(v2_res.keys()))
 
         keylist.remove('Version')
+        keylist.remove('UpdateVersion')
         keylist.remove('domainName')
         keylist.remove('dataUniqueID')
         keylist.remove('dataFirstSeen')

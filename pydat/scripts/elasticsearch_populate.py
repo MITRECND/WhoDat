@@ -31,6 +31,7 @@ STATS = {'total': 0,
         }
 
 VERSION_KEY = 'dataVersion'
+UPDATE_KEY = 'updateVersion'
 UNIQUE_KEY = 'dataUniqueID'
 FIRST_SEEN = 'dataFirstSeen'
 
@@ -185,7 +186,7 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
 
                     domainName = entry['domainName']
 
-                    if options.firstImport or options.update:
+                    if options.firstImport:
                         current_entry_raw = None
                     else:
                         current_entry_raw = find_entry(es, domainName, options)
@@ -259,6 +260,7 @@ def parse_entry(input_entry, header, options):
     entry = {
                 VERSION_KEY: options.identifier,
                 FIRST_SEEN: options.identifier,
+                UPDATE_KEY: options.updateVersion,
                 'details': details,
                 'domainName': domainName,
             }
@@ -318,7 +320,9 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         current_type = current_entry_raw['_type']
         current_entry = current_entry_raw['_source']
 
-        if current_entry[VERSION_KEY] == options.identifier: # duplicate entry in source csv's?
+        if not options.update and (current_entry[VERSION_KEY] == options.identifier): # duplicate entry in source csv's?
+            if options.vverbose:
+                sys.stdout.write('%s: Duplicate\n' % domainName)
             stats_queue.put('duplicates')
             return
 
@@ -355,59 +359,96 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             CHANGEDCT[ch[0]] += 1
 
         if diff:
-            stats_queue.put('updated')
-            if options.vverbose:
-                sys.stdout.write("%s: Updated\n" % domainName)
-
             if options.enable_delta_indexes:
                 index_name = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
-                # Delete old entry, put into a 'diff' index
-                api_commands.append(process_command(
-                                                    'delete',
-                                                    current_index,
-                                                    current_id,
-                                                    current_type
-                                    ))
-
-                # Put it into a previousVersion delta index so it doesn't potentially create
-                # a bunch of indexes that will need to be cleaned up later
-                api_commands.append(process_command(
-                                                    'create',
-                                                    WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion),
-                                                    current_id,
-                                                    current_type,
-                                                    current_entry
-                                    ))
-
             else:
-                index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+                index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.indentifier)
 
-            entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
-            entry_id = generate_id(domainName, options.identifier)
-            entry[UNIQUE_KEY] = entry_id
-            (domain_name_only, tld) = parse_domain(domainName)
-            api_commands.append(process_command(
-                                                 'create',
-                                                 index_name,
-                                                 domain_name_only,
-                                                 tld,
-                                                 entry
-                                 ))
+            if options.update and ((current_index == index_name) or (options.previousVersion == 0)): #Can't have two documents with the the same id in the same index
+                stats_queue.put('new')
+                if options.vverbose:
+                    sys.stdout.write("%s: New/Re-Registered\n" % domainName)
+
+                # Effectively move old entry into different document
+                if options.enable_delta_indexes:
+                    api_commands.append(process_command(
+                                                        'create',
+                                                        WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier),
+                                                        "%s&%d" % (current_id, options.updateVersion),
+                                                        current_type,
+                                                        current_entry
+                                        ))
+                else:
+                    api_commands.append(process_command(
+                                                        'create',
+                                                        current_index,
+                                                        "%s&%d" % (current_id, options.updateVersion),
+                                                        current_type,
+                                                        current_entry
+                                        ))
+
+                entry_id = generate_id(domainName, options.identifier)
+                entry[UNIQUE_KEY] = entry_id
+                (domain_name_only, tld) = parse_domain(domainName)
+                api_commands.append(process_command(
+                                                     'index',
+                                                     current_index,
+                                                     current_id,
+                                                     current_type,
+                                                     entry
+                                     ))
+            else:
+                stats_queue.put('updated')
+                if options.vverbose:
+                    sys.stdout.write("%s: Updated\n" % domainName)
+
+                if options.enable_delta_indexes:
+                    # Delete old entry, put into a 'diff' index
+                    api_commands.append(process_command(
+                                                        'delete',
+                                                        current_index,
+                                                        current_id,
+                                                        current_type
+                                        ))
+
+                    # Put it into a previousVersion-d index so it doesn't potentially create
+                    # a bunch of indexes that will need to be cleaned up later
+                    api_commands.append(process_command(
+                                                        'create',
+                                                        WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion),
+                                                        current_id,
+                                                        current_type,
+                                                        current_entry
+                                        ))
+
+                if not options.update:
+                    entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
+                entry_id = generate_id(domainName, options.identifier)
+                entry[UNIQUE_KEY] = entry_id
+                (domain_name_only, tld) = parse_domain(domainName)
+                api_commands.append(process_command(
+                                                     'create',
+                                                     index_name,
+                                                     domain_name_only,
+                                                     tld,
+                                                     entry
+                                     ))
         else:
-            stats_queue.put('unchanged')
-            if options.vverbose:
-                sys.stdout.write("%s: Unchanged\n" % domainName)
-            api_commands.append(process_command(
-                                                 'update',
-                                                 current_index,
-                                                 current_id,
-                                                 current_type,
-                                                 {'doc': {
-                                                             VERSION_KEY: options.identifier,
-                                                            'details': details
-                                                         }
-                                                 }
-                                 ))
+            if not options.update:
+                stats_queue.put('unchanged')
+                if options.vverbose:
+                    sys.stdout.write("%s: Unchanged\n" % domainName)
+                api_commands.append(process_command(
+                                                     'update',
+                                                     current_index,
+                                                     current_id,
+                                                     current_type,
+                                                     {'doc': {
+                                                                 VERSION_KEY: options.identifier,
+                                                                'details': details
+                                                             }
+                                                     }
+                                     ))
     else:
         stats_queue.put('new')
         if options.vverbose:
@@ -585,6 +626,7 @@ def main():
         print("Please select a script mode: Insert , Redo, or Update")
         parser.parse_args(["-h"])
 
+
     threads = []
 
     work_queue = jmpQueue(maxsize=10000)
@@ -632,13 +674,20 @@ def main():
 
     es = connectElastic(options.es_uri)
     metadata = None
+    version_identifier = 0
     previousVersion = 0
 
     #Create the metadata index if it doesn't exist
     if not es.indices.exists(WHOIS_META):
+        if options.identifier <= 0:
+            print("Identifier must be greater than 0")
+            sys.exit(1)
+
         if options.redo or options.update:
             print("Script cannot conduct a redo or update when no initial data exists")
             sys.exit(1)
+
+        version_identifier = options.identifier
 
         configTemplate(es, data_template, options.index_prefix)
 
@@ -700,6 +749,7 @@ def main():
                 print("Identifier must be 'greater than' previous identifier")
                 sys.exit(1)
 
+            version_identifier = options.identifier
             previousVersion = metadata['lastVersion']
 
             # Pre-emptively create index
@@ -729,7 +779,8 @@ def main():
                 print("Unable to fetch entries from metadata index")
                 sys.exit(1)
 
-            previousVersion = result['hits']['hits'][-2]['_id']
+            previousVersion = int(result['hits']['hits'][-2]['_id'])
+            version_identifier = previousVersion
 
     options.previousVersion = previousVersion
 
@@ -746,45 +797,57 @@ def main():
     index_list = [entry['_source']['metadata'] for entry in index_list['hits']['hits'][:-1]]
     options.INDEX_LIST = []
 
-    for index_name in index_list:
+    for index_version in index_list:
         if options.enable_delta_indexes:
-            index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+            index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, index_version)
         else:
-            index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+            index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, index_version)
 
         options.INDEX_LIST.append(index)
 
     # Change Index settings to better suit bulk indexing
     if options.optimize_import:
         if options.enable_delta_indexes:
-            index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+            index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
 
             if options.previousVersion != 0:
                 optimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion))
         else:
-            index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+            index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
 
         optimizeIndex(es, index)
 
+    options.updateVersion = 0
+
+    if options.exclude != "":
+        options.exclude = options.exclude.split(',')
+    else:
+        options.exclude = None
+
+    if options.include != "":
+        options.include = options.include.split(',')
+    else:
+        options.include = None
 
     # Redo or Update Mode
     if options.redo or options.update:
         # Get the record for the attempted import
-        options.identifier = int(metadata['lastVersion'])
+        version_identifier = int(metadata['lastVersion'])
+        options.identifier = version_identifier
         try:
-            previous_record = es.get(index=WHOIS_META, id=options.identifier)['_source']
+            previous_record = es.get(index=WHOIS_META, id=version_identifier)['_source']
         except:
            print("Unable to retrieve information for last import")
            sys.exit(1)
 
         if 'excluded_keys' in previous_record:
             options.exclude = previous_record['excluded_keys']
-        else:
+        elif options.redo:
             options.exclude = None
 
         if 'included_keys' in previous_record:
             options.include = previous_record['included_keys']
-        else:
+        elif options.redo:
             options.include = None
 
         options.comment = previous_record['comment']
@@ -793,13 +856,19 @@ def main():
         STATS['updated'] = int(previous_record['updated'])
         STATS['unchanged'] = int(previous_record['unchanged'])
         STATS['duplicates'] = int(previous_record['duplicates'])
+        if 'updateVersion' in previous_record:
+            options.updateVersion = int(previous_record['updateVersion'])
+
+        if options.update:
+            options.updateVersion += 1
+
         CHANGEDCT = previous_record['changed_stats']
 
         if options.verbose:
             if options.redo:
-                print("Re-importing for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
+                print("Re-importing for: \n\tIdentifier: %s\n\tComment: %s" % (version_identifier, options.comment))
             else:
-                print("Updating for: \n\tIdentifier: %s\n\tComment: %s" % (options.identifier, options.comment))
+                print("Updating for: \n\tIdentifier: %s\n\tComment: %s" % (version_identifier, options.comment))
 
         for ch in CHANGEDCT.keys():
             CHANGEDCT[ch] = int(CHANGEDCT[ch])
@@ -827,16 +896,6 @@ def main():
 
     #Insert(normal) Mode
     else:
-        if options.exclude != "":
-            options.exclude = options.exclude.split(',')
-        else:
-            options.exclude = None
-
-        if options.include != "":
-            options.include = options.include.split(',')
-        else:
-            options.include = None
-
         #Start worker threads
         if options.verbose:
             print("Starting %i worker threads" % options.threads)
@@ -858,6 +917,7 @@ def main():
         #Create the entry for this import
         meta_struct = {  
                         'metadata': options.identifier,
+                        'updateVersion': 0,
                         'comment' : options.comment,
                         'total' : 0,
                         'new' : 0,
@@ -921,12 +981,12 @@ def main():
             # Change settings back
             if options.optimize_import:
                 if options.enable_delta_indexes:
-                    index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+                    index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
 
                     if options.previousVersion != 0:
                         unOptimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion), data_template)
                 else:
-                    index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
+                    index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
 
                 unOptimizeIndex(es, index, data_template)
 
@@ -935,9 +995,10 @@ def main():
 
             #Update the stats
             try:
-                es.update(index=WHOIS_META, id=options.identifier,
+                es.update(index=WHOIS_META, id=version_identifier,
                                                  doc_type='meta',
                                                  body = { 'doc': {
+                                                          'updateVersion': options.updateVersion,
                                                           'total' : STATS['total'],
                                                           'new' : STATS['new'],
                                                           'updated' : STATS['updated'],
