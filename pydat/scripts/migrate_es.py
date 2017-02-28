@@ -85,7 +85,7 @@ def updateIndex(source_es, source_index, bulkRequestQueue, scanOpts):
         _type = doc['_type']
 
         bulkRequest = {
-            '_op_type': 'index',
+            '_op_type': 'update',
             '_index': source_index,
             '_type': _type,
             '_id': _id,
@@ -160,6 +160,7 @@ def main():
         sys.stderr.write("Unable to connect to source ElasticSearch ... %s\n" % (str(e)))
         sys.exit(1)
 
+    global read_docs
     global WHOIS_META, WHOIS_SEARCH
     WHOIS_META      = WHOIS_META_FORMAT_STRING % (options.dest_index_prefix)
     WHOIS_SEARCH    = WHOIS_SEARCH_FORMAT_STRING % (options.dest_index_prefix)
@@ -191,7 +192,6 @@ def main():
     configTemplate(dest_es, data_template, options.dest_index_prefix)
 
     if options.upgrade:
-        global read_docs
         scanFinished = Event()
         stop = Event()
         bulkRequestQueue = Queue.Queue(maxsize=10000)
@@ -238,6 +238,7 @@ def main():
                                 source_delta_index = "%s-%d-d" % (options.index_prefix, version)
                                 actions.extend([{"add": {"index": source_delta_index, "alias": WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
                                                {"add": {"index": source_delta_index, "alias": WHOIS_SEARCH}}])
+                                updateIndex(source_es, source_delta_index, bulkRequestQueue, scan_options)
                         else:
                             # Non delta indexes have the same format string so no need to alias individual index
                             # Still need to alias search
@@ -256,6 +257,7 @@ def main():
                         }
 
                         bulkRequestQueue.put(bulkRequest)
+                        read_docs += 1
 
                 alias_actions.append({"add": {"index": "@%s_meta" % (options.index_prefix), "alias": WHOIS_META}})
                 dest_es.indices.update_aliases(body={"actions": alias_actions})
@@ -285,7 +287,6 @@ def main():
                                                             }
                                                         })
 
-        global read_docs
         scanFinished = Event()
         stop = Event()
         bulkRequestQueue = Queue.Queue(maxsize=10000)
