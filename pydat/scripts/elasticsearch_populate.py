@@ -560,24 +560,24 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    dataSource = parser.add_mutually_exclusive_group(required=True)
+    dataSource = parser.add_mutually_exclusive_group()
     dataSource.add_argument("-f", "--file", action="store", dest="file",
         default=None, help="Input CSV file")
     dataSource.add_argument("-d", "--directory", action="store", dest="directory",
         default=None, help="Directory to recursively search for CSV files -- mutually exclusive to '-f' option")
-    dataSource.add_argument("--config-template-only", action="store_true", default=False, dest="config_template_only",
-                        help="Configure the ElasticSearch template and then exit")
 
     parser.add_argument("-e", "--extension", action="store", dest="extension",
         default='csv', help="When scanning for CSV files only parse files with given extension (default: 'csv')")
 
-    mode = parser.add_mutually_exclusive_group()
+    mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("-i", "--identifier", action="store", dest="identifier", type=int,
         default=None, help="Numerical identifier to use in update to signify version (e.g., '8' or '20140120')")
     mode.add_argument("-r", "--redo", action="store_true", dest="redo",
         default=False, help="Attempt to re-import a failed import or import more data, uses stored metadata from previous import (-o, -n, and -x not required and will be ignored!!)")
     mode.add_argument("-z", "--update", action= "store_true", dest="update",
         default=False, help = "Run the script in update mode. Intended for taking daily whois data and adding new domains to the current existing index in ES.")
+    mode.add_argument("--config-template-only", action="store_true", default=False, dest="config_template_only",
+                        help="Configure the ElasticSearch template and then exit")
 
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose",
         default=False, help="Be verbose")
@@ -609,8 +609,6 @@ def main():
         default=1, help="How many threads to spawn to send bulk ES messages. The larger your cluster, the more you can increase this")
     parser.add_argument("--enable-delta-indexes", action="store_true", dest="enable_delta_indexes",
         default=False, help="If enabled, will put changed entries in a separate index. These indexes can be safely deleted if space is an issue, also provides some other improvements")
-    parser.add_argument("--es5", action="store_true", dest="es5", default=False,
-                        help="If enabled, will use template made for ElasticSearch 5 -- only needs to be set on the first run of the system")
     parser.add_argument("--ignore-field-prefixes", nargs='*',dest="ignore_field_prefixes", type=str,
         default=['zoneContact','billingContact','technicalContact'], help="list of fields (in whois data) to ignore when extracting and inserting into ElasticSearch")
 
@@ -622,8 +620,8 @@ def main():
     options.firstImport = False
 
     #as these are crafted as optional args, but are really a required mutually exclusive group, must check that one is specified
-    if not (options.identifier or options.redo or options.update):
-        print("Please select a script mode: Insert , Redo, or Update")
+    if not options.config_template_only and (options.file is None and options.directory is None):
+        print("A File or Directory source is required")
         parser.parse_args(["-h"])
 
 
