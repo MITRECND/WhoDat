@@ -202,15 +202,20 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
         if low == high or high is None: # single version
             try:
                 version_filter = [{"term": {'dataVersion': int(low)}}]
-            except: #TODO XXX
-                pass
+            except:
+                raise ValueError("Low must be interger value")
+
             if lowUpdate is not None:
-                version_filter.append({"term": {'updateVersion': int(lowUpdate)}})
+                if int(lowUpdate) == 0:
+                    updateVersionQuery = {'bool': {'should': [{"bool": {"must_not": {"exists": {"field": "updateVersion"}}}}, {"term": {"updateVersion": int(lowUpdate)}}]}}
+                else:
+                    updateVersionQuery = {"term": {"updateVersion": int(lowUpdate)}}
+                version_filter.append(updateVersionQuery)
         elif high is not None:
             try:
                 version_filter = [{"range": {"dataVersion": {"gte": int(low), "lte": int(high)}}}]
-            except: #TODO XXX
-                pass 
+            except:
+                raise ValueError("Low and High values must be integers")
 
     if version_filter is not None:
         final_filter.extend(version_filter)
@@ -286,15 +291,13 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
     if domains['hits']['total'] > 0:
         for domain in domains['hits']['hits']:
-            updateVersion = 0
-            if 'updateVersion' in domain['_source']:
-                updateVersion = domain['_source']['updateVersion']
-
+            updateVersion = domain['_source'].get('updateVersion', 0)
+            entryVersion = "%d.%d" % (domain['_source']['dataVersion'], updateVersion)
             #First element is placeholder for expansion cell
             #TODO Make this configurable?
             details = domain['_source']['details']
             dom_arr = ["&nbsp;", domain['_source']['domainName'], details['registrant_name'], details['contactEmail'], 
-                        details['standardRegCreatedDate'], details['registrant_telephone'], "%d.%d" % (domain['_source']['dataVersion'], updateVersion)]
+                        details['standardRegCreatedDate'], details['registrant_telephone'], entryVersion]
             results['aaData'].append(dom_arr)
 
     #Number of Records after any sort of filtering/searching
@@ -310,7 +313,7 @@ def __createAdvancedQuery__(query, skip, size, unique):
                         {'_score': {'order': 'desc'}}, 
                         {'domainName': {'order': 'asc'}}, 
                         {'dataVersion': {'order': 'desc'}},
-                        {'updateVersion': {'order': 'desc'}}
+                        {'updateVersion': {'order': 'desc', 'missing': 0, 'unmapped_type': 'long'}}
                     ]
         q['size'] = size
         q['from'] = skip
@@ -333,7 +336,7 @@ def __createAdvancedQuery__(query, skip, size, unique):
                                     "sort": [
                                         {'_score': {'order': 'desc'}}, 
                                         {"dataVersion": {"order": "desc"}},
-                                        {"updateVersion": {"order": "desc"}}
+                                        {"updateVersion": {"order": "desc", "missing": 0, "unmapped_type": "long"}}
                                     ]
                                 }
                             }
@@ -385,14 +388,13 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
             for domain in domains['hits']['hits']:
                 pdomain = domain['_source']
                 details = pdomain['details']
-                updateVersion = 0
-                if 'updateVersion' in pdomain:
-                    updateVersion = pdomain['updateVersion']
+                updateVersion = pdomain.get('updateVersion', 0)
+                entryVersion = "%d.%d" % (pdomain['dataVersion'], updateVersion)
                 # Take each key in details (if any) and stuff it in top level dict.
                 dom_arr = ["&nbsp;", pdomain['domainName'], 
                             details['registrant_name'], details['contactEmail'], 
                             details['standardRegCreatedDate'], details['registrant_telephone'], 
-                            "%d.%d" % (pdomain['dataVersion'], updateVersion), "%.2f" % round(domain['_score'], 2)]
+                            entryVersion, "%.2f" % round(domain['_score'], 2)]
                 results['aaData'].append(dom_arr)
 
         results['success'] = True
@@ -405,13 +407,12 @@ def advDataTableSearch(query, skip, pagesize, unique = False):
             domain = bucket['top_domains']['hits']['hits'][0]
             pdomain = domain['_source']
             details = pdomain['details']
-            updateVersion = 0
-            if 'updateVersion' in pdomain:
-                updateVersion = pdomain['updateVersion']
+            updateVersion = pdomain.get('updateVersion', 0)
+            entryVersion = "%d.%d" % (pdomain['dataVersion'], updateVersion)
             dom_arr = ["&nbsp;", pdomain['domainName'],
                         details['registrant_name'], details['contactEmail'],
                         details['standardRegCreatedDate'], details['registrant_telephone'],
-                        "%d.%d" % (pdomain['dataVersion'], updateVersion) , "%.2f" % round(domain['sort'][0], 2)] # For some reason the _score goes away in the aggregations if you sort by it
+                        entryVersion, "%.2f" % round(domain['sort'][0], 2)] # For some reason the _score goes away in the aggregations if you sort by it
             results['aaData'].append(dom_arr)
 
         results['success'] = True
@@ -444,7 +445,6 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     query_filter = {"term": {key: value}}
     final_filter = [query_filter]
     version_filter = None
-
     lowUpdate = None
 
     try:
@@ -457,14 +457,18 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
             try:
                 version_filter = [{"term": {'dataVersion': int(low)}}]
                 if lowUpdate is not None:
-                    version_filter.append({"term": {'updateVersion': int(lowUpdate)}})
+                    if int(lowUpdate) == 0:
+                        updateVersionQuery = {'bool': {'should': [{"bool": {"must_not": {"exists": {"field": "updateVersion"}}}}, {"term": {"updateVersion": int(lowUpdate)}}]}}
+                    else:
+                        updateVersionQuery = {"term": {"updateVersion": int(lowUpdate)}}
+                    version_filter.append(updateVersionQuery)
             except: #TODO XXX
-                pass
+                raise
         elif high is not None:
             try:
                 version_filter = [{"range": {"dataVersion": {"gte": int(low), "lte": int(high)}}}]
-            except: #TODO XXX
-                pass 
+            except:
+                raise ValueError("Low and High values must be integers")
 
     if version_filter is not None:
         final_filter.extend(version_filter)
@@ -479,7 +483,7 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
     }
 
     if versionSort:
-        query["sort"] = [{"dataVersion": {"order": "asc"}}, {"updateVersion": {"order": "asc"}}]
+        query["sort"] = [{"dataVersion": {"order": "asc"}}, {"updateVersion": {"order": "asc", "missing": 0, "unmapped_type": "long"}}]
     if es_source:
         query["_source"] = es_source
 
@@ -504,9 +508,13 @@ def search(key, value, filt=None, limit=settings.LIMIT, low = None, high = None,
         if 'dataVersion' in pdomain:
             pdomain['Version'] = pdomain['dataVersion']
             del pdomain['dataVersion']
+
         if 'updateVersion' in pdomain:
             pdomain['UpdateVersion'] = pdomain['updateVersion']
             del pdomain['updateVersion']
+        else:
+            pdomain['UpdateVersion'] = 0
+
         results['data'].append(pdomain)
 
     results['avail'] = len(results['data'])
