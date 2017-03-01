@@ -12,7 +12,6 @@ import elasticsearch
 from elasticsearch import helpers
 from elasticsearch_populate import connectElastic, configTemplate,\
                                    optimizeIndex, unOptimizeIndex,\
-                                   UPDATE_KEY,\
                                    WHOIS_META_FORMAT_STRING,\
                                    WHOIS_SEARCH_FORMAT_STRING,\
                                    WHOIS_WRITE_FORMAT_STRING,\
@@ -63,8 +62,6 @@ def scanIndex(source_es, source_index, dest_index, bulkRequestQueue, scanOpts):
         _type = doc['_type']
         _source = doc['_source']
 
-        _source[UPDATE_KEY] = 0
-
         bulkRequest = {
             '_op_type': 'index',
             '_index': dest_index,
@@ -75,26 +72,6 @@ def scanIndex(source_es, source_index, dest_index, bulkRequestQueue, scanOpts):
 
         read_docs += 1
         bulkRequestQueue.put(bulkRequest)
-
-
-def updateIndex(source_es, source_index, bulkRequestQueue, scanOpts):
-    global read_docs
-
-    for doc in helpers.scan(source_es, index=source_index, size=scanOpts['size']):
-        _id = doc['_id']
-        _type = doc['_type']
-
-        bulkRequest = {
-            '_op_type': 'update',
-            '_index': source_index,
-            '_type': _type,
-            '_id': _id,
-            'doc': {UPDATE_KEY: 0}
-        }
-
-        read_docs += 1
-        bulkRequestQueue.put(bulkRequest)
-
 
 def checkVersion(es):
     try:
@@ -113,15 +90,12 @@ def checkVersion(es):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Script to migrate previous format 'delta' indexes to new format")
+    parser = argparse.ArgumentParser(description="Script to migrate previous 2.x indices to ES 5.2+ format")
 
     parser.add_argument("-u", "--es-uri", nargs="*", dest="source_uri",
         default=['localhost:9200'], help="Location(s) of ElasticSearch server (e.g., foo.server.com:9200) can take multiple endpoints")
     parser.add_argument("-p", "--index-prefix", action="store", dest="index_prefix",
         default='whois', help="Index prefix to use in ElasticSearch (default: whois)")
-
-    parser.add_argument("-g", "--upgrade", action="store_true", default=False, dest="upgrade",
-                        help="If upgrading an existing cluster, this will update aliases/names used to match new format and migrate metadata")
 
     parser.add_argument("-d", "--dest-es-uri", nargs="*", dest="dest_uri",
         default=['localhost:9200'], help="Location(s) of destination ElasticSearch server (e.g., foo.server.com:9200) can take multiple endpoints")
@@ -165,9 +139,6 @@ def main():
     WHOIS_META      = WHOIS_META_FORMAT_STRING % (options.dest_index_prefix)
     WHOIS_SEARCH    = WHOIS_SEARCH_FORMAT_STRING % (options.dest_index_prefix)
 
-    if options.upgrade: # Update existing cluster to new convention
-        options.dest_uri = options.source_uri
-
     try:
         dest_es = connectElastic(options.dest_uri)
     except elasticsearch.exceptions.TransportError as e:
@@ -191,205 +162,121 @@ def main():
     # Initialize template in destination cluster
     configTemplate(dest_es, data_template, options.dest_index_prefix)
 
-    if options.upgrade:
-        scanFinished = Event()
-        stop = Event()
-        bulkRequestQueue = Queue.Queue(maxsize=10000)
-
-        try:
-            meta_count = source_es.count(index="@%s_meta" % (options.index_prefix))['count']
-            meta_count -= 1 # Remove the 0 entryt
-        except:
-            sys.stderr.write("Unable to get number of entries\n")
-            sys.exit(1)
-
-        try:
-            doc_count = source_es.count(index="%s-*" % (options.index_prefix))['count']
-        except:
-            sys.stderr.write("Unable to get number of metadata entries\n")
-            sys.exit(1)
-
-        total_docs = meta_count + doc_count
-
-        progress_thread = threading.Thread(target=progressThread, args=(stop, total_docs))
-        progress_thread.start()
-
-        bulk_thread = threading.Thread(target=bulkThread, args=(scanFinished, dest_es, bulkRequestQueue, bulk_options))
-        bulk_thread.daemon=True
-        bulk_thread.start()
-
-        alias_actions = []
-        res = source_es.search(index="@%s_meta" % (options.index_prefix), body={"query": {"match_all": {}}, "sort": "metadata", "size": "10000"})
-        try:
-            if res['hits']['total'] > 0:
-                lastVersion = res['hits']['hits'][0]['_source']['lastVersion']
-                for i, doc in enumerate(res['hits']['hits']):
-                    _index = doc['_index']
-                    _id = doc['_id']
-                    _type = doc['_type']
-                    _source = doc['_source']
-                    version = _source['metadata']
-
-                    if version != 0:
-                        if options.deltaIndexes:
-                            source_index = "%s-%d-o" % (options.index_prefix, version)
-                            actions = [{"add": {"index": source_index, "alias": WHOIS_ORIG_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
-                                       {"add": {"index": source_index, "alias":  WHOIS_SEARCH}}]
-                            if version != lastVersion:
-                                source_delta_index = "%s-%d-d" % (options.index_prefix, version)
-                                actions.extend([{"add": {"index": source_delta_index, "alias": WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)}},
-                                               {"add": {"index": source_delta_index, "alias": WHOIS_SEARCH}}])
-                                updateIndex(source_es, source_delta_index, bulkRequestQueue, scan_options)
-                        else:
-                            # Non delta indexes have the same format string so no need to alias individual index
-                            # Still need to alias search
-                            source_index = "%s-%d" % (options.index_prefix, version)
-                            actions = [{"add": {"index": source_index, "alias":  WHOIS_SEARCH}}]
-
-                        alias_actions.extend(actions)
-                        updateIndex(source_es, source_index, bulkRequestQueue, scan_options)
-
-                        bulkRequest = {
-                            '_op_type': 'update',
-                            '_index': _index,
-                            '_type': _type,
-                            '_id': _id,
-                            'doc': {UPDATE_KEY: 0}
-                        }
-
-                        bulkRequestQueue.put(bulkRequest)
-                        read_docs += 1
-
-                alias_actions.append({"add": {"index": "@%s_meta" % (options.index_prefix), "alias": WHOIS_META}})
-                dest_es.indices.update_aliases(body={"actions": alias_actions})
-        except KeyboardInterrupt as e:
-            scanFinished.set()
-            stop.set()
-
-        scanFinished.set()
-        bulk_thread.join()
-        stop.set()
-        progress_thread.join()
-
-
-    else:
-        # Create Metadata Index
-        dest_es.indices.create(index=WHOIS_META, body = {"settings" : {
-                                                                "index" : {
-                                                                    "number_of_shards" : 1,
-                                                                    "analysis" : {
-                                                                        "analyzer" : {
-                                                                            "default" : {
-                                                                                "type" : "keyword"
-                                                                            }
+    # Create Metadata Index
+    dest_es.indices.create(index=WHOIS_META, body = {"settings" : {
+                                                            "index" : {
+                                                                "number_of_shards" : 1,
+                                                                "analysis" : {
+                                                                    "analyzer" : {
+                                                                        "default" : {
+                                                                            "type" : "keyword"
                                                                         }
                                                                     }
                                                                 }
                                                             }
-                                                        })
+                                                        }
+                                                    })
 
-        scanFinished = Event()
-        stop = Event()
-        bulkRequestQueue = Queue.Queue(maxsize=10000)
+    scanFinished = Event()
+    stop = Event()
+    bulkRequestQueue = Queue.Queue(maxsize=10000)
 
-        try:
-            meta_count = source_es.count(index="@%s_meta" % (options.index_prefix))['count']
-        except:
-            sys.stderr.write("Unable to get number of entries\n")
+    try:
+        meta_count = source_es.count(index="@%s_meta" % (options.index_prefix))['count']
+    except:
+        sys.stderr.write("Unable to get number of entries\n")
+        sys.exit(1)
+
+    try:
+        doc_count = source_es.count(index="%s-*" % (options.index_prefix))['count']
+    except:
+        sys.stderr.write("Unable to get number of metadata entries\n")
+        sys.exit(1)
+
+    total_docs = meta_count + doc_count
+
+    progress_thread = threading.Thread(target=progressThread, args=(stop, total_docs))
+    progress_thread.start()
+
+    bulk_thread = threading.Thread(target=bulkThread, args=(scanFinished, dest_es, bulkRequestQueue, bulk_options))
+    bulk_thread.daemon=True
+    bulk_thread.start()
+
+    lastVersion = 0
+    res = source_es.search(index="@%s_meta" % (options.index_prefix), body={"query": {"match_all": {}}, "sort": "metadata", "size": "10000"})
+    try:
+        if res['hits']['total'] > 0:
+            lastVersion = res['hits']['hits'][0]['_source']['lastVersion']
+            for i, doc in enumerate(res['hits']['hits']):
+                read_docs += 1
+                _id = doc['_id']
+                _type = doc['_type']
+                _source = doc['_source']
+                version = _source['metadata']
+
+                if version != 0:
+                    if options.deltaIndexes:
+                        source_index = "%s-%d-o" % (options.index_prefix, version)
+                        dest_index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
+
+                        if version != lastVersion:
+                            source_delta_index = "%s-%d-d" % (options.index_prefix, version)
+                            dest_delta_index = WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
+                            dest_es.indices.create(index=WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version))
+                            optimizeIndex(dest_es, dest_delta_index, 0)
+                            scanIndex(source_es, source_delta_index, dest_delta_index, bulkRequestQueue, scan_options)
+
+                    else:
+                        source_index = "%s-%d" % (options.index_prefix, version)
+                        dest_index = WHOIS_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
+
+                    body = {}
+                    if i == 1: # double shards for first set
+                        body['settings'] = {"index": {
+                                                "number_of_shards": int(data_template["settings"]["number_of_shards"]) * 2
+                                            }}
+                    dest_es.indices.create(index=dest_index, body=body)
+                    optimizeIndex(dest_es, dest_index, 0)
+                    scanIndex(source_es, source_index, dest_index, bulkRequestQueue, scan_options)
+
+
+                bulkRequest = {
+                    '_op_type': 'index',
+                    '_index': WHOIS_META,
+                    '_type': _type,
+                    '_source': _source,
+                    '_id': _id
+                }
+
+                bulkRequestQueue.put(bulkRequest)
+        else:
+            sys.stderr.write("Unable to find any metadata entries\n")
             sys.exit(1)
-
-        try:
-            doc_count = source_es.count(index="%s-*" % (options.index_prefix))['count']
-        except:
-            sys.stderr.write("Unable to get number of metadata entries\n")
-            sys.exit(1)
-
-        total_docs = meta_count + doc_count
-
-        progress_thread = threading.Thread(target=progressThread, args=(stop, total_docs))
-        progress_thread.start()
-
-        bulk_thread = threading.Thread(target=bulkThread, args=(scanFinished, dest_es, bulkRequestQueue, bulk_options))
-        bulk_thread.daemon=True
-        bulk_thread.start()
-
-        lastVersion = 0
-        res = source_es.search(index="@%s_meta" % (options.index_prefix), body={"query": {"match_all": {}}, "sort": "metadata", "size": "10000"})
-        try:
-            if res['hits']['total'] > 0:
-                lastVersion = res['hits']['hits'][0]['_source']['lastVersion']
-                for i, doc in enumerate(res['hits']['hits']):
-                    read_docs += 1
-                    _id = doc['_id']
-                    _type = doc['_type']
-                    _source = doc['_source']
-                    version = _source['metadata']
-
-                    if version != 0:
-                        _source[UPDATE_KEY] = 0
-
-                        if options.deltaIndexes:
-                            source_index = "%s-%d-o" % (options.index_prefix, version)
-                            dest_index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
-
-                            if version != lastVersion:
-                                source_delta_index = "%s-%d-d" % (options.index_prefix, version)
-                                dest_delta_index = WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
-                                dest_es.indices.create(index=WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version))
-                                optimizeIndex(dest_es, dest_delta_index, 0)
-                                scanIndex(source_es, source_delta_index, dest_delta_index, bulkRequestQueue, scan_options)
-
-                        else:
-                            source_index = "%s-%d" % (options.index_prefix, version)
-                            dest_index = WHOIS_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
-
-                        body = {}
-                        if i == 1: # double shards for first set
-                            body['settings'] = {"index": {
-                                                    "number_of_shards": int(data_template["settings"]["number_of_shards"]) * 2
-                                                }}
-                        dest_es.indices.create(index=dest_index, body=body)
-                        optimizeIndex(dest_es, dest_index, 0)
-                        scanIndex(source_es, source_index, dest_index, bulkRequestQueue, scan_options)
-
-
-                    bulkRequest = {
-                        '_op_type': 'index',
-                        '_index': WHOIS_META,
-                        '_type': _type,
-                        '_source': _source,
-                        '_id': _id
-                    }
-
-                    bulkRequestQueue.put(bulkRequest)
-            else:
-                sys.stderr.write("Unable to find any metadata entries\n")
-                sys.exit(1)
-        except KeyboardInterrupt as e:
-            scanFinished.set()
-            stop.set()
-
+    except KeyboardInterrupt as e:
         scanFinished.set()
-        bulk_thread.join()
         stop.set()
-        progress_thread.join()
+
+    scanFinished.set()
+    bulk_thread.join()
+    stop.set()
+    progress_thread.join()
 
 
-        for i, doc in enumerate(res['hits']['hits']):
-            version = doc['_source']['metadata']
-            if version != 0:
-                if options.deltaIndexes:
-                    source_index = "%s-%d-o" % (options.index_prefix, version)
-                    dest_index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
+    for i, doc in enumerate(res['hits']['hits']):
+        version = doc['_source']['metadata']
+        if version != 0:
+            if options.deltaIndexes:
+                source_index = "%s-%d-o" % (options.index_prefix, version)
+                dest_index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
 
-                    if version != lastVersion:
-                        dest_delta_index = WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
-                        unOptimizeIndex(dest_es, dest_delta_index, data_template)
-                else:
-                    source_index = "%s-%d" % (options.index_prefix, version)
-                    dest_index = WHOIS_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
+                if version != lastVersion:
+                    dest_delta_index = WHOIS_DELTA_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
+                    unOptimizeIndex(dest_es, dest_delta_index, data_template)
+            else:
+                source_index = "%s-%d" % (options.index_prefix, version)
+                dest_index = WHOIS_WRITE_FORMAT_STRING % (options.dest_index_prefix, version)
 
-                unOptimizeIndex(dest_es, dest_index, data_template)
+            unOptimizeIndex(dest_es, dest_index, data_template)
 
     
 if __name__ == "__main__":
