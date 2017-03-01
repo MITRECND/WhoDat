@@ -260,10 +260,12 @@ def parse_entry(input_entry, header, options):
     entry = {
                 VERSION_KEY: options.identifier,
                 FIRST_SEEN: options.identifier,
-                UPDATE_KEY: options.updateVersion,
                 'details': details,
                 'domainName': domainName,
             }
+
+    if options.update:
+        entry[UPDATE_KEY] = options.updateVersion
 
     return entry
 
@@ -856,11 +858,11 @@ def main():
         STATS['updated'] = int(previous_record['updated'])
         STATS['unchanged'] = int(previous_record['unchanged'])
         STATS['duplicates'] = int(previous_record['duplicates'])
-        if 'updateVersion' in previous_record:
-            options.updateVersion = int(previous_record['updateVersion'])
-
         if options.update:
-            options.updateVersion += 1
+            if 'updateVersion' in previous_record:
+                options.updateVersion = int(previous_record['updateVersion']) + 1
+            else:
+                options.updateVersion = 1
 
         CHANGEDCT = previous_record['changed_stats']
 
