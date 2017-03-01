@@ -60,7 +60,11 @@ def dataTable(request, key, value, low = None, high = None):
     if (len(sSearch) == 0):
         sSearch = None
 
-    results = handler.dataTableSearch(key, value, page, pagesize, sort, sSearch, low, high)
+    try:
+        results = handler.dataTableSearch(key, value, page, pagesize, sort, sSearch, low, high)
+    except Exception as e:
+        return __renderErrorJSON__(str(e))
+
     #Echo back the echo
     results['sEcho'] = sEcho
     
@@ -92,7 +96,11 @@ def advDataTable(request):
     else:
         unique = False
 
-    results = handler.advDataTableSearch(query, page, pagesize, unique)
+    try:
+        results = handler.advDataTableSearch(query, page, pagesize, unique)
+    except Exception as e:
+        return __renderErrorJSON__(str(e))
+
     #Echo back the echo
     results['sEcho'] = sEcho
     
@@ -116,7 +124,11 @@ def advanced_search(request):
         return __renderErrorJSON__("Query required")
         
     skip = (page - 1) * size
-    results = handler.advanced_search(search_string, skip, size, unique)
+    try:
+        results = handler.advanced_search(search_string, skip, size, unique)
+    except Exception as e:
+        return __renderErrorJSON__(str(e))
+
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
 
@@ -147,7 +159,11 @@ def domains(request, key, value, low = None, high = None):
     if key == 'domainName':
         versionSort = True
 
-    results = handler.search(key, value, filt = None, low = low, high = high, versionSort = versionSort)
+    try:
+        results = handler.search(key, value, filt = None, low = low, high = high, versionSort = versionSort)
+    except Exception as e:
+        return __renderErrorJSON__(str(e))
+
     if results['success'] == False:
         return __renderErrorJSON__(results['message'])
 
@@ -162,16 +178,13 @@ def domain(request, domainName = None, low = None, high = None):
             return __renderErrorJSON__('Requires Domain Name Argument')
         domainName = urllib.unquote(domainName)
 
-        results = handler.search('domainName', domainName, filt=None, low = low, high = high, versionSort = True)
+        try:
+            results = handler.search('domainName', domainName, filt=None, low = low, high = high, versionSort = True)
+        except Exception as e:
+            return __renderErrorJSON__(str(e))
 
         return HttpResponse(json.dumps(results), content_type='application/json')
-        if results['success']: #Clean up the data
-            results['data'] = results['data'][0]
-            del results['total']
-            del results['avail']
-            return HttpResponse(json.dumps(results), content_type='application/json')
-        else:
-            return __renderErrorJSON__(results['message'])
+
     else:
         return __renderErrorJSON__('Bad Method.')
 
@@ -181,8 +194,15 @@ def domain_diff(request, domainName = None, v1 = None, v2 = None):
             return __renderErrorJSON__('Required Parameters Missing')
         domainName = urllib.unquote(domainName)
 
-        v1_res = handler.search('domainName', domainName, filt=None, low = v1)
-        v2_res = handler.search('domainName', domainName, filt=None, low = v2)
+        try:
+            v1_res = handler.search('domainName', domainName, filt=None, low = v1)
+        except Exception as e:
+            return __renderErrorJSON__(str(e))
+
+        try:
+            v2_res = handler.search('domainName', domainName, filt=None, low = v2)
+        except Exception as e:
+            return __renderErrorJSON__(str(e))
 
         try:
             v1_res = v1_res['data'][0]
