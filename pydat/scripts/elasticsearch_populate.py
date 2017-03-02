@@ -741,7 +741,7 @@ def main():
             print("Error fetching metadata from index")
             sys.exit(1)
 
-        options.enable_delta_indexes = metadata['deltaIndexes']
+        options.enable_delta_indexes = metadata.get('deltaIndexes', False)
 
         if options.identifier is not None:
             if options.identifier < 1:
@@ -760,7 +760,10 @@ def main():
 
                 # Pre-emptively create delta index
                 if previousVersion > 0:
-                    es.indices.create(index=WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, previousVersion))
+                    try:
+                        es.indices.create(index=WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, previousVersion))
+                    except elasticsearch.exceptions.RequestError as e:
+                        pass # Assume it exists XXX TODO
             else:
                 index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
 
@@ -769,32 +772,26 @@ def main():
 
         else: # redo or update
             result = es.search(index=WHOIS_META,
-                               body = { "query": {
-                                            "match_all": {}
-                                        },
-                                        "sort":[
-                                            {"metadata": {"order": "asc"}}
-                                        ]
-                                      })
+                               body = { "query": {"match_all": {}},
+                                        "sort":[{"metadata": {"order": "asc"}}]})
 
             if result['hits']['total'] == 0:
                 print("Unable to fetch entries from metadata index")
                 sys.exit(1)
 
+            lastEntry = result['hits']['hits'][-1]['_source']
             previousVersion = int(result['hits']['hits'][-2]['_id'])
-            version_identifier = previousVersion
+            version_identifier = int(metadata['lastVersion'])
+            if options.redo and (lastEntry.get('updateVersion', 0) > 0):
+                print("A Redo is only valid on recovering from a failed import via the -i flag.\nAfter ingesting a daily update, it is no longer available")
+                sys.exit(1)
 
     options.previousVersion = previousVersion
 
     index_list = es.search(index=WHOIS_META,
-                           body = { "query": {
-                                        "match_all": {}
-                                    },
-                                    "_source": "metadata",
-                                    "sort":[
-                                        {"metadata": {"order": "desc"}}
-                                    ]
-                                  })
+                           body = {"query": { "match_all": {}},
+                                   "_source": "metadata",
+                                   "sort":[{"metadata": {"order": "desc"}}]})
 
     index_list = [entry['_source']['metadata'] for entry in index_list['hits']['hits'][:-1]]
     options.INDEX_LIST = []
