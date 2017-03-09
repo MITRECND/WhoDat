@@ -99,22 +99,34 @@ def parse_csv(work_queue, filename, options):
     if shutdown_event.is_set():
         return
 
+    try:
+        csvfile = open(filename, 'rb')
+        s = os.stat(filename)
+        if s.st_size == 0:
+            sys.stderr.write("File %s empty\n" % (filename))
+            return
+    except Exception as e:
+        sys.stderr.write("Unable to stat file %s, skiping\n" % (filename))
+        return
+
     if options.verbose:
         print("Processing file: %s" % filename)
 
-    csvfile = open(filename, 'rb')
-    dnsreader = unicodecsv.reader(csvfile, strict = True, skipinitialspace = True)
     try:
-        header = next(dnsreader)
-        if not check_header(header):
-            raise unicodecsv.Error('CSV header not found')
+        dnsreader = unicodecsv.reader(csvfile, strict = True, skipinitialspace = True)
+        try:
+            header = next(dnsreader)
+            if not check_header(header):
+                raise unicodecsv.Error('CSV header not found')
 
-        for row in dnsreader:
-            if shutdown_event.is_set():
-                break
-            work_queue.put({'header': header, 'row': row})
-    except unicodecsv.Error as e:
-        sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
+            for row in dnsreader:
+                if shutdown_event.is_set():
+                    break
+                work_queue.put({'header': header, 'row': row})
+        except unicodecsv.Error as e:
+            sys.stderr.write("CSV Parse Error in file %s - line %i\n\t%s\n" % (os.path.basename(filename), dnsreader.line_num, str(e)))
+    except Exception as e:
+        sys.stderr.write("Unable to process file %s - %s\n" % (filename, str(e)))
 
 
 ####### STATS THREAD ###########
