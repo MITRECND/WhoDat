@@ -366,10 +366,10 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             else:
                 index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.indentifier)
 
+            stats_queue.put('updated')
             if options.update and ((current_index == index_name) or (options.previousVersion == 0)): #Can't have two documents with the the same id in the same index
-                stats_queue.put('new')
                 if options.vverbose:
-                    sys.stdout.write("%s: New/Re-Registered\n" % domainName)
+                    sys.stdout.write("%s: Re-Registered/Transferred\n" % domainName)
 
                 # Effectively move old entry into different document
                 if options.enable_delta_indexes:
@@ -400,9 +400,11 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                      entry
                                      ))
             else:
-                stats_queue.put('updated')
                 if options.vverbose:
-                    sys.stdout.write("%s: Updated\n" % domainName)
+                    if options.update:
+                        sys.stdout.write("%s: Re-Registered/Transferred\n" % domainName)
+                    else:
+                        sys.stdout.write("%s: Updated\n" % domainName)
 
                 if options.enable_delta_indexes:
                     # Delete old entry, put into a 'diff' index
@@ -413,8 +415,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                         current_type
                                         ))
 
-                    # Put it into a previousVersion-d index so it doesn't potentially create
-                    # a bunch of indexes that will need to be cleaned up later
+                    # Put it into a previousVersion index
                     api_commands.append(process_command(
                                                         'create',
                                                         WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion),
@@ -436,21 +437,20 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
                                                      entry
                                      ))
         else:
-            if not options.update:
-                stats_queue.put('unchanged')
-                if options.vverbose:
-                    sys.stdout.write("%s: Unchanged\n" % domainName)
-                api_commands.append(process_command(
-                                                     'update',
-                                                     current_index,
-                                                     current_id,
-                                                     current_type,
-                                                     {'doc': {
-                                                                 VERSION_KEY: options.identifier,
-                                                                'details': details
-                                                             }
-                                                     }
-                                     ))
+            stats_queue.put('unchanged')
+            if options.vverbose:
+                sys.stdout.write("%s: Unchanged\n" % domainName)
+            api_commands.append(process_command(
+                                                 'update',
+                                                 current_index,
+                                                 current_id,
+                                                 current_type,
+                                                 {'doc': {
+                                                             VERSION_KEY: options.identifier,
+                                                            'details': details
+                                                         }
+                                                 }
+                                 ))
     else:
         stats_queue.put('new')
         if options.vverbose:
