@@ -953,6 +953,9 @@ def main():
     stats_worker_thread.daemon = True
     stats_worker_thread.start()
 
+    #perf testing
+    st = time.time()
+
     #Start up Reader Thread
     reader_thread = Thread(target=reader_worker, args=(work_queue, options), name='Reader')
     reader_thread.daemon = True
@@ -1000,6 +1003,8 @@ def main():
                     index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
 
                 unOptimizeIndex(es, index, data_template)
+
+            print("Script run time: {0} secs").format(time.time() - st)
 
             stats_queue.put('finished')
             stats_worker_thread.join()
