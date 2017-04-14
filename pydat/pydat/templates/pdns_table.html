@@ -1,15 +1,22 @@
 <div id = 'pdns'>
     <ul>
-        {% for set in results.sets %}
+        {% comment %} 
+        the below template tag filter just orders the for loop
+        based on results.sets.type (which is pDNS source name)
+        {% endcomment %}
+        
+        {% for set in results.sets|dictsort:"type" %}
             <li><a href="#tab-{{ set.type }}">{{ set.type }}</a></li>
         {% endfor %}
     </ul>
-
+    
+    {% comment %}
+    The loop below was altered to use variable supplied templates (from pdns modules) that are
+    supplied with the result sets. Basically when a pdns module is called to process a pdns request,
+    it will return the results with a supplied template for displaying the results in the pydat interface. The below loop will include that supplied template.
+    {% endcomment %}
+    
     {% for set in results.sets %}
-        {% if set.type == "DNSDB" %}
-            {% include "dnsdb.html" with set=set %}
-        {% elif set.type == "PassiveTotal" %}
-            {% include "passivetotal.html" with set=set %}
-        {% endif %}
+        {% include set.table_template with results=set %}
     {% endfor %}
 </div>

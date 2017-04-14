@@ -12,10 +12,13 @@
 
 {% block js %}
     <script type="text/javascript" src="{% static '/js/pdns.js' %}"></script>
+    <script>
+    $( function() {$( "#accordion" ).accordion({heightStyle: "content"});});
+    </script>
 {% endblock %}
 
 {% block searchBar %}
-    {% include 'rpdns_form.html' %}
+    {% include 'rpdns_form_dynamic.html' %}
 {% endblock %}
 
 {% block page %}
