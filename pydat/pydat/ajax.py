@@ -215,7 +215,6 @@ def domain_diff(request, domainName = None, v1 = None, v2 = None):
         keylist.remove('Version')
         keylist.remove('UpdateVersion')
         keylist.remove('domainName')
-        keylist.remove('dataUniqueID')
         keylist.remove('dataFirstSeen')
 
         output = {}
