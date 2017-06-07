@@ -683,7 +683,7 @@ def main():
     parser.add_argument("-B", "--bulk-size", action="store", dest="bulk_size", type=int,
         default=1000, help="Size of Bulk Elasticsearch Requests")
     parser.add_argument("--optimize-import", action="store_true", dest="optimize_import",
-        default=False, help="If enabled, will change ES index settings to speed up bulk imports, but if the cluster has a failure, data might be lost permanently!")
+        default=False, help="If enabled, will change ES index settings to speed up bulk imports, but if the cluster has a failure, data might be lost permanently! This also makes rolling indexes over less consistent!")
     parser.add_argument("--rollover-size", action="store", type=int, dest="rollover_docs",
         default=10000000, help="Set the number of documents after which point a new index should be created, defaults to 10 milllion, note that this is fuzzy since the index count isn't continuously updated, so should be reasonably below 2 billion per ES shard and should take your ES configuration into consideration")
 
@@ -860,19 +860,10 @@ def main():
     options.previousVersion = previousVersion
 
     # Change Index settings to better suit bulk indexing
-    #TODO FIXME
-    """
     if options.optimize_import:
-        if options.enable_delta_indexes:
-            index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
+        optimizeIndex(es, WHOIS_ORIG_WRITE)
+        optimizeIndex(es, WHOIS_DELTA_WRITE)
 
-            if options.previousVersion != 0:
-                optimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion))
-        else:
-            index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
-
-        optimizeIndex(es, index)
-    """
     options.updateVersion = 0
 
     if options.exclude != "":
@@ -1039,19 +1030,9 @@ def main():
                 t.join()
 
             # Change settings back
-            # TODO FIXME
-            """
             if options.optimize_import:
-                if options.enable_delta_indexes:
-                    index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
-
-                    if options.previousVersion != 0:
-                        unOptimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion), data_template)
-                else:
-                    index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, version_identifier)
-
-                unOptimizeIndex(es, index, data_template)
-            """
+                unOptimizeIndex(es, WHOIS_ORIG_SEARCH, data_template)
+                unOptimizeIndex(es, WHOIS_DELTA_SEARCH, data_template)
 
             stats_queue.put('finished')
             stats_worker_thread.join()
@@ -1108,7 +1089,6 @@ def main():
         # The worker threads will exit on their own after getting the shutdown_event
 
         # Joining on the insert queue is important to ensure ES isn't left in an inconsistent state if delta indexes are being used
-        # since it 'moves' documents from one index to another which involves an insert and a delete
         insert_queue.join()
 
         # All of the workers should have seen the shutdown event and exited after finishing whatever they were last working on
@@ -1143,19 +1123,9 @@ def main():
 
         sys.stdout.write("\tFinalizing settings\n")
         # Make sure to de-optimize the indexes for import
-        # TODO FIXME
-        """
         if options.optimize_import:
-            if options.enable_delta_indexes:
-                index = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
-
-                if options.previousVersion != 0:
-                    unOptimizeIndex(es, WHOIS_DELTA_WRITE_FORMAT_STRING % (options.index_prefix, options.previousVersion), data_template)
-            else:
-                index = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
-
-            unOptimizeIndex(es, index, data_template)
-        """
+            unOptimizeIndex(es, WHOIS_ORIG_SEARCH, data_template)
+            unOptimizeIndex(es, WHOIS_DELTA_SEARCH, data_template)
 
         try:
             work_queue.close()
