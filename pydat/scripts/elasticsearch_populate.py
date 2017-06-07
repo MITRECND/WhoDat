@@ -39,6 +39,7 @@ CHANGEDCT = {}
 shutdown_event = multiprocessing.Event()
 finished_event = multiprocessing.Event()
 bulkError_event = multiprocessing.Event()
+rollover_event = multiprocessing.Event()
 
 WHOIS_ORIG_WRITE_FORMAT_STRING = "%s-write"
 WHOIS_DELTA_WRITE_FORMAT_STRING = "%s-delta-write"
@@ -124,6 +125,10 @@ def parse_csv(work_queue, filename, options):
                 raise unicodecsv.Error('CSV header not found')
 
             for row in dnsreader:
+                while rollover_event.is_set():
+                    if shutdown_event.is_set():
+                        break
+                    time.sleep(.5)
                 if shutdown_event.is_set():
                     break
                 work_queue.put({'header': header, 'row': row})
@@ -510,6 +515,121 @@ def configTemplate(es, data_template, index_prefix):
 
 
 
+def rolloverRequired(es, options):
+    try:
+        doc_count = int(es.cat.count(index=WHOIS_ORIG_WRITE, h="count"))
+    except elasticsearch.exceptions.NotFoundError as e:
+        sys.stderr.write("Unable to find required index\n")
+    except Exception as e:
+        sys.stderr.write("Unexpected exception\n")
+
+    if doc_count > options.rollover_docs:
+        return 1
+
+    try:
+        doc_count = int(es.cat.count(index=WHOIS_DELTA_WRITE, h="count"))
+    except elasticsearch.exceptions.NotFoundError as e:
+        sys.stderr.write("Unable to find required index\n")
+    except Exception as e:
+        sys.stderr.write("Unexpected exception\n")
+
+    if doc_count > options.rollover_docs:
+        return 2
+
+    return 0
+
+
+def rolloverIndex(roll, es, options, target,
+                  work_queue, insert_queue, stats_queue,
+                  threads, es_bulk_shipper):
+    global rollover_event
+
+    if options.verbose:
+        print("Rolling over ElasticSearch Index")
+
+    # Set the event to stop the reader thread
+    rollover_event.set()
+
+    while not work_queue.empty():
+        # If bulkError occurs stop processing
+        if bulkError_event.is_set():
+            sys.stdout.write("Bulk API error -- forcing program shutdown \n")
+            raise KeyboardInterrupt("Error response from ES worker, stopping processing")
+
+    work_queue.join()
+    insert_queue.join()
+
+    try:
+        # Set the finished event, this will cause
+        # the workers and shipper to exit
+        finished_event.set()
+
+        # Join with the processes
+        es_bulk_shipper.join()
+        for t in threads:
+            t.join()
+
+
+        # Processing should have finished
+        # Rollover the large index
+        if roll == 1:
+            write_alias = WHOIS_ORIG_WRITE
+            search_alias = WHOIS_ORIG_SEARCH
+        elif roll == 2:
+            write_alias = WHOIS_DELTA_WRITE
+            search_alias = WHOIS_DELTA_SEARCH
+
+        try:
+            orig_name = es.indices.get_alias(name=write_alias).keys()[0]
+        except Exception as e:
+            sys.stderr.write("Unable to get resolve index alias\n")
+
+        try:
+            result = es.indices.rollover(alias=write_alias,
+                                         body = {"aliases": {
+                                                    search_alias: {}
+                                                }
+                                         })
+        except:
+            sys.stderr.write("Unable to issue rollover command: %s\n" % (str(e)))
+
+        try:
+            es.indices.refresh(index=orig_name)
+        except Exception as e:
+            sys.stderr.write("Unable to refresh rolled over index\n")
+
+        # Update the search index list
+        if roll == 1:
+            index_list = es.indices.get_alias(name=WHOIS_ORIG_SEARCH)
+            options.INDEX_LIST = sorted(index_list.keys(), reverse=True)
+
+        # Index rolled over, restart processing
+        finished_event.clear()
+        threads = []
+        for i in range(options.threads):
+            t = Process(target=target,
+                        args=(work_queue,
+                              insert_queue,
+                              stats_queue,
+                              options),
+                        name='Worker %i' % i)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+
+
+        es_bulk_shipper = Thread(target=es_bulk_shipper_proc, args=(insert_queue, options))
+        es_bulk_shipper.start()
+
+        if options.verbose:
+            print("Roll over complete")
+
+        # Processors restarted, restart reading
+        rollover_event.clear()
+    except KeyboardInterrupt:
+        sys.stderr.write("Keyboard Interrupt ignored while rolling over index, please wait a few seconds and try again\n")
+
+
 ###### MAIN ######
 
 def main():
@@ -565,7 +685,7 @@ def main():
     parser.add_argument("--optimize-import", action="store_true", dest="optimize_import",
         default=False, help="If enabled, will change ES index settings to speed up bulk imports, but if the cluster has a failure, data might be lost permanently!")
     parser.add_argument("--rollover-size", action="store", type=int, dest="rollover_docs",
-        default=10000000, help="Set the number of documents after which point a new index should be created, defaults to 10 milllion, note that this is fuzzy and is checked before a new import is being made so should be reasonably below 2,147,483,519 per ES shard and should take your ES configuration into consideration")
+        default=10000000, help="Set the number of documents after which point a new index should be created, defaults to 10 milllion, note that this is fuzzy since the index count isn't continuously updated, so should be reasonably below 2 billion per ES shard and should take your ES configuration into consideration")
 
     parser.add_argument("-t", "--threads", action="store", dest="threads", type=int,
         default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster since it will try to lookup whatever record it is working on in ES")
@@ -717,36 +837,6 @@ def main():
                 print("Identifier must be 'greater than' previous identifier")
                 sys.exit(1)
 
-            # Attempt to rollover the existing indices if they're large enough
-            # To ensure consistency, only do this before importing and not before
-            # a redo.
-            max_docs = options.rollover_docs
-            try:
-                result = es.indices.rollover(alias=WHOIS_ORIG_WRITE,
-                                             body = {"conditions": {
-                                                        "max_docs": max_docs
-                                                     },
-                                                    "aliases": {
-                                                        WHOIS_ORIG_SEARCH: {}
-                                                    }
-                                             })
-            except Exception as e:
-                sys.stderr.write("Unable to issue rollover command: %s\n" % (str(e)))
-
-            try:
-                result = es.indices.rollover(alias=WHOIS_DELTA_WRITE,
-                                             body = {"conditions": {
-                                                        "max_docs": max_docs
-                                                     },
-                                                    "aliases": {
-                                                        WHOIS_DELTA_SEARCH: {}
-                                                    }
-                                             })
-            except:
-                sys.stderr.write("Unable to issue rollover command: %s\n" % (str(e)))
-
-
-
             version_identifier = options.identifier
             previousVersion = metadata['lastVersion']
 
@@ -768,9 +858,6 @@ def main():
                 sys.exit(1)
 
     options.previousVersion = previousVersion
-
-    index_list = es.indices.get_alias(name=WHOIS_ORIG_SEARCH)
-    options.INDEX_LIST = index_list.keys()
 
     # Change Index settings to better suit bulk indexing
     #TODO FIXME
@@ -797,6 +884,8 @@ def main():
         options.include = options.include.split(',')
     else:
         options.include = None
+
+    target = process_worker
 
     # Redo or Update Mode
     if options.redo or options.update:
@@ -848,19 +937,7 @@ def main():
 
         if options.redo:
             target = process_reworker
-        else:
-            target = process_worker
 
-        for i in range(options.threads):
-            t = Process(target=target,
-                        args=(work_queue,
-                              insert_queue,
-                              stats_queue,
-                              options),
-                        name='Worker %i' % i)
-            t.daemon = True
-            t.start()
-            threads.append(t)
         #No need to update lastVersion or create metadata entry
 
     #Insert(normal) Mode
@@ -868,17 +945,6 @@ def main():
         #Start worker threads
         if options.verbose:
             print("Starting %i worker threads" % options.threads)
-
-        for i in range(options.threads):
-            t = Process(target=process_worker,
-                        args=(work_queue, 
-                              insert_queue, 
-                              stats_queue,
-                              options), 
-                        name='Worker %i' % i)
-            t.daemon = True
-            t.start()
-            threads.append(t)
 
         #Update the lastVersion in the metadata
         es.update(index=WHOIS_META, id=0, doc_type='meta', body = {'doc': {'lastVersion': options.identifier}} )
@@ -903,13 +969,27 @@ def main():
             
         es.create(index=WHOIS_META, id=options.identifier, doc_type='meta',  body = meta_struct)
 
-
-    es_bulk_shipper = Thread(target=es_bulk_shipper_proc, args=(insert_queue, options))
-    es_bulk_shipper.start()
-
     stats_worker_thread = Thread(target=stats_worker, args=(stats_queue,), name = 'Stats')
     stats_worker_thread.daemon = True
     stats_worker_thread.start()
+
+    index_list = es.indices.get_alias(name=WHOIS_ORIG_SEARCH)
+    options.INDEX_LIST = sorted(index_list.keys(), reverse=True)
+
+    for i in range(options.threads):
+        t = Process(target=target,
+                    args=(work_queue,
+                          insert_queue,
+                          stats_queue,
+                          options),
+                    name='Worker %i' % i)
+        t.daemon = True
+        t.start()
+        threads.append(t)
+
+
+    es_bulk_shipper = Thread(target=es_bulk_shipper_proc, args=(insert_queue, options))
+    es_bulk_shipper.start()
 
     #Start up Reader Thread
     reader_thread = Thread(target=reader_worker, args=(work_queue, options), name='Reader')
@@ -917,7 +997,18 @@ def main():
     reader_thread.start()
 
     try:
+        timer = 0
         while True:
+            now = time.time()
+            # Check every 30 seconds
+            if now - timer >= 30:
+                timer = now
+                roll = rolloverRequired(es, options)
+                if roll:
+                    rolloverIndex(roll, es, options, target,
+                                  work_queue, insert_queue, stats_queue,
+                                  threads, es_bulk_shipper)
+
             reader_thread.join(.1)
             if not reader_thread.is_alive():
                 break
