@@ -390,9 +390,9 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
 
             # Copy old entry into different document
             api_commands.append(process_command(
-                                                'index',
+                                                'create',
                                                 WHOIS_DELTA_WRITE,
-                                                None,
+                                                "%s#%d.%d" % (current_id, current_entry[VERSION_KEY], current_entry.get(UPDATE_KEY, 0)),
                                                 current_type,
                                                 current_entry
                                 ))
@@ -400,7 +400,6 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             # Update latest/orig entry
             if not options.update:
                 entry[FIRST_SEEN] = current_entry[FIRST_SEEN]
-            (domain_name_only, tld) = parse_domain(domainName)
             api_commands.append(process_command(
                                                  'index',
                                                  current_index,
