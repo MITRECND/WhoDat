@@ -75,20 +75,21 @@ def reader_worker(work_queue, options):
         print("File or Directory required")
 
 def scan_directory(work_queue, directory, options):
-    for root, subdirs, filenames in os.walk(directory):
-        if len(subdirs):
-            for subdir in sorted(subdirs):
-                scan_directory(work_queue, subdir, options)
-        for filename in sorted(filenames):
+    for path in sorted(os.listdir(directory)):
+        fp = os.path.join(directory, path)
+
+        if os.path.isdir(fp):
+                scan_directory(work_queue, fp, options)
+        elif os.path.isfile(fp):
             if shutdown_event.is_set():
                 return
             if options.extension != '':
-                fn, ext = os.path.splitext(filename)
+                fn, ext = os.path.splitext(path)
                 if ext and ext[1:] != options.extension:
                     continue
-
-            full_path = os.path.join(root, filename)
-            parse_csv(work_queue, full_path, options)
+            parse_csv(work_queue, fp, options)
+        else:
+            sys.stderr.write("%s is neither a file nor directory" % (fp))
 
 def check_header(header):
     for field in header:
