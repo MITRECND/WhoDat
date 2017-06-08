@@ -46,7 +46,7 @@ def __createRequestContext__(request, data = None):
     if settings.HANDLER == 'es':
         ctx_var['health'] = handler.cluster_health().capitalize()
         ctx_var['record_count'] = handler.record_count()
-        ctx_var['last_import'] = handler.lastVersion()
+        ctx_var['last_import'] = handler.lastUpdate()
 
     if data is not None:
         ctx_var.update(data)
