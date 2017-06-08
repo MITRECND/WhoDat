@@ -142,6 +142,10 @@
             "type" : "keyword",
             "include_in_all": "false"
           },
+          "tld": {
+                "type": "keyword",
+                "normalizer": "lowercase_fold"
+          },
           "domainName" : {
             "type" : "keyword",
             "normalizer": "lowercase_fold",

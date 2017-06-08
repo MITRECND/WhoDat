@@ -34,6 +34,8 @@ VERSION_KEY = 'dataVersion'
 UPDATE_KEY = 'updateVersion'
 FIRST_SEEN = 'dataFirstSeen'
 
+DOC_TYPE = 'whois'
+
 CHANGEDCT = {}
 
 shutdown_event = multiprocessing.Event()
@@ -280,6 +282,7 @@ def parse_entry(input_entry, header, options):
     entry = {
                 VERSION_KEY: options.identifier,
                 FIRST_SEEN: options.identifier,
+                'tld': parse_domain(domainName)[1],
                 'details': details,
                 'domainName': domainName,
             }
@@ -427,33 +430,25 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
         if options.vverbose:
             sys.stdout.write("%s: New\n" % domainName)
         (domain_name_only, tld) = parse_domain(domainName)
-
+        doc_id = "%s.%s" % (tld, domain_name_only)
         if options.update:
             api_commands.append(process_command(
                                                 'index',
                                                 WHOIS_ORIG_WRITE,
-                                                domain_name_only,
-                                                tld,
+                                                doc_id,
+                                                DOC_TYPE,
                                                 entry
                                 ))
         else:
             api_commands.append(process_command(
                                                 'create',
                                                 WHOIS_ORIG_WRITE,
-                                                domain_name_only,
-                                                tld,
+                                                doc_id,
+                                                DOC_TYPE,
                                                 entry
                                 ))
     for command in api_commands:
         insert_queue.put(command)
-
-def generate_id(domainName, identifier):
-    dhash = hashlib.md5(domainName.encode('utf-8')).hexdigest() + str(identifier)
-    return dhash
-
-def parse_tld(domainName):
-    parts = domainName.rsplit('.', 1)
-    return parts[-1]
 
 def parse_domain(domainName):
     parts = domainName.rsplit('.', 1)
@@ -463,9 +458,10 @@ def parse_domain(domainName):
 def find_entry(es, domainName, options):
     try:
         (domain_name_only, tld) = parse_domain(domainName)
+        doc_id = "%s.%s" % (tld, domain_name_only)
         docs = []
         for index_name in options.INDEX_LIST:
-            getdoc = {'_index': index_name, '_type': tld, '_id': domain_name_only}
+            getdoc = {'_index': index_name, '_type': DOC_TYPE, '_id': doc_id}
             docs.append(getdoc)
 
         result = es.mget(body = {"docs": docs})

@@ -45,7 +45,7 @@ def cluster_stats():
 
     query = {"aggs": {
                 "type": {
-                          "terms": {"field": "_type"}, 
+                          "terms": {"field": "tld", "size": 10000},
                             "aggregations": {"unique": {"cardinality": {"field": "domainName.hash"}}}
                         },
                 "created": {
