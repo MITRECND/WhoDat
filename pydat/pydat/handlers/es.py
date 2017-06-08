@@ -111,6 +111,21 @@ def lastVersion():
     except ElasticsearchError as e:
         return -1
 
+def lastUpdate():
+    try:
+        es = es_connector()
+
+        res = es.search(index=META_INDEX, body={"query": {"match_all": {}},
+                                                "sort": [{"metadata": {"order": "desc"}}],
+                                                "size": 1})
+
+        if res['hits']['total'] >= 1:
+            data = res['hits']['hits'][0]['_source']
+            return("%d.%d" % (data['metadata'], data.get('updateVersion', 0)))
+        else:
+            return "0.0"
+    except ElasticsearchError as e:
+        return "0.0"
 
 def metadata(version = None):
     results = {'success': False}
