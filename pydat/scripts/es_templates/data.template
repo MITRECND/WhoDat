@@ -28,17 +28,17 @@
                 "email_analyzer":{
                     "type": "custom",
                     "tokenizer": "uax_url_email",
-                    "filter": ["email", "lowercase", "unique"]
+                    "filter": ["lowercase", "email", "domain", "unique"]
                 },
                 "email_domain_analyzer":{
                     "type": "custom",
                     "tokenizer": "uax_url_email",
-                    "filter": ["email_domain", "email", "lowercase", "unique"]
+                    "filter": ["lowercase", "email_domain", "email", "unique"]
                 },
                 "email_local_analyzer":{
                     "type": "custom",
                     "tokenizer": "uax_url_email",
-                    "filter": ["email_local", "email", "lowercase", "unique"]
+                    "filter": ["lowercase", "email_local", "email", "unique"]
                 },
                 "reversed":{
                     "type": "custom",
@@ -58,12 +58,12 @@
                 "name_server_analyzer": {
                     "type": "custom",
                     "tokenizer": "array_tokenizer",
-                    "filter": ["lowercase", "domain", "unique"]
+                    "filter": ["lowercase", "name_server", "unique"]
                 },
                 "all_analyzer": {
                     "type": "custom",
                     "tokenizer": "standard",
-                    "filter": ["lowercase", "all_filter", "asciifolding"]
+                    "filter": ["lowercase", "all_filter", "asciifolding", "unique"]
                 }
             },
             "tokenizer": {
@@ -77,9 +77,21 @@
                    "type" : "pattern_capture",
                    "preserve_original" : "true",
                    "patterns" : [
-                      "(\\w+)",
+                      "([\\w]+)",
+                      "([\\w\\-]+)",
                       "(\\p{L}+)",
                       "(\\d+)"
+                   ]
+                },
+                "name_server" : {
+                   "type" : "pattern_capture",
+                   "preserve_original" : "true",
+                   "patterns" : [
+                      "([\\w]+)",
+                      "([\\w\\-]+)",
+                      "(\\p{L}+)",
+                      "(\\d+)",
+                      "(?=((?<![\\w\\-])[\\w\\-]+[.][\\w\\-]+))"
                    ]
                 },
                 "email" : {
@@ -111,6 +123,7 @@
                    "preserve_original": "true",
                    "patterns" : [
                       "(\\w+)",
+                      "([\\w\\-]+)",
                       "(\\p{L}+)",
                       "(\\d+)"
                    ]
