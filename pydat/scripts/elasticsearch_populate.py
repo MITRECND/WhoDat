@@ -680,7 +680,7 @@ def main():
     parser.add_argument("--optimize-import", action="store_true", dest="optimize_import",
         default=False, help="If enabled, will change ES index settings to speed up bulk imports, but if the cluster has a failure, data might be lost permanently! This also makes rolling indexes over less consistent!")
     parser.add_argument("--rollover-size", action="store", type=int, dest="rollover_docs",
-        default=10000000, help="Set the number of documents after which point a new index should be created, defaults to 10 milllion, note that this is fuzzy since the index count isn't continuously updated, so should be reasonably below 2 billion per ES shard and should take your ES configuration into consideration")
+        default=50000000, help="Set the number of documents after which point a new index should be created, defaults to 50 milllion, note that this is fuzzy since the index count isn't continuously updated, so should be reasonably below 2 billion per ES shard and should take your ES configuration into consideration")
 
     parser.add_argument("-t", "--threads", action="store", dest="threads", type=int,
         default=2, help="Number of workers, defaults to 2. Note that each worker will increase the load on your ES cluster since it will try to lookup whatever record it is working on in ES")
