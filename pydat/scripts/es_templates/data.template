@@ -170,9 +170,6 @@
                 "reverse": {
                             "type": "text",
                             "analyzer": "reversed"
-                },
-                "hash": {
-                    "type": "murmur3"
                 }
             }
           },

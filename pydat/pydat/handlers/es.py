@@ -46,7 +46,7 @@ def cluster_stats():
     query = {"aggs": {
                 "type": {
                           "terms": {"field": "tld", "size": 10000},
-                            "aggregations": {"unique": {"cardinality": {"field": "domainName.hash"}}}
+                            "aggregations": {"unique": {"cardinality": {"field": "domainName"}}}
                         },
                 "created": {
                           "filter": { "range": {"details.standardRegCreatedDate": {"gte": year_string }}}, 
