@@ -8,11 +8,11 @@
 # won't need to merge future updates of settings.py.
 
 # Set this to True if you want to see full debug output in your browser.
-DEBUG = False
+#DEBUG = False
 
 # If DEBUG is set to False this must be set to the hosts that are allowed
 # to access the application
-ALLOWED_HOSTS = ['*']
+#ALLOWED_HOSTS = ['*']
 
 #Default handler is mongo
 #Uncomment below line to switch handler to ElasticSearch
@@ -35,30 +35,55 @@ ALLOWED_HOSTS = ['*']
 #ES_URI = 'localhost:9200'
 #ES_INDEX_PREFIX = 'whois'
 
+
+#Fill in with pdns sources within the custom_settings.py. 
+#PDNS_SOURCES ={}
+
+
+'''
+Requirements for PDNS_SOURCES dictionary:
+    -pdns_sources keys must be the same name of corresponding pdns
+     package name for that pdns source. For example, the
+     dnsdb source is a package called "dnsdb" and within it there
+     is "dnsdb.py" module
+    -pdns entries must have key/value pairs for the following keys:
+       -active               (pdns module/source is active or not)
+       -type                 (a tag to use as a label for pdns results sets.
+                             This value will be attached to any pdns results
+                             right before they are sent to a template rendering)
+       -table_template       (the name of the table template for the pdns source
+                             to use in rendering pdns data)
+
+    -any additional key/value pairs may be added for specific variables used
+     for that particular module
+
+example:
+
+PDNS_SOURCES ={
+    "dnsdb":{
+        "active": True,
+        "type":"DNSDB",
+        "table_template": "dnsdb.html",
+        "dnsdb_headers":{}, 
+        "ssl_verify":True        
+    },
+    "passivetotal":{
+        "active": False,
+        "type":"PassiveTotal",
+        "table_template":"passivetotal.html",
+        "passivetotal_key": None,
+    }
+}
+'''
+
 # If you need to use a proxy set it here.
 #PROXIES = {
 #  "http": "http://127.0.0.1",
 #  "https": "https://127.0.0.1"
 #}
 
-# If you have a DNSDB API key set it here.
-#DNSDB_HEADERS = {
-#  'X-API-Key': 'DNSDB-API-KEY-HERE',
-#  'Accept': 'application/json'
-#}
-
-# If you have a passivetotal API key set it here.
-#PASSIVETOTAL_KEY = ''
-
-# Verify SSL certificates in external calls.
+# Verify SSL certificates in external calls
 #SSL_VERIFY = True
-
-#Array of values to use as limits for DNSDB lookups
-#DNSDB_PAGE_LIMITS = [10, 20, 50, 100, 200, 500, 1000]
-#Index of above array that should be used as default value
-#DNSDB_PAGE_LIMIT_DEFAULT = 3
-#Maximum Value for requests
-#DNSDB_LIMIT = 1000
 
 # Limit all db queries to this many documents.
 #LIMIT = 10000
