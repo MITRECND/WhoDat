@@ -153,7 +153,7 @@ SECRET_KEY = 'o=skwv+igf2%#6n&p!nd##w(a*wqugkcq4-2=wugz0(715*!l#'
 
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
-MIDDLEWARE_CLASSES = [
+MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     #'django.middleware.csrf.CsrfViewMiddleware',

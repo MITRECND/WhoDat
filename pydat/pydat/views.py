@@ -2,8 +2,7 @@ import json
 import socket
 
 from django.conf import settings
-from django.template import RequestContext
-from django.shortcuts import render_to_response, HttpResponse
+from django.shortcuts import render, HttpResponse
 from django.http import QueryDict
 import urllib
 
@@ -11,13 +10,13 @@ from pydat.forms import domain_form, advdomain_form, pdns_form, pdns_r_form, val
 from pydat.handlers import handler
 from pydat.handlers import passive
 
-def __renderErrorResponse__(request, view, message, data = None):
+def __renderErrorResponse__(request, view, message, data=None):
     d = {'error': message}
     if data is not None:
         d.update(data)
 
-    context = __createRequestContext__(request, d)
-    return render_to_response(view, context)
+    context = __createRequestContext__(d)
+    return render(request, view, context=context)
     
 
 def __renderErrorPage__(request, message, data = None):
@@ -25,10 +24,10 @@ def __renderErrorPage__(request, message, data = None):
     if data is not None:
         d.update(data)
 
-    context = __createRequestContext__(request, d)
-    return render_to_response('error.html', context)
+    context = __createRequestContext__(d)
+    return render(request, 'error.html', context=context)
 
-def __createRequestContext__(request, data = None):
+def __createRequestContext__(data=None):
     #Default to adding search forms to every context
     search_f = domain_form()
     pdns_f = pdns_form()
@@ -59,23 +58,23 @@ def __createRequestContext__(request, data = None):
             else:
                 ctx_var['active'] = 0
 
-    return RequestContext(request, ctx_var)
+    return ctx_var
 
 def index(request):
     if settings.HANDLER == 'es':
         legacy = False
     else:
         legacy = True
-    context = __createRequestContext__(request, data = { 'legacy_search': legacy})
-    return render_to_response('domain.html', context)
+    context = __createRequestContext__(data = { 'legacy_search': legacy})
+    return render(request, 'domain.html', context=context)
 
 def pdns_index(request):
-    context = __createRequestContext__(request)
-    return render_to_response('pdns.html', context)
+    context = __createRequestContext__()
+    return render(request, 'pdns.html', context=context)
 
 def rpdns_index(request):
-    context = __createRequestContext__(request)
-    return render_to_response('rpdns.html', context)
+    context = __createRequestContext__()
+    return render(request, 'rpdns.html', context=context)
 
 def stats(request):
     stats = handler.cluster_stats()
@@ -90,11 +89,11 @@ def stats(request):
     if lastten[0]['metadata'] == 0:
         lastten = lastten[1:]
 
-    context = __createRequestContext__(request, data = {'domainStats': stats['domainStats'], 
+    context = __createRequestContext__(data = {'domainStats': stats['domainStats'],
                                                         'histogram': stats['histogram'],
                                                         'lastten': lastten,
                                                         'lastimport': lastimport})
-    return render_to_response('stats.html', context)
+    return render(request, 'stats.html', context=context)
 
 def help(request):
     try:
@@ -104,12 +103,12 @@ def help(request):
     except:
         helptxt = "Unable to render help text."
 
-    context = __createRequestContext__(request, data = {'help': helptxt})
-    return render_to_response('help.html', context)
+    context = __createRequestContext__(data = {'help': helptxt})
+    return render(request, 'help.html', context=context)
 
 def about(request):
-    context = __createRequestContext__(request)
-    return render_to_response('about.html', context)
+    context = __createRequestContext__()
+    return render(request, 'about.html', context=context)
     
 
 def advdomains(request):
@@ -130,8 +129,8 @@ def advdomains(request):
     if not search_f.is_valid():
         return __renderErrorResponse__(request, 'domain.html', '', {'advdomain_form': search_f, 'legacy_search': False})
         #return __renderErrorPage__(request, '', {'advdomain_form': search_f})
-        #context = __createRequestContext__(request, data = { 'advdomain_form': search_f } )
-        #return render_to_response('domain.html', context)
+        #context = __createRequestContext__(data = { 'advdomain_form': search_f } )
+        #return render(request, 'domain.html', context=context)
 
     fmt = search_f.cleaned_data['fmt'] or 'normal'
     search_string = search_f.cleaned_data['query']
@@ -142,13 +141,13 @@ def advdomains(request):
 
     
     if fmt == 'normal':
-        context = __createRequestContext__(request, data = { 'search_string': urllib.quote(search_string) or '',
+        context = __createRequestContext__(data = { 'search_string': urllib.quote(search_string) or '',
                                                              'query_unique': query_unique,
                                                              'advdomain_form': search_f,
                                                              'legacy_search': False,
                })
 
-        return render_to_response('domain_results.html', context)
+        return render(request, 'domain_results.html', context=context)
     else:
         filt_key = search_f.cleaned_data['filt']
         try:
@@ -223,14 +222,14 @@ def domains(request, key=None, value=None):
             low_version_js = 'null'
         if high_version == None:
             high_version_js = 'null'
-        context = __createRequestContext__(request, data = { 'key': urllib.quote(key),
+        context = __createRequestContext__(data = { 'key': urllib.quote(key),
                                                              'value': urllib.quote(value),
                                                              'low_version': low_version_js,
                                                              'high_version': high_version_js,
                                                              'domain_form': search_f,
                                                              'legacy_search': True,
                })
-        return render_to_response('domain_results.html', context)
+        return render(request, 'domain_results.html', context=context)
 
     else:
         results = handler.search(key, value, filt=filt, limit=limit, low = low_version)
@@ -280,11 +279,11 @@ def pdns(request, domain = None):
     results = passive.request_pdns(domain, absolute, rrtypes, limit, pretty)
     if fmt == 'normal':
         if results['success']:
-            context = __createRequestContext__(request, {'results': results,
+            context = __createRequestContext__({'results': results,
                                                          'inverse': False,
                                                          'pdns_form': pdns_f,
                                                         })
-            return render_to_response('pdns_results.html', context)
+            return render(request, 'pdns_results.html', context=context)
         else:
             return __renderErrorPage__(request, results['error'], {'pdns_form': pdns_f})
     elif fmt == 'json':
@@ -340,8 +339,8 @@ def pdns_r(request, key = None, value = None):
     results = passive.request_pdns_reverse(key, value, rrtypes, limit, pretty)
     if fmt == 'normal':
         if results['success']:
-            context = __createRequestContext__(request, {'results': results, 'inverse': True, 'pdns_r_form': pdns_r_f})
-            return render_to_response('pdns_results.html', context)
+            context = __createRequestContext__({'results': results, 'inverse': True, 'pdns_r_form': pdns_r_f})
+            return render(request, 'pdns_results.html', context=context)
         else:
             return __renderErrorPage__(request, results['error'], {'pdns_r_form':pdns_r_f})
     elif fmt == 'json':
