@@ -5,6 +5,7 @@
 
 import os
 import sys
+from pydat.pdns_sources import pdns_pkg_template_dirs, pdns_pkg_static_dirs
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -24,14 +25,10 @@ ES_INDEX_PREFIX = 'whois'
 
 PROXIES = {}
 
-DNSDB_HEADERS = {}
-PASSIVETOTAL_KEY = None
-
-# Verify SSL certificates in DNSDB calls.
-SSL_VERIFY = True
-
 # Elasticsearch limits regular queries to 10000 entries
 LIMIT = 10000
+
+PDNS_SOURCES = {}
 
 # These keys are the ones we allow you to search on. This list must be
 # kept up to date as more searches are allowed.
@@ -43,29 +40,6 @@ SEARCH_KEYS = [ ('domainName', 'Domain'),
                 ('registrant_telephone', 'Telephone')
               ]
 
-#Types that are searchable via DNSDB, update to taste
-RRTYPE_KEYS = [ ('any', 'Any'),
-                ('a', 'A'),
-                ('aaaa', 'AAAA'),
-                ('cname', 'CNAME'),
-                ('txt', 'TXT'),
-                ('mx', 'MX'),
-                ('ns', 'NS'),
-                ('ptr', 'PTR'),
-              ]
-
-RDATA_KEYS = [
-              ('ip', 'IP'), 
-              ('name', 'Domain'),
-              ('raw', 'Raw (Hex)'),
-             ]
-
-#Array of values to use as limits for DNSDB lookups
-DNSDB_PAGE_LIMITS = [10, 20, 50, 100, 200, 500, 1000]
-#Index of above array that should be used as default value
-DNSDB_PAGE_LIMIT_DEFAULT = 3 # 100
-#Maximum Value for Requests
-DNSDB_LIMIT = 1000
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
@@ -137,7 +111,9 @@ STATICFILES_DIRS = [
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
     os.path.join(SITE_ROOT, 'static'),
+
 ]
+STATICFILES_DIRS.extend(pdns_pkg_static_dirs)
 
 # List of finder classes that know how to find static files in
 # various locations.
@@ -155,7 +131,7 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 MIDDLEWARE_CLASSES = [
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    #'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     # Uncomment the next line for simple clickjacking protection:
@@ -167,8 +143,13 @@ ROOT_URLCONF = 'pydat.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'pydat.wsgi.application'
 
+#add pdns template directories to the django directory list
+_TEMPLATE_DIRS_ = list(pdns_pkg_template_dirs)
 
-_TEMPLATE_DIRS_ =[os.path.join(SITE_ROOT, 'templates')]
+#insert the core django template directory at the front of
+#django template directory list (django searches directories in order)
+_TEMPLATE_DIRS_.insert(0, os.path.join(SITE_ROOT, 'templates'))
+
 TEMPLATES = [
         {
         "BACKEND": "django.template.backends.django.DjangoTemplates",

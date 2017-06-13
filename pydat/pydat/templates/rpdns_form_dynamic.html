@@ -1,0 +1,87 @@
+<div id="rpdns_form">
+{% load dynamic_form_extras %}
+{% if rpdns_form_dynamic %}
+	<div id="rpdns_fields">
+		<form action = "{% url 'pdns_r_results' %}" method= "POST" id = "form2">
+		{% csrf_token %}
+			<table id = "domain_field_header">
+			<tbody>
+				<tr>
+					<td>
+						<label>
+							<span style="font-weight: bold;">
+								{{ rpdns_form_dynamic.search_value.label }}
+							</span>
+						</label>
+					</td>
+					<td>
+						{{ rpdns_form_dynamic.search_value }}
+					</td>
+					<td>&nbsp;</td>
+					<td>
+						{{ rpdns_form_dynamic.search_value_type.label }}
+					</td>
+					<td>
+						{{ rpdns_form_dynamic.search_value_type }}
+					</td>
+					<td>&nbsp;</td>
+					<td>&nbsp;</td>
+					<td>
+						{{ rpdns_form_dynamic.result_format.label }}
+					</td>
+					<td>
+						{{ rpdns_form_dynamic.result_format }}
+					</td>
+					<td>&nbsp;</td>
+					<td>&nbsp;</td>
+					<td>&nbsp;</td>
+					<td>
+	                    <input type="submit" value="Search"/>
+	                </td>
+				</tr>
+			</tbody>	
+			</table>
+			<div id="accordion">
+				{% for pdns_source in pdns_sources %}
+					<h1> 
+						<span style="font-weight: bold;">{{ pdns_source }} </span>
+					</h1>
+					<div>
+						<table>
+							<tbody>
+								{% for field in rpdns_form_dynamic %}
+								{# Remember 'with" tag requires no spaces around "=" #}
+								{% with panel_id=forloop.parentloop.counter0|source_id %}
+									{% if panel_id in field.name  %}
+										<tr>
+											<td>
+												<label for="id_{{ field.name }}" title="{{ field.help_text }}"> {{ field.label }}</label>
+											</td>
+											<td>
+												{{ field }}
+											</td>
+										</tr>
+										<tr>&nbsp;</tr>
+									{% endif %}
+								{% endwith %}
+								{% endfor %}
+							</tbody>
+						</table>
+					</div>
+				{% endfor %}
+			</div>
+		</form>
+	</div>
+	 <div class='errors'>
+		{% for field in rpdns_form_dynamic %}
+			{% if field.errors %}
+				{% for error in field.errors %}
+				<span class='error'>
+					{{ error }}
+				</span>
+				{% endfor %}
+			{% endif %}
+		{% endfor %}
+	</div>
+{% endif %}
+</div>
