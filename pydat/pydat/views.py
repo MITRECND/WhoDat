@@ -134,8 +134,7 @@ def advdomains(request):
         search_f.data['fmt'] = request.GET.get('fmt','normal')
         search_f.data['limit'] = request.GET.get('limit', settings.LIMIT)
         search_f.data['filt'] = request.GET.get('filt', settings.SEARCH_KEYS[0][0])
-        if settings.ES_SCRIPTING_ENABLED:
-            search_f.data['unique'] = request.GET.get('unique', False)
+        search_f.data['unique'] = request.GET.get('unique', False)
     else:
         #return __renderErrorPage__(request, 'Bad Method')
         return __renderErrorResponse__(
@@ -155,11 +154,7 @@ def advdomains(request):
 
     fmt = search_f.cleaned_data['fmt'] or 'normal'
     search_string = search_f.cleaned_data['query']
-    if settings.ES_SCRIPTING_ENABLED:
-        query_unique = str(search_f.cleaned_data['unique']).lower()
-    else:
-        query_unique = 'false'
-
+    query_unique = str(search_f.cleaned_data['unique']).lower()
     
     if fmt == 'normal':
         context = __createRequestContext__(data = {

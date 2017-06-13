@@ -34,7 +34,6 @@
 #Uncomment to change
 #ES_URI = 'localhost:9200'
 #ES_INDEX_PREFIX = 'whois'
-#ES_SCRIPTING_ENABLED = False
 
 
 #Fill in with pdns sources within the custom_settings.py. 
