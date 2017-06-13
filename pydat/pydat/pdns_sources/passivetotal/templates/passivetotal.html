@@ -1,11 +1,11 @@
-<div id = "tab-{{set.type}}">
+<div id = "tab-{{results.type}}">
     <ul>
-        {% for entry in set.subsets %}
+        {% for entry in results.subsets %}
             <li><a href="#tab-{{ forloop.counter }}">{{ entry.title }}</a></li>
         {% endfor %}
     </ul>
 
-    {% for subset in set.subsets %}
+    {% for subset in results.subsets %}
         {% if subset.title == "Records" %}
             <div id = "tab-{{ forloop.counter }}">
                 <table class = "dnsres">
@@ -20,7 +20,7 @@
                     {% for item in subset.data %}
                     <tr>
                       <td class='count'>
-                        {% if set.key == 'domain' %}
+                        {% if results.key == 'domain' %}
                         <a href="{% url 'pdns_r_rest' "ip" item.resolve %}">{{ item.resolve }}</a>
                         {% else %}
                         <a href="{% url 'pdns_rest' item.resolve %}">{{ item.resolve }}</a>
@@ -55,7 +55,7 @@
                     {% for ip, count in subset.data.items %}
                     <tr>
                       <td class='count'>
-                        {% if set.key == 'domain' %}
+                        {% if results.key == 'domain' %}
                         <a href="{% url 'pdns_r_rest' "ip" ip %}">{{ ip }}</a>
                         {% else %}
                         <a href="{% url 'pdns_rest' ip %}">{{ ip }}</a>

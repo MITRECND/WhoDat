@@ -1,12 +1,12 @@
-<div id = "tab-{{set.type}}">
-{% if set.data.items %}
+<div id = "tab-{{results.type}}">
+{% if results.data.items %}
     <ul>
-        {% for rrtype, entry in set.data.items %}
+        {% for rrtype, entry in results.data.items %}
             <li><a href="#tab-{{ forloop.counter }}">{{ rrtype }}</a></li>
         {% endfor %}
     </ul>
 
-    {% for rrtype, entry in set.data.items %}
+    {% for rrtype, entry in results.data.items %}
         <div id = "tab-{{ forloop.counter }}">
             <table class = "dnsres">
               <thead>

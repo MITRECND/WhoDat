@@ -8,12 +8,20 @@
     </script>
 {% endblock %}
 
+{% block css %}
+{% endblock %}
+
 {% block js %}
+<script>
+	$( function() {$( "#accordion" ).accordion({heightStyle: "content"});});
+
+</script>
 {% endblock %}
 
 {% block searchBar %}
-    {% include 'pdns_form.html' %}
+    {% include 'pdns_form_dynamic.html' %}
 {% endblock %}
 
 {% block page %}
+	{% include 'pdns_status.html' with pdns_status=pdns_status %}
 {% endblock %}
