@@ -2,7 +2,6 @@ import json
 import socket
 
 from django.conf import settings
-from django.template import RequestContext
 from django.shortcuts import render, HttpResponse
 from django.http import QueryDict
 import urllib
@@ -118,7 +117,7 @@ def help(request):
         helptxt = "Unable to render help text."
 
     context = __createRequestContext__(data = {'help': helptxt})
-    return render(request,'help.html', context=context)
+    return render(request, 'help.html', context=context)
 
 def about(request):
     context = __createRequestContext__()
@@ -150,7 +149,7 @@ def advdomains(request):
                                         {'advdomain_form': search_f, 'legacy_search': False})
         #return __renderErrorPage__(request, '', {'advdomain_form': search_f})
         #context = __createRequestContext__(data = { 'advdomain_form': search_f } )
-        #return render(request, 'domain.html', context= context)
+        #return render(request, 'domain.html', context=context)
 
     fmt = search_f.cleaned_data['fmt'] or 'normal'
     search_string = search_f.cleaned_data['query']
@@ -165,7 +164,7 @@ def advdomains(request):
                                                 }
                                         )
 
-        return render(request,'domain_results.html', context=context)
+        return render(request, 'domain_results.html', context=context)
     else:
         filt_key = search_f.cleaned_data['filt']
         try:

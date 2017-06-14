@@ -110,8 +110,6 @@ STATICFILES_DIRS = [
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
-    os.path.join(SITE_ROOT, 'static'),
-
 ]
 STATICFILES_DIRS.extend(pdns_pkg_static_dirs)
 
@@ -120,7 +118,6 @@ STATICFILES_DIRS.extend(pdns_pkg_static_dirs)
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-#    'django.contrib.staticfiles.finders.DefaultStorageFinder',
 ]
 
 # Make this unique, and don't share it with anybody.
@@ -128,7 +125,7 @@ SECRET_KEY = 'o=skwv+igf2%#6n&p!nd##w(a*wqugkcq4-2=wugz0(715*!l#'
 
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
-MIDDLEWARE_CLASSES = [
+MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
