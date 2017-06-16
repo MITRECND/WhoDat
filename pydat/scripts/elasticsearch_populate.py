@@ -42,6 +42,7 @@ shutdown_event = multiprocessing.Event()
 finished_event = multiprocessing.Event()
 bulkError_event = multiprocessing.Event()
 rollover_event = multiprocessing.Event()
+rolled_over = multiprocessing.Event()
 
 WHOIS_ORIG_WRITE_FORMAT_STRING = "%s-write"
 WHOIS_DELTA_WRITE_FORMAT_STRING = "%s-delta-write"
@@ -208,7 +209,7 @@ def process_worker(work_queue, insert_queue, stats_queue, options):
 
                     domainName = entry['domainName']
 
-                    if options.firstImport:
+                    if options.firstImport and not rolled_over.is_set():
                         current_entry_raw = None
                     else:
                         current_entry_raw = find_entry(es, domainName, options)
@@ -538,6 +539,7 @@ def rolloverIndex(roll, es, options, target,
                   work_queue, insert_queue, stats_queue,
                   threads, es_bulk_shipper):
     global rollover_event
+    global rolled_over
 
     if options.verbose:
         print("Rolling over ElasticSearch Index")
@@ -568,6 +570,7 @@ def rolloverIndex(roll, es, options, target,
         # Processing should have finished
         # Rollover the large index
         if roll == 1:
+            rolled_over.set()
             write_alias = WHOIS_ORIG_WRITE
             search_alias = WHOIS_ORIG_SEARCH
         elif roll == 2:
