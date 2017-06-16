@@ -154,6 +154,18 @@ def stats_worker(stats_queue):
 
 def es_bulk_shipper_proc(insert_queue, options):
     os.setpgrp()
+
+    bulk_threads = []
+    for _ in range(options.bulk_threads):
+        bulk_thread = Thread(target=es_bulk_shipper_thread, args=(insert_queue, options))
+        bulk_thread.start()
+        bulk_threads.append(bulk_thread)
+
+
+    for thread in bulk_threads:
+        thread.join()
+
+def es_bulk_shipper_thread(insert_queue, options):
     global bulkError_event
     es = connectElastic(options.es_uri)
 
@@ -169,7 +181,7 @@ def es_bulk_shipper_proc(insert_queue, options):
             yield req
 
     try:
-        for (ok, response) in helpers.parallel_bulk(es, bulkIter(), raise_on_error=False, thread_count=options.bulk_threads, chunk_size=options.bulk_size):
+        for (ok, response) in helpers.streaming_bulk(es, bulkIter(), raise_on_error=False, chunk_size=options.bulk_size):
             resp = response[response.keys()[0]]
             if not ok and resp['status'] not in [404, 409]:
                     if not bulkError_event.is_set():
@@ -616,7 +628,7 @@ def rolloverIndex(roll, es, options, target,
             threads.append(t)
 
 
-        es_bulk_shipper = Thread(target=es_bulk_shipper_proc, args=(insert_queue, options))
+        es_bulk_shipper = Process(target=es_bulk_shipper_proc, args=(insert_queue, options))
         es_bulk_shipper.start()
 
         if options.verbose:
@@ -977,7 +989,7 @@ def main():
         threads.append(t)
 
 
-    es_bulk_shipper = Thread(target=es_bulk_shipper_proc, args=(insert_queue, options))
+    es_bulk_shipper = Process(target=es_bulk_shipper_proc, args=(insert_queue, options))
     es_bulk_shipper.start()
 
     #Start up Reader Thread
