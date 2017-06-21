@@ -5,6 +5,8 @@ from django.conf import settings
 from django.shortcuts import render, HttpResponse
 from django.http import QueryDict
 import urllib
+import unicodecsv as csv
+import cStringIO
 
 from pydat.forms import (domain_form, advdomain_form, pdns_form_dynamic,
                          rpdns_form_dynamic, validate_ip, validate_hex)
@@ -130,12 +132,11 @@ def advdomains(request):
     elif request.method == "GET":
         search_f = advdomain_form(QueryDict(''))
         search_f.data['query'] = request.GET.get('query', None)
-        search_f.data['fmt'] = request.GET.get('fmt','normal')
+        search_f.data['fmt'] = request.GET.get('fmt','none')
         search_f.data['limit'] = request.GET.get('limit', settings.LIMIT)
         search_f.data['filt'] = request.GET.get('filt', settings.SEARCH_KEYS[0][0])
         search_f.data['unique'] = request.GET.get('unique', False)
     else:
-        #return __renderErrorPage__(request, 'Bad Method')
         return __renderErrorResponse__(
                                         request,
                                         'domain.html',
@@ -147,15 +148,12 @@ def advdomains(request):
                                         'domain.html',
                                         '',
                                         {'advdomain_form': search_f, 'legacy_search': False})
-        #return __renderErrorPage__(request, '', {'advdomain_form': search_f})
-        #context = __createRequestContext__(data = { 'advdomain_form': search_f } )
-        #return render(request, 'domain.html', context=context)
 
-    fmt = search_f.cleaned_data['fmt'] or 'normal'
+    fmt = search_f.cleaned_data['fmt'] or 'none'
     search_string = search_f.cleaned_data['query']
     query_unique = str(search_f.cleaned_data['unique']).lower()
     
-    if fmt == 'normal':
+    if fmt == 'none':
         context = __createRequestContext__(data = {
                                                     'search_string': urllib.quote(search_string) or '',
                                                     'query_unique': query_unique,
@@ -186,24 +184,42 @@ def advdomains(request):
                                             limit,
                                             query_unique)
         if not results['success']:
-            #return __renderErrorPage__(request, results['message'])
             return __renderErrorResponse__(
                                             request,
                                             'domain.html',
                                             results['message'])
-        if fmt=='json':
-            return HttpResponse(
+
+        if len(results['data']) == 0:
+            return __renderErrorResponse__(request, 'domain.html', 'No results')
+
+        if fmt =='json':
+            response = HttpResponse(
                                 json.dumps(results),
                                 content_type='application/json')
+            response['Content-Disposition'] = 'attachment; filename="results.json"'
         elif fmt == 'list':
             data = '\n'.join([d[filt_key] for d in results['data']])
-            return HttpResponse(data, content_type='text/plain')
+            response = HttpResponse(data, content_type='text/plain')
+            response['Content-Disposition'] = 'attachment; filename="results.txt"'
+        elif fmt == 'csv':
+            raw_data = results['data']
+            header_keys = set()
+            for row in raw_data:
+                header_keys = header_keys.union(set(row.keys()))
+            csv_out = cStringIO.StringIO()
+            writer = csv.DictWriter(csv_out, sorted(list(header_keys)))
+            writer.writeheader()
+            writer.writerows(raw_data)
+            csv_data = csv_out.getvalue()
+            csv_out.close()
+            response = HttpResponse(csv_data, content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="results.csv"'
         else:
-            #return __renderErrorPage__(request, 'Invalid Format.')
             return __renderErrorResponse__(
                                             request,
                                             'domain.html',
                                             'Invalid Format')
+        return response
 
 
 def domains(request, key=None, value=None):

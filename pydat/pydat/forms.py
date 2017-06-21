@@ -56,7 +56,7 @@ class domain_form(forms.Form):
 class advdomain_form(forms.Form):
     query = forms.CharField(
                         label='Search',
-                        widget=forms.TextInput(attrs={'size': '60'}))
+                        widget=forms.TextInput(attrs={'size': '120'}))
     filt = forms.ChoiceField(
                         label="Filter",
                         required=False)
@@ -76,8 +76,9 @@ class advdomain_form(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super(advdomain_form, self).__init__(*args, **kwargs)
-        self.fields['fmt'].choices = [('normal', 'Web'),
+        self.fields['fmt'].choices = [('none', ''),
                                       ('json', 'JSON'),
+                                      ('csv', 'CSV'),
                                       ('list', 'List')]
         nonelist = [('none', 'None')]
         nonelist.extend(settings.SEARCH_KEYS)

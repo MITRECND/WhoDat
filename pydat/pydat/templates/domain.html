@@ -42,6 +42,11 @@
             {% endif %}
         {% endfor %}
     {% endif %}
+    {% if error %}
+        <span class = 'error'>
+            {{ error }}
+        </span>
+    {% endif %}
 {% endblock %}
 
 

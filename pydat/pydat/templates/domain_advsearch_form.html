@@ -19,7 +19,19 @@
             <tbody>
                 <tr>
                     <td>
-                        <label for="id_fmt">Format:</label>
+                        <label for="id_unique" class='tooltip' title="Returns only the latest domain">Unique Domains:</label>
+                    </td>
+                    <td>
+                        {{ advdomain_form.unique }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <table class='adv_table2'>
+            <tbody>
+                <tr>
+                    <td class='tooltip' title="Click 'Search' above to export data">
+                        <label for="id_fmt">Export to</label>
                     </td>
                     <td>
                         {{ advdomain_form.fmt }}
@@ -46,18 +58,6 @@
                     </td>
                 </tr>
             </tbody> 
-        </table>
-        <table class='adv_table2'>
-            <tbody>
-                <tr>
-                    <td>
-                        <label for="id_unique">Unique Domains:</label>
-                    </td>
-                    <td>
-                        {{ advdomain_form.unique }}
-                    </td>
-                </tr>
-            </tbody>
         </table>
      </form>
     {% endif %}
