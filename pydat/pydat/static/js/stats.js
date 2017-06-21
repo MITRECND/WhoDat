@@ -1,5 +1,16 @@
 $(document).ready(function() {
 
+    $('#tld_table').dataTable(
+                {
+                    "bJQueryUI": true,
+                    "oLanguage": {'sSearch': 'Filter:',
+                                  'sZeroRecords': 'No TLDs Found',
+                                 },
+                    "sPaginationType": "full_numbers",
+                    "sDom" : '<"H"lfirp>t<"F"p>',
+                    "iDisplayLength" : 10,
+                });
+
     var regChartctx = $("#regChart").get(0).getContext("2d");
     var regChart = new Chart(regChartctx).Bar(chartData, {
                                                 legendTemplate: 

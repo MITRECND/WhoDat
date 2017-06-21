@@ -45,7 +45,7 @@ def cluster_stats():
 
     query = {"aggs": {
                 "type": {
-                          "terms": {"field": "_type"}, 
+                          "terms": {"field": "_type", "size": 10000},
                             "aggregations": {"unique": {"cardinality": {"field": "domainName.hash"}}}
                         },
                 "created": {
@@ -74,6 +74,7 @@ def cluster_stats():
 
     for bucket in results['aggregations']['type']['buckets']:
         stats['domainStats'][bucket['key']] = (bucket['doc_count'], bucket['unique']['value'])
+    stats['domainStats'] = collections.OrderedDict(sorted(stats['domainStats'].items()))
    
     for bucket in results['aggregations']['created']['dates']['buckets']:
         date_label = "/".join(bucket['key_as_string'].split('-'))
