@@ -387,7 +387,7 @@ def process_entry(insert_queue, stats_queue, es, entry, current_entry_raw, optio
             if options.enable_delta_indexes:
                 index_name = WHOIS_ORIG_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
             else:
-                index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.indentifier)
+                index_name = WHOIS_WRITE_FORMAT_STRING % (options.index_prefix, options.identifier)
 
             stats_queue.put('updated')
             if options.update and ((current_index == index_name) or (options.previousVersion == 0)): #Can't have two documents with the the same id in the same index
