@@ -154,13 +154,11 @@ def advdomains(request):
     query_unique = str(search_f.cleaned_data['unique']).lower()
     
     if fmt == 'none':
-        context = __createRequestContext__(data = {
-                                                    'search_string': urllib.quote(search_string) or '',
-                                                    'query_unique': query_unique,
-                                                    'advdomain_form': search_f,
-                                                    'legacy_search': False,
-                                                }
-                                        )
+        context = __createRequestContext__(data = {'search_string': urllib.quote(search_string) or '',
+                                                   'query_unique': query_unique,
+                                                   'advdomain_form': search_f,
+                                                   'legacy_search': False,
+                                                   'fmt': fmt})
 
         return render(request, 'domain_results.html', context=context)
     else:
@@ -193,14 +191,9 @@ def advdomains(request):
             return __renderErrorResponse__(request, 'domain.html', 'No results')
 
         if fmt =='json':
-            response = HttpResponse(
-                                json.dumps(results),
-                                content_type='application/json')
-            response['Content-Disposition'] = 'attachment; filename="results.json"'
+            data = [json.dumps(d) for d in results['data']]
         elif fmt == 'list':
-            data = '\n'.join([d[filt_key] for d in results['data']])
-            response = HttpResponse(data, content_type='text/plain')
-            response['Content-Disposition'] = 'attachment; filename="results.txt"'
+            data = [d[filt_key] for d in results['data']]
         elif fmt == 'csv':
             raw_data = results['data']
             header_keys = set()
@@ -212,14 +205,20 @@ def advdomains(request):
             writer.writerows(raw_data)
             csv_data = csv_out.getvalue()
             csv_out.close()
-            response = HttpResponse(csv_data, content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="results.csv"'
+            data = csv_data.split('\n')
         else:
-            return __renderErrorResponse__(
-                                            request,
-                                            'domain.html',
-                                            'Invalid Format')
-        return response
+            return __renderErrorResponse__(request,
+                                           'domain.html',
+                                           'Invalid Format')
+
+        context = __createRequestContext__(data={'search_string': urllib.quote(search_string) or '',
+                                                 'query_unique': str(query_unique).lower(),
+                                                 'advdomain_form': search_f,
+                                                 'legacy_search': False,
+                                                 'fmt': fmt,
+                                                 'data': data})
+
+        return render(request, 'domain_results.html', context=context)
 
 
 def domains(request, key=None, value=None):

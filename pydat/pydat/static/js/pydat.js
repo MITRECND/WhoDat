@@ -30,6 +30,8 @@ $(document).ready(function() {
         }
     }); 
 
+    $(".search_form [name='fmt']").change();
+
 });
 
 

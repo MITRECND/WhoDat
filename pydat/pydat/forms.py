@@ -76,7 +76,7 @@ class advdomain_form(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super(advdomain_form, self).__init__(*args, **kwargs)
-        self.fields['fmt'].choices = [('none', ''),
+        self.fields['fmt'].choices = [('none', 'Web'),
                                       ('json', 'JSON'),
                                       ('csv', 'CSV'),
                                       ('list', 'List')]
