@@ -12,7 +12,7 @@ urlpatterns = [
   url(r'^pdns_results/$', views.pdns, name='pdns_results'),
   url(r'^pdns_search/$', views.pdns_index, name='pdns'),
 
-  url(r'^pdnsr_results/(?P<search_value_type>.*)/(?P<search_value>.*)/$', views.pdns_r, name='pdns_r_rest'),
+  url(r'^pdnsr_results/(?P<search_value>.*)/$', views.pdns_r, name='pdns_r_rest'),
   url(r'^pdnsr_results/$', views.pdns_r, name='pdns_r_results'),
   url(r'^pdnsr_search/$', views.rpdns_index, name='pdns_r'),
 

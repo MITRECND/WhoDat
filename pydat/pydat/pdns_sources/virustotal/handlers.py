@@ -74,9 +74,6 @@ def pdns_request_handler(domain, result_format, **dynamic_fields):
             results = _format_results(results, result_format, dynamic_fields)
         else:
             results['data'] = response_json
-    else:
-        results['error'] = "Not found"
-        return results
 
     results['success'] = True
 
@@ -118,9 +115,6 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
 
     if response_json['response_code'] == 1:
         results['data'] = response_json['resolutions']
-    else:
-        results['error'] = "Not found"
-        return results
 
     results['success'] = True
 

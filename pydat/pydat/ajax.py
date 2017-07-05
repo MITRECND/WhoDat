@@ -256,7 +256,7 @@ def resolve(request, domainName = None):
     }
     for ip in iplist:
         ipo = { 'ip' : ip,
-                'url' : reverse('pdns_r_rest', args=("ip",ip,))
+                'url' : reverse('pdns_r_rest', args=(ip,))
               }
         result['ips'].append(ipo)
 

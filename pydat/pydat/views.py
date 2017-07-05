@@ -341,7 +341,7 @@ def pdns(request, search_value=None):
     return render(request, 'pdns_results.html', context=context)
 
 
-def pdns_r(request, search_value = None, search_value_type = None):
+def pdns_r(request, search_value = None):
     if request.method == 'POST':
         rpdns_f_dyn = rpdns_form_dynamic(request.POST)
     elif request.method == 'GET': # Craft a form to make it easier to validate
