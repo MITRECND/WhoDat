@@ -1,41 +1,116 @@
-import glob   #since in python 2.7
-import os
-import sys
 
+class configExistsError(Exception):
+    """Error to indicate config item already defined"""
 
-'''
-variable name constants
-'''
+class configMissingValidationError(Exception):
+    """Error to indicate a missing config during validation"""
 
-#all normal pdns request methods must be named the following
-PDNS_MOD_REQUEST_METHOD = "pdns_request_handler"
-#all reverse pdns request methds must be named the following
-PDNS_MOD_R_REQUEST_METHOD = "pdns_reverse_request_handler"
-#path to pdns source modules
-PDNS_MOD_PKG = "pydat.pdns_sources"
+class pdnsConfig(object):
+    def __init__(self, name, displayName=None):
+        self.name = name
+        self.displayName = name if displayName is None else displayName
+        self.configs = {}
+        self.myConfig = {}
 
-'''
-create a list of the directory names where any pdns package
-specific django templates reside so as to dynamically update
-django's global list of template directories. That list is in pydat.settings.py
-'''
+        self.addConfig("active", True, False,
+                       description="whether the module should be processed(used) for" \
+                                   " pdns data when pdns requests are initiated in pydat")
 
-pdns_pkg_template_dirs =set()
-#recursively search pydat.pdns_modules for any templates that reside in modules
-for dirpath, dirs, files in os.walk(os.path.dirname(os.path.realpath(__file__)), topdown=True):
-	for dir_ in dirs:
-		if "templates" in dir_:
-			pdns_pkg_template_dirs.add(os.path.join(dirpath, dir_))
+    def addConfig(self, name, required, default_value, description):
+        if name in self.configs:
+            raise configExistsError('%s already exists' % (name))
+        self.configs[name] = {'default_value': default_value,
+                             'required': required,
+                             'description': description
+        }
 
-'''
-create a list of the directory names where any passive DNS package
-specific django static reside so as to dynamically update 
-django's global list of static file directories. That list is in pydat.settings.py
+    def __dict__(self):
+        return self.configs
 
-'''
-pdns_pkg_static_dirs = set()
-#recursively search pydat.pdns_modules for any templates that reside in modules
-for dirpath, dirs, files in os.walk(os.path.dirname(os.path.realpath(__file__)), topdown=True):
-	for dir_ in dirs:
-		if "static" in dir_:
-			pdns_pkg_static_dirs.add(os.path.join(dirpath, dir_))
+    def __iter__(self):
+        return self.configs
+
+    def _try_default_var(self, name, d):
+        """internal utility function for script 1 - when the initialization script finds
+            a required pdns module setting with no key/value OR value defined,
+            an attempt is made to use a default value for that pdns module
+            variable(pulled from the pdns module settings file). If there is no
+            default value defined, the pdns module is deactivated.
+        """
+        if name not in d.keys() or d[name] is None:
+            if self.configs[name]['default_value'] is not None:
+                d[name] = self.configs[name]['default_value']
+
+    def validate(self, d):
+        for (name, config) in self.configs.items():
+            if config["required"]:
+                self._try_default_var(name, d)
+                if name not in d.keys():
+                    raise configMissingValidationError("config value %s expected but not present" % (name))
+            if name in d.keys():
+                self.myConfig[name] = d[name]
+
+class fieldExistsError(Exception):
+    """Error to indicate form field already exists"""
+
+class formFields(object):
+    def __init__(self, name):
+        self.name = name
+        self.fields = {'base': {},
+                       'forward': {},
+                       'reverse': {}}
+
+    def addBaseField(self, name, type, default, parameters):
+        if name in self.fields['base']:
+            raise fieldExistsError("Field %s already exists in base fields" % (name))
+
+        self.fields['base'][name] = {
+            "field_type": type,
+            "field_value_default": default,
+            "parameters": parameters
+        }
+
+    def addForwardField(self, name, type, default, parameters):
+        if name in self.fields['forward']:
+            raise fieldExistsError("Field %s already exists in forward fields" % (name))
+
+        self.fields['forward'][name] = {
+            "field_type": type,
+            "field_value_default": default,
+            "parameters": parameters
+        }
+
+    def addReverseField(self, name, type, default, parameters):
+        if name in self.fields['reverse']:
+            raise fieldExistsError("Field %s already exists in reverse fields" % (name))
+
+        self.fields['reverse'][name] = {
+            "field_type": type,
+            "field_value_default": default,
+            "parameters": parameters
+        }
+
+    @property
+    def base(self):
+        return self.fields['base']
+
+    @property
+    def forward(self):
+        return self.fields['forward']
+
+    @property
+    def reverse(self):
+        return self.fields['reverse']
+
+class passiveHandlers(object):
+    def __init__(self, forward, reverse):
+        self.forwardfn = forward
+        self.reversefn = reverse
+
+    @property
+    def forward(self):
+        return self.forwardfn
+
+    @property
+    def reverse(self):
+        return self.reversefn

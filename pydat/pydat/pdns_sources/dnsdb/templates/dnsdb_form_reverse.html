@@ -1,0 +1,21 @@
+{% load dynamic_form_extras %}
+<div id="dnsdb_reverse">
+    <table>
+        <tbody>
+            {% for field in rpdns_form_dynamic %}
+                {% if field.name|prefix:'dnsdb' %}
+                    <tr>
+                        <td>
+                            <label for="id_{{ field.name }}" title="{{ field.help_text }}"> {{ field.label }}</label>
+                        </td>
+                        <td>
+                            {{ field }}
+                        </td>
+                    </tr>
+                    <tr>&nbsp;</tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+

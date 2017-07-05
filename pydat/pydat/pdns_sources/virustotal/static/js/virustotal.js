@@ -1,14 +1,7 @@
-$(document).ready(function() {
+$(document).ready(function(){
 
-    //search_toggle(0);
-
-    $('#pdns').tabs();
-
-    /*
-	$('#tab-DNSDB').tabs();
-	$('#tab-PassiveTotal').tabs();
-
-    $('.dnsres').dataTable(
+    $('#virustotal-tab').tabs();
+    $('.virustotal-dnsres').dataTable(
 				{
 					"bJQueryUI": true,
 					//"bAutoWidth": false,
@@ -20,7 +13,7 @@ $(document).ready(function() {
                     ],
 					"sPaginationType": "full_numbers",
                     "sDom" : '<"H"lfirp>t<"F"lfip>',
-					"iDisplayLength" : 50,
+					"iDisplayLength" : 25,
 					"fnDrawCallback": function(oSettings) { 
 						$(".resolve").on("click", function() {
                             $(this).removeClass('link');
@@ -30,14 +23,17 @@ $(document).ready(function() {
 					}
 				});
 
-    var tabName = $(document.createElement('span'));
-    tabName.text("PDNS" + direction + " Results");
-    tabName.css('position', 'absolute');
-    tabName.css('right', '20px');
-    //tabName.css('color', 'white');
-    tabName.css('font-size', '20px');
-    tabName.css('top', '13px');
-    $("#pdns-DNSDB").append(tabName);
-    $("#pdns-PassiveTotal").append(tabName);
-    */
+    $(".pdns_search_form [name='result_format']").change(function(){
+        //Filtering should only be visible for List
+        if($(this).find("option:selected").val() == "list"){
+            $(this).parents().find('.form_filter').removeClass("novis").show();
+        }else{
+            $(this).parents().find('.form_filter').addClass("novis");
+        }
+    }); 
+
+
+    $(".pdns_search_form [name='result_format']").change();
+    
+
 });

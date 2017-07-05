@@ -1,5 +1,7 @@
 $(document).ready(function() {
     //Associate toggle with click
+	$(".accordion" ).accordion({heightStyle: "content", collapsible: true});
+
     $("#searchIcon").on("click", function() { search_toggle();}); 
 
     $('.tooltip').tooltip();
@@ -29,6 +31,8 @@ $(document).ready(function() {
             $(this).parents('tbody').find('.form_filter').addClass("novis");
         }
     }); 
+
+    $(".search_form [name='fmt']").change();
 
 });
 

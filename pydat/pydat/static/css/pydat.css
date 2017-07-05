@@ -243,6 +243,10 @@ tr td.oldVersion {
     background-color: #fece2f !important;
 }
 
+#page #dnsdata {
+    word-break: break-all;
+    word-break: break-word;
+}
 
 /***pdns.html***/
 #noresults{
@@ -255,4 +259,8 @@ tr td.oldVersion {
 
 #pdns .dnsres a {
     color: black;
+}
+
+#pdns_fields {
+    width: 100%;
 }

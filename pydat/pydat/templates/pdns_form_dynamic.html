@@ -1,8 +1,7 @@
 <div id="pdns_form">
-{% load dynamic_form_extras %}
 {% if pdns_form_dynamic %}
 	<div id="pdns_fields">
-		<form action = "{% url 'pdns_results' %}" method= "POST" id="form1">
+		<form action = "{% url 'pdns_results' %}" method= "POST" id="form1" class="pdns_search_form">
 		{% csrf_token %}
 			<table id = "domain_field_header">
 			<tbody>
@@ -32,40 +31,21 @@
 				</tr>
 			</tbody>	
 			</table>
-			<div id="accordion">
+			<div id="pdns_options" class="accordion">
 				{% for pdns_source in pdns_sources %}
 					<h1> 
-						<span style="font-weight: bold;">{{ pdns_source }} </span>
+						<span style="font-weight: bold;">{{ pdns_source.displayName }} Options </span>
 					</h1>
-					<div>
-						<table>
-							<tbody>
-								{% for field in pdns_form_dynamic %}
-								{# Remember 'with" tag requires no spaces around "=" #}
-								{% with panel_id=forloop.parentloop.counter0|source_id %}
-									{% if panel_id in field.name  %}
-										<tr>
-											<td>
-												<label for="id_{{ field.name }}" title="{{ field.help_text }}"> {{ field.label }}</label>
-											</td>
-											<td>
-												{{ field }}
-											</td>
-										</tr>
-										<tr>&nbsp;</tr>
-									{% endif %}
-								{% endwith %}
-								{% endfor %}
-							</tbody>
-						</table>
-					</div>
+                    {% with pdns_source.name|add:"_form_forward.html" as form_template %}
+                    {% include form_template %}
+                    {% endwith %}
 				{% endfor %}
 			</div>
 		</form>
 	</div>
 	 <div class='errors'>
 		{% for field in pdns_form_dynamic %}
-			{% if field.errors %}
+			{% if field.errors != "" %}
 				{% for error in field.errors %}
 				<span class='error'>
 					{{ error }}

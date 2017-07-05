@@ -44,5 +44,17 @@
 
 
 {% block page%}
-    {% include 'domain_table.html' %}
+    {% if fmt == "none" %}
+        {% include 'domain_table.html' %}
+    {% else %}
+        <div id="dnsdata">
+            <table>
+                {% for line in data %}
+                <tr>
+                    <td> {{ line }} </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    {% endif %}
 {% endblock %}

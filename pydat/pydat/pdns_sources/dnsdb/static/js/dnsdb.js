@@ -1,14 +1,7 @@
-$(document).ready(function() {
+$(document).ready(function(){
 
-    //search_toggle(0);
-
-    $('#pdns').tabs();
-
-    /*
-	$('#tab-DNSDB').tabs();
-	$('#tab-PassiveTotal').tabs();
-
-    $('.dnsres').dataTable(
+    $('#dnsdb-tab').tabs();
+    $('.dnsdb-dnsres').dataTable(
 				{
 					"bJQueryUI": true,
 					//"bAutoWidth": false,
@@ -30,14 +23,28 @@ $(document).ready(function() {
 					}
 				});
 
+    /*
     var tabName = $(document.createElement('span'));
     tabName.text("PDNS" + direction + " Results");
     tabName.css('position', 'absolute');
     tabName.css('right', '20px');
-    //tabName.css('color', 'white');
     tabName.css('font-size', '20px');
     tabName.css('top', '13px');
     $("#pdns-DNSDB").append(tabName);
-    $("#pdns-PassiveTotal").append(tabName);
     */
+
+    
+    $(".pdns_search_form [name='result_format']").change(function(){
+        //Filtering should only be visible for List
+        if($(this).find("option:selected").val() == "list"){
+            $(this).parents().find('.form_filter').removeClass("novis").show();
+        }else{
+            $(this).parents().find('.form_filter').addClass("novis");
+        }
+    }); 
+
+
+    $(".pdns_search_form [name='result_format']").change();
+    
+
 });
