@@ -154,41 +154,42 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
                             verify=config.myConfig["ssl_verify"])
         except Exception as e:
                 results['error'] = str(e)
-                print ("external request didntwork")
                 return results
-        # Each line of the response is an individual JSON blob.
-        for line in r.text.split('\n'):
-            # Skip empty lines.
-            if not line:
-                continue
-            try:
-                tmp = json.loads(line)
-            except Exception as e:
-                results['error'] = "%s: %s" % (
-                                                str(e),
-                                                cgi.escape(line, quote=True))
-                return results
-                    # Convert epoch timestamps to human readable.
-            for key in ['time_first', 'time_last']:
-                if key in tmp:
-                    tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S",
-                                             time.gmtime(tmp[key]))
-            rrtype = tmp['rrtype']
-            # Strip the MX weight.
-            if rrtype == 'MX':
-                tmp['rdata'] = [rd.split()[1] for rd in tmp['rdata']]
 
-            if result_format == 'none':
-                if tmp['rrname'][-1] == ".":
-                    tmp['rrname'] = tmp['rrname'][:-1]
-                for i in range(len(tmp['rdata'])):
-                    if tmp['rdata'][i][-1] == ".":
-                        tmp['rdata'][i] = tmp['rdata'][i][:-1]
+        if r.status_code != 404:
+            # Each line of the response is an individual JSON blob.
+            for line in r.text.split('\n'):
+                # Skip empty lines.
+                if not line:
+                    continue
+                try:
+                    tmp = json.loads(line)
+                except Exception as e:
+                    results['error'] = "%s: %s" % (
+                                                    str(e),
+                                                    cgi.escape(line, quote=True))
+                    return results
+                        # Convert epoch timestamps to human readable.
+                for key in ['time_first', 'time_last']:
+                    if key in tmp:
+                        tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S",
+                                                 time.gmtime(tmp[key]))
+                rrtype = tmp['rrtype']
+                # Strip the MX weight.
+                if rrtype == 'MX':
+                    tmp['rdata'] = [rd.split()[1] for rd in tmp['rdata']]
 
-            try:
-                results['data'][rrtype].append(tmp)
-            except KeyError:
-                results['data'][rrtype] = [tmp]
+                if result_format == 'none':
+                    if tmp['rrname'][-1] == ".":
+                        tmp['rrname'] = tmp['rrname'][:-1]
+                    for i in range(len(tmp['rdata'])):
+                        if tmp['rdata'][i][-1] == ".":
+                            tmp['rdata'][i] = tmp['rdata'][i][:-1]
+
+                try:
+                    results['data'][rrtype].append(tmp)
+                except KeyError:
+                    results['data'][rrtype] = [tmp]
 
     results['success'] = True
 
@@ -239,43 +240,44 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
             results['error'] = str(e)
             return results
 
-        # Each line of the response is an individual JSON blob.
-        for line in r.text.split('\n'):
-            # Skip empty lines.
-            if not line:
-                continue
+        if r.status_code != 404:
+            # Each line of the response is an individual JSON blob.
+            for line in r.text.split('\n'):
+                # Skip empty lines.
+                if not line:
+                    continue
 
-            try:
-                tmp = json.loads(line)
-            except Exception as e:
-                results['error'] = "%s: %s" % (str(e),
-                                                cgi.escape(line, quote=True))
-                return results
+                try:
+                    tmp = json.loads(line)
+                except Exception as e:
+                    results['error'] = "%s: %s" % (str(e),
+                                                    cgi.escape(line, quote=True))
+                    return results
 
-            # Convert epoch timestamps to human readable.
-            for key in ['time_first', 'time_last']:
-                if key in tmp:
-                    tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S",
-                                             time.gmtime(tmp[key]))
+                # Convert epoch timestamps to human readable.
+                for key in ['time_first', 'time_last']:
+                    if key in tmp:
+                        tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S",
+                                                 time.gmtime(tmp[key]))
 
-            rrtype = tmp['rrtype']
-            #Strip the MX weight
-            if rrtype == 'MX':
-                tmp['rdata'] = [tmp['rdata'].split()[1]]
-            else:
-                tmp['rdata'] = [tmp['rdata']]
+                rrtype = tmp['rrtype']
+                #Strip the MX weight
+                if rrtype == 'MX':
+                    tmp['rdata'] = [tmp['rdata'].split()[1]]
+                else:
+                    tmp['rdata'] = [tmp['rdata']]
 
-            if result_format == 'none':
-                if tmp['rrname'][-1] == ".":
-                    tmp['rrname'] = tmp['rrname'][:-1]
-                for i in range(len(tmp['rdata'])):
-                    if tmp['rdata'][i][-1] == ".":
-                        tmp['rdata'][i] = tmp['rdata'][i][:-1]
+                if result_format == 'none':
+                    if tmp['rrname'][-1] == ".":
+                        tmp['rrname'] = tmp['rrname'][:-1]
+                    for i in range(len(tmp['rdata'])):
+                        if tmp['rdata'][i][-1] == ".":
+                            tmp['rdata'][i] = tmp['rdata'][i][:-1]
 
-            try:
-                results['data'][rrtype].append(tmp)
-            except KeyError:
-                results['data'][rrtype] = [tmp]
+                try:
+                    results['data'][rrtype].append(tmp)
+                except KeyError:
+                    results['data'][rrtype] = [tmp]
 
     results['success'] = True
     if result_format != 'none':

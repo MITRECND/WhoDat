@@ -45,7 +45,7 @@ fields.addBaseField("rrtypes", "MultipleChoiceField", ["any"],
                                        ('ptr', 'PTR')
                                    ]})
 
-fields.addReverseField("type", "ChoiceField", "IP",
+fields.addReverseField("type", "ChoiceField", "ip",
                        parameters={"label": "Type",
                                    "required": True,
                                    "help_text": "The type of data to search for",

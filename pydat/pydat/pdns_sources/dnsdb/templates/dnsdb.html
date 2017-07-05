@@ -29,7 +29,7 @@
                           <td class='rdata'>
                             {% if item.rrtype == 'A' %}
                               {% for rd in item.rdata %}
-                              <a href="{% url 'pdns_r_rest' "ip" rd %}">{{ rd }}</a><br>
+                              <a href="{% url 'pdns_r_rest' rd %}">{{ rd }}</a><br>
                               {% endfor %}
                             {% else %}
                               {% for rd in item.rdata %}

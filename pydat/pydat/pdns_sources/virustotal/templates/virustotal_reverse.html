@@ -13,7 +13,7 @@
                     {% for item in results.data %}
                     <tr>
                       <td>
-                            {{ item.hostname }}
+                            <a href="{% url 'pdns_rest' item.hostname %}">{{ item.hostname }}</a>
                       </td>
                       <td>
                             {{ item.last_resolved }}

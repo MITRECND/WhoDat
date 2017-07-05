@@ -19,7 +19,7 @@
                 {% for item in results.data.resolutions %}
                 <tr>
                   <td>
-                        {{ item.ip_address }}
+                        <a href="{% url 'pdns_r_rest' item.ip_address %}"> {{ item.ip_address }}</a>
                   </td>
                   <td>
                         {{ item.last_resolved }}
@@ -40,7 +40,7 @@
                     {% for sd in results.data.subdomains %}
                     <tr>
                         <td>
-                            {{ sd }}
+                            <a href="{% url 'pdns_rest' sd %}">{{ sd }}</a>
                         </td>
                     </tr>
                     {% endfor %}
