@@ -7,45 +7,151 @@ import cgi
 import time
 import json
 import requests
+import socket
 import urllib
+import cStringIO
+import unicodecsv as csv
 from django.conf import settings
 
+from dnsdb import config
+
+def _format_results(results, fmt, dynamic_data):
+    if fmt =='json':
+        data = []
+        for rrtype in results['data']:
+            for d in results['data'][rrtype]:
+                data.append(json.dumps(d))
+        results['data'] = data
+    elif fmt == 'list':
+        filt_key = dynamic_data['filter']
+        data = []
+        for rrtype in results['data'].keys():
+            for record in results['data'][rrtype]:
+                if not isinstance(record[filt_key], basestring): #it's a list
+                    data.extend(record[filt_key])
+                else: #it's just a string
+                    data.append(record[filt_key])
+        data = data[1:]
+        results['data'] = data
+    elif fmt == 'csv':
+        compiled_data = []
+        header_keys = set()
+        for rrtype in results['data']:
+            for d in results['data'][rrtype]:
+                compiled_data.append(d)
+                header_keys = header_keys.union(set(d.keys()))
+
+        csv_out = cStringIO.StringIO()
+        writer = csv.DictWriter(csv_out, sorted(list(header_keys)))
+        writer.writeheader()
+        writer.writerows(compiled_data)
+        csv_data = csv_out.getvalue()
+        csv_out.close()
+        data = csv_data.split('\n')
+        results['data'] = data
+    else:
+        raise RuntimeError("Unrecognized format %s" % (fmt))
+
+    return results
+
+def validate_ip(input_ip):
+    ip = ""
+    mask = None
+    version = 4
+    if input_ip.count("/") > 0:
+        if input_ip.count("/") > 1:
+            raise TypeError("Invalid IP Syntax")
+        (ip, mask) = input_ip.split("/")
+    else:
+        ip = input_ip
+
+    #Validate ip part
+    try:
+        socket.inet_pton(socket.AF_INET6, ip)
+        version = 6
+    except: #invalid ipv6
+        try:
+            socket.inet_pton(socket.AF_INET, ip)
+        except Exception, e:
+            raise TypeError("Invalid IP Address")
+
+    output_ip = ip
+    #Validate mask if present
+    if mask is not None:
+        try:
+            mask = int(mask)
+            if mask < 1:
+                raise ValueError("Mask must be at least 1")
+            elif version == 4 and mask > 32:
+                raise ValueError("IP Mask too large for v4")
+            elif version == 6 and mask > 128:
+                raise ValueError("IP Mask too large for v6")
+        except:
+            raise TypeError("Unable to process mask")
+        output_ip += ",%d" % mask
+    return output_ip
+
+def validate_hex(input_hex):
+    try:
+        output_hex = "%x" % int(input_hex, 16)
+    except:
+        raise TypeError("Not hex")
+
+    if len(output_hex) % 2 == 1: #make hex string always pairs of hex values
+        output_hex = "0" + output_hex
+
+    return output_hex
+
+def _verify_type(value, type):
+    if type == 'ip':
+        try:
+            value = validate_ip(value)
+        except Exception as e:
+            raise TypeError("Unable to verify search value as ip")
+    elif type == 'name':
+        if isinstance(value, unicode):
+            value = value.encode("idna")
+    elif type == 'raw':
+        try:
+            value = validate_hex(value)
+        except Exception as e:
+            raise TypeError("Unable to verify type as hex")
+    else:
+        raise RuntimeError("Unexpected type")
+
+    return value
 
 
-'''Method to allow for custom pdns requests handler for DNSDB as a pdns source
-   Note: method name must be "pdns_request_handler" 
-'''
-
-def pdns_request_handler(common_field_dict,
-                         specific_field_dict,
-                         pdns_var_dict):
+def pdns_request_handler(domain, result_format, **dynamic_data):
     results = {'success': False }
 
-    if not pdns_var_dict["dnsdb_headers"]:
+    if not config.myConfig['apikey']:
         results['error'] = 'No DNSDB key.'
         return results
 
     # If 'any' is in rrtypes and anything else too, just default to 'any'
-    if 'any' in specific_field_dict['rrtypes'] and len(specific_field_dict['rrtypes']) >= 2:
-        specific_field_dict['rrtypes'] = ['any']
+    if 'any' in dynamic_data['rrtypes']:
+        dynamic_data['rrtypes'] = ['any']
 
     results['data'] = {}
     wildcard = "*."
     
-    if specific_field_dict['absolute']:
+    if dynamic_data['absolute']:
         wildcard = ""
-    for rrtype in specific_field_dict['rrtypes']:
+
+    for rrtype in dynamic_data['rrtypes']:
         url = "https://api.dnsdb.info/lookup/rrset/name/" \
                 + wildcard \
-                + urllib.quote(common_field_dict['domain']) + "/" \
+                + urllib.quote(domain) + "/" \
                 + rrtype \
-                + "/?limit=" + str(specific_field_dict['limit'])
+                + "/?limit=" + str(dynamic_data['limit'])
         try:
+            headers = {'Accept': 'application/json',
+                       'X-API-Key': config.myConfig['apikey']}
             r = requests.get(url,
                             proxies=settings.PROXIES,
-                            headers=pdns_var_dict["dnsdb_headers"],
-                            verify=pdns_var_dict["ssl_verify"]
-                )
+                            headers=headers,
+                            verify=config.myConfig["ssl_verify"])
         except Exception as e:
                 results['error'] = str(e)
                 print ("external request didntwork")
@@ -72,7 +178,7 @@ def pdns_request_handler(common_field_dict,
             if rrtype == 'MX':
                 tmp['rdata'] = [rd.split()[1] for rd in tmp['rdata']]
 
-            if pdns_var_dict['pretty']:
+            if result_format == 'none':
                 if tmp['rrname'][-1] == ".":
                     tmp['rrname'] = tmp['rrname'][:-1]
                 for i in range(len(tmp['rdata'])):
@@ -86,19 +192,8 @@ def pdns_request_handler(common_field_dict,
 
     results['success'] = True
 
-    #additional formatting-if user desired format is list format
-    filt_key = specific_field_dict['filter']
-    if common_field_dict['result_format'] == "list":
-        data = ''
-        for rrtype in results['data'].keys():
-            for record in results['data'][rrtype]:
-                if not isinstance(record[filt_key], basestring): #it's a list
-                    for item in record[filt_key]:
-                        data += '\n%s' % item
-                else: #it's just a string
-                    data += '\n%s' % record[filt_key]
-        data = data[1:]
-        results['data'] = data
+    if result_format != 'none':
+        results = _format_results(results, result_format, dynamic_data)
 
     return results
 
@@ -109,30 +204,37 @@ def pdns_request_handler(common_field_dict,
 
    Note: the method name must be "pdns_reverse_request_handler"
 '''
-def pdns_reverse_request_handler(common_field_dict,
-                                 specific_field_dict,
-                                 pdns_var_dict):
+def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
     results = {'success': False}
-    if not pdns_var_dict["dnsdb_headers"]:
+
+    if not config.myConfig['apikey']:
         results['error'] = 'No DNSDB key.'
+        return results
+
+    try:
+       value = _verify_type(search_value, dynamic_fields['type'])
+    except Exception as e:
+        results['error'] = 'Unable to verify input'
         return results
   
     # If 'any' is in rrtypes and anything else too, just default to 'any'
-    if 'any' in specific_field_dict['rrtypes'] and len(specific_field_dict['rrtypes']) >= 2:
-        specific_field_dict['rrtypes'] = ['any']
+    if 'any' in dynamic_fields['rrtypes']:
+        dynamic_fields['rrtypes'] = ['any']
 
     results['data'] = {}
-    for rrtype in specific_field_dict['rrtypes']:
+    for rrtype in dynamic_fields['rrtypes']:
         url = "https://api.dnsdb.info/lookup/rdata/" \
-                + common_field_dict['search_value_type'] +"/" \
-                + urllib.quote(common_field_dict['search_value'])  + "/" \
+                + dynamic_fields['type'] +"/" \
+                + urllib.quote(value)  + "/" \
                 + rrtype \
-                + "?limit=" + str(specific_field_dict['limit'])
+                + "?limit=" + str(dynamic_fields['limit'])
         try:
+            headers = {'Accept': 'application/json',
+                       'X-API-Key': config.myConfig['apikey']}
             r = requests.get(url,
                              proxies=settings.PROXIES,
-                             headers=pdns_var_dict["dnsdb_headers"],
-                             verify=pdns_var_dict["ssl_verify"])
+                             headers=headers,
+                             verify=config.myConfig["ssl_verify"])
         except Exception as e:
             results['error'] = str(e)
             return results
@@ -146,9 +248,8 @@ def pdns_reverse_request_handler(common_field_dict,
             try:
                 tmp = json.loads(line)
             except Exception as e:
-                results['error'] = "%s: %s" % (
-                                                str(e),
-                                                 cgi.escape(line, quote=True))
+                results['error'] = "%s: %s" % (str(e),
+                                                cgi.escape(line, quote=True))
                 return results
 
             # Convert epoch timestamps to human readable.
@@ -164,7 +265,7 @@ def pdns_reverse_request_handler(common_field_dict,
             else:
                 tmp['rdata'] = [tmp['rdata']]
 
-            if pdns_var_dict['pretty']:
+            if result_format == 'none':
                 if tmp['rrname'][-1] == ".":
                     tmp['rrname'] = tmp['rrname'][:-1]
                 for i in range(len(tmp['rdata'])):
@@ -177,20 +278,8 @@ def pdns_reverse_request_handler(common_field_dict,
                 results['data'][rrtype] = [tmp]
 
     results['success'] = True
-
-    #additional formatting-if user desired format is list format
-    filt_key = specific_field_dict['filter']
-    if common_field_dict['result_format'] == "list":
-        data = ''
-        for rrtype in results['data'].keys():
-            for record in results['data'][rrtype]:
-                if not isinstance(record[filt_key], basestring): #it's a list
-                    for item in record[filt_key]:
-                        data += '\n%s' % item
-                else: #it's just a string
-                    data += '\n%s' % record[filt_key]
-        data = data[1:]
-        results['data'] = data
+    if result_format != 'none':
+        results = _format_results(results, result_format, dynamic_data)
 
     return results
-            
+

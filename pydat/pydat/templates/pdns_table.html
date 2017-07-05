@@ -5,18 +5,17 @@
         based on results.sets.type (which is pDNS source name)
         {% endcomment %}
         
-        {% for set in results.sets|dictsort:"type" %}
+        {% for set in results|dictsort:"type" %}
             <li><a href="#tab-{{ set.type }}">{{ set.type }}</a></li>
         {% endfor %}
     </ul>
     
-    {% comment %}
-    The loop below was altered to use variable supplied templates (from pdns modules) that are
-    supplied with the result sets. Basically when a pdns module is called to process a pdns request,
-    it will return the results with a supplied template for displaying the results in the pydat interface. The below loop will include that supplied template.
-    {% endcomment %}
-    
-    {% for set in results.sets %}
-        {% include set.table_template with results=set %}
+    {% for set in results|dictsort:"type" %}
+        <!-- {{ set.name }} -->
+        <div id="tab-{{ set.type }}">
+            {% with set.name|add:"_"|add:direction|add:".html" as table_template %}
+                {% include table_template with results=set %}
+            {% endwith %}
+        </div>
     {% endfor %}
 </div>

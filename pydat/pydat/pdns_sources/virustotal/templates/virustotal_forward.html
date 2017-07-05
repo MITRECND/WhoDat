@@ -1,0 +1,75 @@
+{% if results.data %}
+<div id="virustotal-tab">
+    {% if fmt == "none" %}
+        <ul>
+            <li><a href="#virustotal-tab-resolutions">IP</a></li>
+            <li><a href="#virustotal-tab-subdomains">SubDomains</a></li>
+            <li><a href="#virustotal-tab-whois">WHOIS</a></li>
+        </ul>
+
+        <div id="virustotal-tab-resolutions">
+            <table class = "virustotal-dnsres dnsres">
+              <thead>
+                <tr>
+                  <th>IP Address</th>
+                  <th>Last Resolved</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in results.data.resolutions %}
+                <tr>
+                  <td>
+                        {{ item.ip_address }}
+                  </td>
+                  <td>
+                        {{ item.last_resolved }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+        </div>
+        <div id="virustotal-tab-subdomains">
+            <table class="virustotal-dnsres dnsres">
+                <thead>
+                    <tr>
+                        <th>Sub Domain</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sd in results.data.subdomains %}
+                    <tr>
+                        <td>
+                            {{ sd }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div id="virustotal-tab-whois">
+            <pre>{{ results.data.whois }}</pre>
+        </div>
+    {% else %}
+        <div id="virustotal-data">
+            <table>
+                <tbody>
+                    {% for line in results.data %}
+                    <tr>
+                        <td> {{ line }} </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+{% elif results.error %}
+    <span class='error'>
+        {{ results.error }}
+    </span>
+{% else %}
+    <div id = 'noresults'>
+    <h2>No Results Found</h2>
+    </div>
+{% endif %}

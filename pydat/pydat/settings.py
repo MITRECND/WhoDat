@@ -5,7 +5,6 @@
 
 import os
 import sys
-from pydat.pdns_sources import pdns_pkg_template_dirs, pdns_pkg_static_dirs
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -29,6 +28,10 @@ PROXIES = {}
 LIMIT = 10000
 
 PDNS_SOURCES = {}
+
+# Dynamic Passive DNS settings
+# Path to pdns source modules
+PDNS_MOD_PKG_BASE = "pdns_sources"
 
 # These keys are the ones we allow you to search on. This list must be
 # kept up to date as more searches are allowed.
@@ -111,7 +114,12 @@ STATICFILES_DIRS = [
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
 ]
-STATICFILES_DIRS.extend(pdns_pkg_static_dirs)
+
+#recursively search pydat.pdns_modules for any templates that reside in modules
+for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE), topdown=True):
+    for dir_ in dirs:
+        if "static" in dir_:
+            STATICFILES_DIRS.append(os.path.join(dirpath, dir_))
 
 # List of finder classes that know how to find static files in
 # various locations.
@@ -141,7 +149,14 @@ ROOT_URLCONF = 'pydat.urls'
 WSGI_APPLICATION = 'pydat.wsgi.application'
 
 #add pdns template directories to the django directory list
-_TEMPLATE_DIRS_ = list(pdns_pkg_template_dirs)
+_TEMPLATE_DIRS_ = [os.path.join(SITE_ROOT, "templates")]
+
+#recursively search pydat.pdns_modules for any templates that reside in modules
+for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE), topdown=True):
+    for dir_ in dirs:
+        if "templates" in dir_:
+            _TEMPLATE_DIRS_.append(os.path.join(dirpath, dir_))
+
 
 #insert the core django template directory at the front of
 #django template directory list (django searches directories in order)

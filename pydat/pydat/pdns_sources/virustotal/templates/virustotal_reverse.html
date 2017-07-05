@@ -1,0 +1,46 @@
+<div id = "virustotal-tab">
+{% if results %}
+    {% if fmt == "none" %}
+            <div>
+                <table class = "virustotal-dnsres dnsres">
+                  <thead>
+                    <tr>
+                      <th>Hostname</th>
+                      <th>Last Resolved</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in results.data %}
+                    <tr>
+                      <td>
+                            {{ item.hostname }}
+                      </td>
+                      <td>
+                            {{ item.last_resolved }}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+            </div>
+    {% else %}
+        <div id="virustotal-data">
+            <table>
+                {% for line in results.data %}
+                <tr>
+                    <td> {{ line }} </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    {% endif %}
+{% elif results.error %}
+    <span class='error'>
+        {{ results.error }}
+    </span>
+{% else %}
+    <div id = 'noresults'>
+    <h2>No Results Found</h2>
+    </div>
+{% endif %}
+</div>

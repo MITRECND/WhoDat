@@ -260,3 +260,7 @@ tr td.oldVersion {
 #pdns .dnsres a {
     color: black;
 }
+
+#pdns_fields {
+    width: 100%;
+}

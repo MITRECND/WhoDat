@@ -14,3 +14,11 @@ panel which is then filled with fields that are binded to it via an ID)
 @stringfilter
 def source_id(pdns_index):
     return "source" + str(pdns_index)
+
+@register.filter('prefix')
+def prefix(data, pre):
+    try:
+        return data.startswith(pre)
+    except:
+        pass
+    return False
