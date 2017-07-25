@@ -281,7 +281,7 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
 
     results['success'] = True
     if result_format != 'none':
-        results = _format_results(results, result_format, dynamic_data)
+        results = _format_results(results, result_format, dynamic_fields)
 
     return results
 
