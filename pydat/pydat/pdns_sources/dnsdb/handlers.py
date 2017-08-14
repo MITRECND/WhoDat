@@ -31,7 +31,7 @@ def _format_results(results, fmt, dynamic_data):
                     data.extend(record[filt_key])
                 else: #it's just a string
                     data.append(record[filt_key])
-        data = data[1:]
+        data = list(set(data[1:]))
         results['data'] = data
     elif fmt == 'csv':
         compiled_data = []
@@ -179,7 +179,7 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
                 if rrtype == 'MX':
                     tmp['rdata'] = [rd.split()[1] for rd in tmp['rdata']]
 
-                if result_format == 'none':
+                if result_format in ['none', 'list']:
                     if tmp['rrname'][-1] == ".":
                         tmp['rrname'] = tmp['rrname'][:-1]
                     for i in range(len(tmp['rdata'])):
@@ -267,7 +267,7 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
                 else:
                     tmp['rdata'] = [tmp['rdata']]
 
-                if result_format == 'none':
+                if result_format in ['none', 'list']:
                     if tmp['rrname'][-1] == ".":
                         tmp['rrname'] = tmp['rrname'][:-1]
                     for i in range(len(tmp['rdata'])):
