@@ -80,6 +80,14 @@ html, body {
     width: 50%;
 }
 
+.adv_table1{
+    width: 100%;
+}
+
+.adv_table1 input[type="text"] {
+    width: 95%;
+}
+
 #stats {
     float:right;
     width: 50%;

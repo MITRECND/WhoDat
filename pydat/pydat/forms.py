@@ -56,7 +56,7 @@ class domain_form(forms.Form):
 class advdomain_form(forms.Form):
     query = forms.CharField(
                         label='Search',
-                        widget=forms.TextInput(attrs={'size': '120'}))
+                        widget=forms.TextInput())
     filt = forms.ChoiceField(
                         label="Filter",
                         required=False)
