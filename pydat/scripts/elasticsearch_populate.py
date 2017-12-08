@@ -796,7 +796,8 @@ def main():
         else: # redo or update
             result = es.search(index=WHOIS_META,
                                body = { "query": {"match_all": {}},
-                                        "sort":[{"metadata": {"order": "asc"}}]})
+                                        "sort":[{"metadata": {"order": "asc"}}],
+                                        "size": 9999})
 
             if result['hits']['total'] == 0:
                 print("Unable to fetch entries from metadata index")
@@ -814,7 +815,8 @@ def main():
     index_list = es.search(index=WHOIS_META,
                            body = {"query": { "match_all": {}},
                                    "_source": "metadata",
-                                   "sort":[{"metadata": {"order": "desc"}}]})
+                                   "sort":[{"metadata": {"order": "desc"}}],
+                                   "size": 9999})
 
     index_list = [entry['_source']['metadata'] for entry in index_list['hits']['hits'][:-1]]
     options.INDEX_LIST = []
