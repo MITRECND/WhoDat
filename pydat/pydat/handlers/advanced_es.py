@@ -26,7 +26,7 @@ wildcard_pattern = r'(w"([^\t\n\r\f\v"])+")|' + r"(w'([^\t\n\r\f\v'])+')"
 # Regex precendence is functions in file order followed by regex string with decreasing complexity
 t_QUOTED =  r'"(\\[\\"~:\(\)]|[^\t\n\r\f\v\\"~:\(\)])+"|' + r"'(\\[\\~':\(\)]|[^\t\n\r\f\v\\'~:\(\)])*'"
 t_WORD =    r'((\\[\\~:\(\)])|[^\s\\~:\(\)\'"])+'
-t_DATE =    r'[0-9]{4}-((0[1-9])|1[1-2])-((0[1-9])|([1-2][0-9])|(3[0-1]))'
+t_DATE =    r'[0-9]{4}-((0[1-9])|1[0-2])-((0[1-9])|([1-2][0-9])|(3[0-1]))'
 t_FUZZY =   r'~[0-9]?'
 t_COLON =   r':'
 t_LPAREN =  r'\('
