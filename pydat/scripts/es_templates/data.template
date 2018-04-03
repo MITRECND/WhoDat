@@ -1,7 +1,6 @@
 {
-    "template": "whois-*",
+    "template": "",
     "aliases": {
-        "whois-search": {}
     },
     "settings" : {
         "number_of_shards" : 2,

@@ -20,7 +20,7 @@ MONGO_DATABASE = 'whois'
 COLL_WHOIS = 'whois'
 
 ES_URI = 'localhost:9200'
-ES_INDEX_PREFIX = 'whois'
+ES_INDEX_PREFIX = 'pydat'
 
 PROXIES = {}
 
