@@ -1201,7 +1201,8 @@ def main():
                               "ES shard and should take your ES "
                               "configuration into consideration"))
 
-    parser.add_argument("--processes", action="store", dest="procs", type=int,
+    parser.add_argument("--pipelines", action="store", dest="procs", type=int,
+                        metavar="PIPELINES",
                         default=2, help="Number of pipelines, defaults to 2")
     parser.add_argument("--shipper-threads", action="store",
                         dest="shipper_threads", type=int, default=1,
@@ -1510,7 +1511,7 @@ def main():
     options.INDEX_LIST = sorted(index_list.keys(), reverse=True)
 
     pipelines = []
-    # Check if rollover is required before starting any processes
+    # Check if rollover is required before starting any pipelines
     roll = rolloverRequired(es, options)
     if roll:
         rolloverIndex(roll, es, options, pipelines)
@@ -1660,7 +1661,7 @@ def main():
             while proc.is_alive():
                 proc.join(.1)
 
-        myLogger.debug("Processes shutdown, cleaning up state")
+        myLogger.debug("Pipelines shutdown, cleaning up state")
         # Send the finished message to the stats queue to shut it down
         statTracker.shutdown()
         statTracker.join()

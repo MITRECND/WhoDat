@@ -14,27 +14,10 @@
 # to access the application
 #ALLOWED_HOSTS = ['*']
 
-#Default handler is mongo
-#Uncomment below line to switch handler to ElasticSearch
-#HANDLER = 'es'
-
-#To override the mongo read preference
-#Uncomment the following two lines
-#from pymongo import ReadPreference
-#MONGO_READ_PREFERENCE = ReadPreference.PRIMARY
-
-#Default settings for mongo
-#Uncomment to change
-#MONGO_HOST = 'localhost'
-#MONGO_PORT = 27017
-#MONGO_DATABASE = 'whois'
-#COLL_WHOIS = 'whois'
-
 #Default settings for elasticsearch
 #Uncomment to change
 #ES_URI = 'localhost:9200'
 #ES_INDEX_PREFIX = 'pydat'
-
 
 #Fill in with pdns sources within the custom_settings.py. 
 #PDNS_SOURCES ={}

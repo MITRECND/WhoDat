@@ -21,7 +21,7 @@ RUN \
     apt-get install -y python python-dev $buildDeps && \
     /tmp/get-pip.py && \
     rm /tmp/get-pip.py && \
-    pip install -r /opt/WhoDat/docker/requirements.txt && \
+    pip install -r /opt/WhoDat/requirements.es5.txt && \
     cd /tmp/ && \
     tar -zxf ${WSGI_VERSION}.tar.gz && \
     rm ${WSGI_VERSION}.tar.gz && \

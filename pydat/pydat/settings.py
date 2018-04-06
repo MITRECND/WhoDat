@@ -12,13 +12,7 @@ DEBUG = False
 
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
-HANDLER = 'mongo'
-
-MONGO_HOST = 'localhost'
-MONGO_PORT = 27017
-MONGO_DATABASE = 'whois'
-COLL_WHOIS = 'whois'
-
+HANDLER='es'
 ES_URI = 'localhost:9200'
 ES_INDEX_PREFIX = 'pydat'
 
@@ -35,7 +29,7 @@ PDNS_MOD_PKG_BASE = "pdns_sources"
 
 # These keys are the ones we allow you to search on. This list must be
 # kept up to date as more searches are allowed.
-# Array of tuples (mongo_field_name, Friendly Display Name)
+# Array of tuples (field_name, Friendly Display Name)
 # domainName should always be first
 SEARCH_KEYS = [ ('domainName', 'Domain'), 
                 ('registrant_name', 'Registrant Name'), 
@@ -230,11 +224,3 @@ LOGGING = {
 csfile = os.path.join(SITE_ROOT, 'custom_settings.py')
 if os.path.exists(csfile):
     execfile(csfile)
-
-#Set the mongo read preference if it isn't already
-if HANDLER == 'mongo':
-    try:
-        MONGO_READ_PREFERENCE
-    except NameError:
-            from pymongo import ReadPreference
-            MONGO_READ_PREFERENCE = ReadPreference.PRIMARY

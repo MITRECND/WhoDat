@@ -1,0 +1,6 @@
+requests
+unicodecsv
+markdown
+django
+elasticsearch>=6.0.0,<7.0.0
+ply

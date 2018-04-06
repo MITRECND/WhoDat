@@ -3,7 +3,7 @@ WhoDat Project
 
 
 The WhoDat project is a front-end for whoisxmlapi data, or any whois data
-living in a MongoDB. It integrates whois data, current IP resolutions and
+living in ElasticSearch. It integrates whois data, current IP resolutions and
 passive DNS. In addition to providing an interactive, pivotable application
 for analysts to perform research, it also has an API which will allow output
 in JSON or list format.
@@ -25,41 +25,12 @@ keep reading...
 ElasticSearch
 ==============
 
-<b>The ElasticSearch backend code is still under testing, please consider the following before using ES as a backend:</b>
-
-- Some things might be broken
-    - I.e., some error handling might be non-existent
-- There might be random debug output printed out
-- The search language might not be complete
-- The data template used with ElasticSearch might change
-    - Which means you might have ot re-ingest all of your data at some point!
-
-
 <b>PreReqs to run with ElasticSearch</b>:
 
 - ElasticSearch installed somewhere
 - python elasticsearch library (pip install elasticsearch -- ensure proper version is installed for your version of ES)
 - python lex yacc library (pip install ply)
-- below specified prereqs too 
-
-<b>ElasticSearch Scripting</b>
-ElasticSearch 2.x comes with dynamic Groovy scripting disabled due to potential sandbox breakout issues with the Groovy container. Unfortunately, the only way to do certain things in ElasticSearch is via this scripting language. Because the default installation of ES does not have a work-around, there is a setting called ES_SCRIPTING_ENABLED in the pyDat settings file which is set to False by default. When set to True, the pyDat advanced search capability will expose an extra feature called 'Unique Domains' which given search results that will return multiple results for a given domain (e.g., due to multiple versions of a domain matching) will return only the latest entry instead of all entries. Before setting this option to True, you must install a script server-side on every ES node -- to do this, please copy the file called \_score.groovy from the es_scripts directory to your scripts directory located in the elasticsearch configuration directory. On package-based installs of ES on RedHat/CentOS or Ubuntu this should be /etc/elasticsearch/scripts. If the scripts directory does not exist, please create it. Note you have to restart the Node for it to pick up the script.
-
-If using ElaticSearch 5.x or greater, you can enable the setting ES_PAINLESS which will then use the built-in painless scripting language to accomplish what was done by groovy before. This option takes precedence over ES_SCRIPTING_ENABLED when set to true.
-<b> ElasticSearch Plugins</b>
-
-The murmur3 mapping type was removed from the ElasticSearch core and into a plugin. The stats page uses this field to obtain information about the domains loaded in elasticsearch and further the template provided will not load if the murmur3 mapper is not loaded. Ensure the plugin is installed on *every* node in your cluster before proceeding. Alternatively, you can remove 'hash' field from domainName in the template and disable the stats page (just html comment or remove the link from the header).
-
-
-To install the plugin, use the plugin utility on every node:
-
-<pre>
-plugin install mapper-murmur3
-</pre>
-
-
-This will require a restart of the node to pick up the plugin.
-
+- below specified prereqs too
 
 pyDat
 =====
@@ -68,9 +39,8 @@ pyDat is a Python implementation of [Chris Clark's](https://github.com/Xen0ph0n)
 WhoDat code. It is designed to be more extensible and has more features than
 the PHP implementation.
 
-Version 2.0 of pyDat introduced support for historical whois searches. This capability
-necessitated modifying the way data is stored in the database. To aid in properly populating
-the database, a script called [elasticsearch_populate](./pydat/scripts/elasticsearch_populate.py) is provided
+To aid in properly populating the database, a script called
+[elasticsearch_populate](./pydat/scripts/elasticsearch_populate.py) is provided
 to auto-populate the data. Note that the data coming from whoisxmlapi doesn't seem to be always
 consistent so some care should be taken when ingesting data. More testing needs to be done to ensure
 all data is ingested properly. Anyone setting up their database, should read the available flags for the
@@ -78,60 +48,102 @@ script before running it to ensure they've tweaked it for their setup. The follo
 elasticsearch_populate -h
 
 <pre>
-Usage: elasticsearch_populate.py [options]
+usage: elasticsearch_populate.py [-h] [-f FILE | -d DIRECTORY] [-e EXTENSION]
+                                 (-i IDENTIFIER | -r | -z | --config-template-only)
+                                 [-v] [--vverbose] [-s]
+                                 [-x EXCLUDE | -n INCLUDE] [-o COMMENT]
+                                 [-u [ES_URI [ES_URI ...]]] [-p INDEX_PREFIX]
+                                 [-B BULK_SIZE] [-b BULK_FETCH_SIZE]
+                                 [--optimize-import]
+                                 [--rollover-size ROLLOVER_DOCS]
+                                 [--processes PROCS]
+                                 [--shipper-threads SHIPPER_THREADS]
+                                 [--fetcher-threads FETCHER_THREADS]
+                                 [--ignore-field-prefixes [IGNORE_FIELD_PREFIXES [IGNORE_FIELD_PREFIXES ...]]]
+                                 [--debug]
 
-Options:
+optional arguments:
   -h, --help            show this help message and exit
-  -f FILE, --file=FILE  Input CSV file
-  -d DIRECTORY, --directory=DIRECTORY
-                        Directory to recursively search for CSV files -
-                        prioritized over 'file'
-  -e EXTENSION, --extension=EXTENSION
+  -f FILE, --file FILE  Input CSV file
+  -d DIRECTORY, --directory DIRECTORY
+                        Directory to recursively search for CSV files --
+                        mutually exclusive to '-f' option
+  -e EXTENSION, --extension EXTENSION
                         When scanning for CSV files only parse files with
                         given extension (default: 'csv')
-  -i IDENTIFIER, --identifier=IDENTIFIER
+  -i IDENTIFIER, --identifier IDENTIFIER
                         Numerical identifier to use in update to signify
                         version (e.g., '8' or '20140120')
-  -t THREADS, --threads=THREADS
-                        Number of workers, defaults to 2. Note that each
-                        worker will increase the load on your ES cluster
-  -B BULK_SIZE, --bulk-size=BULK_SIZE
-                        Size of Bulk Insert Requests
+  -r, --redo            Attempt to re-import a failed import or import more
+                        data, uses stored metadata from previous import (-o,
+                        -n, and -x not required and will be ignored!!)
+  -z, --update          Run the script in update mode. Intended for taking
+                        daily whois data and adding new domains to the current
+                        existing index in ES.
+  --config-template-only
+                        Configure the ElasticSearch template and then exit
   -v, --verbose         Be verbose
   --vverbose            Be very verbose (Prints status of every domain parsed,
                         very noisy)
   -s, --stats           Print out Stats after running
-  -x EXCLUDE, --exclude=EXCLUDE
+  -x EXCLUDE, --exclude EXCLUDE
                         Comma separated list of keys to exclude if updating
                         entry
-  -n INCLUDE, --include=INCLUDE
+  -n INCLUDE, --include INCLUDE
                         Comma separated list of keys to include if updating
                         entry (mutually exclusive to -x)
-  -o COMMENT, --comment=COMMENT
+  -o COMMENT, --comment COMMENT
                         Comment to store with metadata
-  -r, --redo            Attempt to re-import a failed import or import more
-                        data, uses stored metatdata from previous import (-o
-                        and -x not required and will be ignored!!)
-  -u ES_URI, --es-uri=ES_URI
-                        Location of ElasticSearch Server (e.g.,
-                        foo.server.com:9200)
-  -p INDEX_PREFIX, --index-prefix=INDEX_PREFIX
-                        Index prefix to use in ElasticSearch (default: whois)
-  --bulk-threads=BULK_THREADS
-                        How many threads to use for making bulk requests to ES
+  -u [ES_URI [ES_URI ...]], --es-uri [ES_URI [ES_URI ...]]
+                        Location(s) of ElasticSearch Server (e.g.,
+                        foo.server.com:9200) Can take multiple endpoints
+  -p INDEX_PREFIX, --index-prefix INDEX_PREFIX
+                        Index prefix to use in ElasticSearch (default: pydat)
+  -B BULK_SIZE, --bulk-size BULK_SIZE
+                        Size of Bulk Elasticsearch Requests
+  -b BULK_FETCH_SIZE, --bulk-fetch-size BULK_FETCH_SIZE
+                        Number of documents to search for at a time (default
+                        50), note that this will be multiplied by the number
+                        of indices you have, e.g., if you have 10
+                        pydat-<number> indices it results in a request for 500
+                        documents
+  --optimize-import     If enabled, will change ES index settings to speed up
+                        bulk imports, but if the cluster has a failure, data
+                        might be lost permanently! This also makes rolling
+                        indexes over less consistent!
+  --rollover-size ROLLOVER_DOCS
+                        Set the number of documents after which point a new
+                        index should be created, defaults to 50 milllion, note
+                        that this is fuzzy since the index count isn't
+                        continuously updated, so should be reasonably below 2
+                        billion per ES shard and should take your ES
+                        configuration into consideration
+  --pipelines PIPELINES
+                        Number of pipelines, defaults to 2
+  --shipper-threads SHIPPER_THREADS
+                        How many threads per pipeline to spawn to send bulk ES
+                        messages. The larger your cluster, the more you can
+                        increase this, defaults to 1
+  --fetcher-threads FETCHER_THREADS
+                        How many threads to spawn to search ES. The larger
+                        your cluster, the more you can increase this, defaults
+                        to 2
+  --ignore-field-prefixes [IGNORE_FIELD_PREFIXES [IGNORE_FIELD_PREFIXES ...]]
+                        list of fields (in whois data) to ignore when
+                        extracting and inserting into ElasticSearch
+  --debug               Enables debug logging
 </pre>
 
 
-Note that when adding a new version of data to the database, you should use either the -x flag to exclude certain
-fields that are not important to track changes or the -n flag to include specific fields that are subject to scrutiny.
-This will significantly decrease the amount of data that is stored between versions. You can only use either -x or -n not both
-at the same time, but you can choose whichever is best for your given environment. As an example, if you get daily updates, you
-might decide that for daily updates you only care if contactEmail changes but every quarter you might want to instead only exclude
+Note that when adding a new version of data to the database, you should use
+either the -x flag to exclude certain fields that are not important to track
+changes or the -n flag to include specific fields that are subject to scrutiny.
+This will significantly decrease the amount of data that is stored between
+versions. You can only use either -x or -n not both at the same time, but you
+can choose whichever is best for your given environment. As an example, if you
+get daily updates, you might decide that for daily updates you only care
+if contactEmail changes but every quarter you might want to instead only exclude
 certain fields you don't find important.
-
-Version 3.0 of pyDat introduces ElasticSearch as the backend going forward for storing and searching data. Although the mongo backend
-should still work, it should be considered deprecated and it is recommended installations move to ES as a backend as it provides 
-numerous benefits with regards to searching, including a full-featured query language allowing for more powerful searches.
 
 ScreenShot
 ===========
@@ -141,12 +153,13 @@ ScreenShot
 Running pyDat
 =============
 
-pyDat does not provide any data on its own. You must provide your own whois data in an ElasticSearch data store . Beyond the data in ElasticSearch you will need
-[Django](https://djangoproject.com), [unicodecsv](https://pypi.python.org/pypi/unicodecsv), 
-[requests](https://pypi.python.org/pypi/requests) (at least 2.2.1) and [markdown](https://pypi.python.org/pypi/Markdown). 
+pyDat does not provide any data on its own. You must provide your own whois
+data in an ElasticSearch data store . Beyond the data in ElasticSearch you will need
+[Django](https://djangoproject.com), [unicodecsv](https://pypi.python.org/pypi/unicodecsv),
+[requests](https://pypi.python.org/pypi/requests) (at least 2.2.1) and [markdown](https://pypi.python.org/pypi/Markdown).
 
 
-Populating ElasticSearch with whoisxmlapi data (Ubuntu 14.04.3 LTS)
+Populating ElasticSearch with whoisxmlapi data (Ubuntu 16.04.3 LTS)
 ===========================================================
 
 - Install ElasticSearch. Using [Docker](https://hub.docker.com/_/elasticsearch/) is the easiest mechanism
@@ -186,15 +199,17 @@ sudo vi /etc/apache2/sites-available/whois
 Docker Installation
 -------------------
 
-If you don't want to install pyDat manually, you can use the docker image to quickly deploy the system.
+If you don't want to install pyDat manually, you can use the docker image to
+quickly deploy the system.
 
-First, make sure to copy custom_settings_example.py to custom_settings.py and customize it to match your environment
+First, make sure to copy custom_settings_example.py to custom_settings.py
+and customize it to match your environment
 
 You can then launch pyDat by running
 
 ```
 docker run -d --name pydat -p 80:80 -v <path/to/custom_settings.py>:/opt/WhoDat/pydat/pydat/custom_settings.py mitrecnd/pydat
-``` 
+```
 
 
 pyDat API
@@ -218,8 +233,6 @@ ajax/domain/<domainName>/diff/<version1>/<version2>/
 ```
 
 The domain endpoint allows you to get information about a specific domain name. By default, this will return information for any version of a domain that is found in the database. You can specify more information to obtain specific versions of domain information or to obtain the latest entry. You can also obtain a diff between two versions of a domain to see what has changed.
-
-**Warning**: The output from the /diff endpoint has changed slightly in 3.0 to conform to the output of other endpoints. Data for the diff now resides in the 'data' object nested under the root
 
 ```
 ajax/domains/<searchKey>/<searchValue>/
@@ -251,8 +264,6 @@ curl http://pydat.myorg.domain/ajax/domains/domainName/google.com/
 Advanced Syntax Endpoint
 -------------------------
 
-If using ElasticSearch as the backend, a new endpoint is available that supports search via the advanced query syntax:
-
 ```
 ajax/query
 ```
@@ -267,7 +278,9 @@ unique - Only accepted if ES scripting is enabled (read above)
 ```
 
 ###Note on the unique parameter
-If you're using the unique parameter, note that paging of results is disabled, but the size paramter will still be used to control the number of results returned.
+If you're using the unique parameter, note that paging of results is disabled,
+but the size parameter will still be used to control the number of results
+returned.
 
 
 Untested Stuff
