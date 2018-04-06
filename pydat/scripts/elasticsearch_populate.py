@@ -126,6 +126,34 @@ class StatTracker(Thread):
         self._stat_queue.put(('stat', field))
 
 
+class EventTracker(object):
+    def __init__(self):
+        self._shutdownEvent = multiprocessing.Event()
+        self._bulkErrorEvent = multiprocessing.Event()
+        self._fileReaderDoneEvent = multiprocessing.Event()
+
+    @property
+    def shutdown(self):
+        return self._shutdownEvent.is_set()
+
+    def setShutdown(self):
+        self._shutdownEvent.set()
+
+    @property
+    def bulkError(self):
+        return self._bulkErrorEvent.is_set()
+
+    def setBulkError(self):
+        self._bulkErrorEvent.set()
+
+    @property
+    def fileReaderDone(self):
+        return self._fileReaderDoneEvent.is_set()
+
+    def setFileReaderDone(self):
+        self._fileReaderDoneEvent.set()
+
+
 class indexFormatter(object):
     """Convenience object to store formatted index names, based on the prefix
     """
@@ -267,9 +295,10 @@ class FileReader(Thread):
     found files into a queue for processing by pipelines
     """
 
-    def __init__(self, datafile_queue, options, **kwargs):
+    def __init__(self, datafile_queue, eventTracker, options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.datafile_queue = datafile_queue
+        self.eventTracker = eventTracker
         self.options = options
         self._shutdown = False
 
@@ -277,12 +306,17 @@ class FileReader(Thread):
         self._shutdown = True
 
     def run(self):
-        if self.options.directory:
-            self.scan_directory(self.options.directory)
-        elif self.options.file:
-            self.datafile_queue.put(self.options.file)
-        else:
-            LOGGER.error("File or Directory required")
+        try:
+            if self.options.directory:
+                self.scan_directory(self.options.directory)
+            elif self.options.file:
+                self.datafile_queue.put(self.options.file)
+            else:
+                LOGGER.error("File or Directory required")
+        except Exception as e:
+            LOGGER.error("Unknown exception in File Reader")
+        finally:
+            self.eventTracker.setFileReaderDone()
 
     def scan_directory(self, directory):
         for path in sorted(os.listdir(directory)):
@@ -310,11 +344,13 @@ class DataReader(Thread):
     places it on a queue for processing by the fetcher
     """
 
-    def __init__(self, datafile_queue, data_queue, options, **kwargs):
+    def __init__(self, datafile_queue, data_queue, eventTracker,
+                 options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.datafile_queue = datafile_queue
         self.data_queue = data_queue
         self.options = options
+        self.eventTracker = eventTracker
         self._shutdown = False
         self._pause = False
         self._finish = False
@@ -340,7 +376,10 @@ class DataReader(Thread):
                 finally:
                     self.datafile_queue.task_done()
             except queue.Empty as e:
-                break
+                if self.eventTracker.fileReaderDone:
+                    break
+                time.sleep(.01)
+                continue
             except Exception as e:
                 LOGGER.exception("Unhandled Exception")
 
@@ -411,13 +450,15 @@ class DataFetcher(Thread):
     the source to be sent to the worker
     """
 
-    def __init__(self, es, data_queue, work_queue, options, **kwargs):
+    def __init__(self, es, data_queue, work_queue, eventTracker,
+                 options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.data_queue = data_queue
         self.work_queue = work_queue
         self.options = options
         self.es = es
         self.fetcher_threads = []
+        self.eventTracker = eventTracker
         self._shutdown = False
         self._finish = False
 
@@ -559,13 +600,14 @@ class DataWorker(Thread):
     shipper
     """
 
-    def __init__(self, work_queue, insert_queue,
-                 statTracker, options, **kwargs):
+    def __init__(self, work_queue, insert_queue, statTracker,
+                 eventTracker, options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.work_queue = work_queue
         self.insert_queue = insert_queue
         self.statTracker = statTracker
         self.options = options
+        self.eventTracker = eventTracker
         self._shutdown = False
         self._finish = False
 
@@ -774,12 +816,12 @@ class DataShipper(Thread):
     """Thread that ships commands to elasticsearch cluster_stats
     """
 
-    def __init__(self, es, insert_queue, bulkErrorEvent,
+    def __init__(self, es, insert_queue, eventTracker,
                  options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.insert_queue = insert_queue
         self.options = options
-        self.bulkErrorEvent = bulkErrorEvent
+        self.eventTracker = eventTracker
         self.es = es
         self._finish = False
 
@@ -807,23 +849,23 @@ class DataShipper(Thread):
                                            chunk_size=self.options.bulk_size):
                 resp = response[response.keys()[0]]
                 if not ok and resp['status'] not in [404, 409]:
-                        if not self.bulkErrorEvent.is_set():
-                            self.bulkErrorEvent.set()
+                        if not self.eventTracker.bulkError:
+                            self.eventTracker.setBulkError()
                         LOGGER.debug("Response: %s" % (str(resp)))
                         LOGGER.error(("Error making bulk request, received "
                                       "error reason: %s")
                                      % (resp['error']['reason']))
         except Exception as e:
             LOGGER.exception("Unexpected error processing bulk commands")
-            if not self.bulkErrorEvent.is_set():
-                self.bulkErrorEvent.set()
+            if not self.eventTracker.bulkError:
+                self.eventTracker.setBulkError
 
 
 class DataProcessor(Process):
     """Main pipeline process which manages individual threads
     """
-    def __init__(self, datafile_queue, statTracker, logger,
-                 shutdownEvent, bulkErrorEvent, options, **kwargs):
+    def __init__(self, pipeline_id, datafile_queue, statTracker, logger,
+                 eventTracker, options, **kwargs):
         Process.__init__(self, **kwargs)
         self.datafile_queue = datafile_queue
         self.statTracker = statTracker
@@ -835,9 +877,9 @@ class DataProcessor(Process):
         self.pause_request = multiprocessing.Value('b', False)
         self._paused = multiprocessing.Value('b', False)
         self._complete = multiprocessing.Value('b', False)
-        self.shutdownEvent = shutdownEvent
-        self.bulkErrorEvent = bulkErrorEvent
+        self.eventTracker = eventTracker
         self.es = None
+        self.myid = pipeline_id
 
         # Queue for individual csv entries
         self.data_queue = queue.Queue(maxsize=10000)
@@ -889,7 +931,7 @@ class DataProcessor(Process):
             self._paused.value = False
 
     def shutdown(self):
-        LOGGER.debug("Shutting down reader")
+        LOGGER.debug("Pipeline %d shutting down reader" % (self.myid))
         self.reader_thread.shutdown()
         while self.reader_thread.is_alive():
             try:
@@ -898,7 +940,7 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Shutting down fetchers")
+        LOGGER.debug("Pipeline %d shutting down fetchers" % (self.myid))
         for fetcher in self.fetcher_threads:
             fetcher.shutdown()
             # Ensure put is not blocking shutdown
@@ -909,7 +951,7 @@ class DataProcessor(Process):
                 except queue.Empty:
                     break
 
-        LOGGER.debug("Draining work queue")
+        LOGGER.debug("Pipeline %d draining work queue" % (self.myid))
         # Drain the work queue
         while not self.work_queue.empty():
             try:
@@ -918,7 +960,7 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Shutting down worker thread")
+        LOGGER.debug("Pipeline %d shutting down worker thread" % (self.myid))
         self.worker_thread.shutdown()
         while self.worker_thread.is_alive():
             try:
@@ -927,7 +969,7 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Draining insert queue")
+        LOGGER.debug("Pipeline %d draining insert queue" % (self.myid))
         # Drain the insert queue
         while not self.insert_queue.empty():
             try:
@@ -936,52 +978,57 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Waiting for shippers to finish")
+        LOGGER.debug("Pipeline %d waiting for shippers to finish"
+                     % (self.myid))
         # Shippers can't be forced to shutdown
         for shipper in self.shipper_threads:
             shipper.finish()
             shipper.join()
 
-        LOGGER.debug("Process Shutdown Complete")
+        LOGGER.debug("Pipeline %d shutdown Complete" % (self.myid))
 
     def finish(self):
-        LOGGER.debug("Waiting for fetchers to finish")
+        LOGGER.debug("Pipeline %d waiting for fetchers to finish"
+                     % (self.myid))
         for fetcher in self.fetcher_threads:
             fetcher.finish()
             fetcher.join()
 
-        LOGGER.debug("Waiting for worker to finish")
+        LOGGER.debug("Pipeline %d waiting for worker to finish" % (self.myid))
         self.worker_thread.finish()
         self.worker_thread.join()
 
-        LOGGER.debug("Waiting for shippers to finish")
+        LOGGER.debug("Pipeline %d waiting for shippers to finish"
+                     % (self.myid))
         for shipper in self.shipper_threads:
             shipper.finish()
             shipper.join()
 
     def startup_rest(self):
-        LOGGER.debug("Starting Worker")
+        LOGGER.debug("Pipeline %d starting Worker" % (self.myid))
         self.worker_thread = DataWorker(self.work_queue,
                                         self.insert_queue,
                                         self.statTracker,
+                                        self.eventTracker,
                                         self.options)
         self.worker_thread.daemon = True
         self.worker_thread.start()
 
-        LOGGER.debug("Starting Fetchers")
+        LOGGER.debug("Pipeline %d starting Fetchers" % (self.myid))
         for _ in range(self.options.fetcher_threads):
             fetcher_thread = DataFetcher(self.es,
                                          self.data_queue,
                                          self.work_queue,
+                                         self.eventTracker,
                                          self.options)
             fetcher_thread.start()
             self.fetcher_threads.append(fetcher_thread)
 
-        LOGGER.debug("Starting Shippers")
+        LOGGER.debug("Pipeline %d starting Shippers" % (self.myid))
         for _ in range(self.options.shipper_threads):
             shipper_thread = DataShipper(self.es,
                                          self.insert_queue,
-                                         self.bulkErrorEvent,
+                                         self.eventTracker,
                                          self.options)
             shipper_thread.start()
             self.shipper_threads.append(shipper_thread)
@@ -991,19 +1038,22 @@ class DataProcessor(Process):
         try:
             self.es = connectElastic(self.options.es_uri)
         except elasticsearch.exceptions.TransportError as e:
-            LOGGER.critical("Unable to establish elastic connection")
+            LOGGER.critical(("Pipeline %d unable to establish elastic "
+                             "connection") % (self.myid))
             return
 
         self.startup_rest()
 
-        LOGGER.debug("Starting Reader")
+        LOGGER.debug("Pipeline %d starting Reader" % (self.myid))
         self.reader_thread = DataReader(self.datafile_queue,
-                                        self.data_queue, self.options)
+                                        self.data_queue,
+                                        self.eventTracker,
+                                        self.options)
         self.reader_thread.start()
 
         # Wait to shutdown/finish
         while 1:
-            if self.shutdownEvent.is_set():
+            if self.eventTracker.shutdown:
                 self.shutdown()
                 break
 
@@ -1015,7 +1065,8 @@ class DataProcessor(Process):
 
             self.reader_thread.join(.1)
             if not self.reader_thread.isAlive():
-                LOGGER.debug("Reader thread exited, finishing up")
+                LOGGER.debug("Pipeline %d Reader thread exited, finishing up"
+                             % (self.myid))
                 self.finish()
                 break
 
@@ -1150,8 +1201,7 @@ def rolloverIndex(roll, es, options, pipelines):
 
 
 def main():
-    shutdownEvent = multiprocessing.Event()
-    bulkErrorEvent = multiprocessing.Event()
+    eventTracker = EventTracker()
     parser = argparse.ArgumentParser()
 
     dataSource = parser.add_mutually_exclusive_group()
@@ -1566,13 +1616,13 @@ def main():
 
     # Everything configured -- start it up
     # Start up Reader Thread
-    reader_thread = FileReader(datafile_queue, options)
+    reader_thread = FileReader(datafile_queue, eventTracker, options)
     reader_thread.daemon = True
     reader_thread.start()
 
-    for _ in range(options.procs):
-        p = DataProcessor(datafile_queue, statTracker, logger,
-                          shutdownEvent, bulkErrorEvent, options)
+    for pipeline_id in range(options.procs):
+        p = DataProcessor(pipeline_id, datafile_queue, statTracker, logger,
+                          eventTracker, options)
         p.start()
         pipelines.append(p)
 
@@ -1596,7 +1646,7 @@ def main():
             timer = rolloverTimer(timer)
 
             # If bulkError occurs stop processing
-            if bulkErrorEvent.is_set():
+            if eventTracker.bulkError:
                 myLogger.critical("Bulk API error -- forcing program shutdown")
                 raise KeyboardInterrupt(("Error response from ES worker, "
                                          "stopping processing"))
@@ -1618,7 +1668,7 @@ def main():
                 timer = rolloverTimer(timer)
                 proc.join(.1)
 
-                if bulkErrorEvent.is_set():
+                if eventTracker.bulkError:
                     myLogger.critical(("Bulk API error -- forcing program "
                                        "shutdown"))
                     raise KeyboardInterrupt(("Error response from ES worker, "
@@ -1702,7 +1752,7 @@ def main():
         reader_thread.join()
 
         # Signal the pipeline procs to shutdown
-        shutdownEvent.set()
+        eventTracker.setShutdown()
 
         myLogger.info("Shutting down processing pipelines...")
         for proc in pipelines:
