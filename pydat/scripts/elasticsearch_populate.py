@@ -45,6 +45,12 @@ def connectElastic(uri):
 
 
 class StatTracker(Thread):
+    """Multi-processing safe stat tracking class
+
+    This class can be provided to all pipelines to keep track of different
+    stats about the domains being ingested
+    """
+
     def __init__(self, **kwargs):
         Thread.__init__(self, **kwargs)
         self._stats = {'total': 0,
@@ -123,6 +129,7 @@ class StatTracker(Thread):
 class indexFormatter(object):
     """Convenience object to store formatted index names, based on the prefix
     """
+
     def __init__(self, prefix):
         self.prefix = prefix
         self.orig_write = "%s-write" % prefix
@@ -137,7 +144,13 @@ class indexFormatter(object):
 
 class mpLogger(Thread):
     """Multiprocessing 'safe' logger implementation
+
+    This logger implementation should probably not be used by the main
+    thread since it relies on a queue for its data processing. So if things
+    need to be printed immediately, i.e,. on error, it should be done via
+    the regular logging instance
     """
+
     def __init__(self, name=__name__, debug=False, **kwargs):
         Thread.__init__(self, **kwargs)
         self._debug = debug
@@ -248,6 +261,12 @@ class mpLogger(Thread):
 
 
 class FileReader(Thread):
+    """Simple data file organizer
+
+    This class focuses on iterating through directories and putting
+    found files into a queue for processing by pipelines
+    """
+
     def __init__(self, datafile_queue, options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.datafile_queue = datafile_queue
@@ -284,6 +303,13 @@ class FileReader(Thread):
 
 
 class DataReader(Thread):
+    """CSV Parsing Class
+
+    This class focuses on reading in and parsing a given CSV file as
+    provided by the FileReader class. After creating its output it
+    places it on a queue for processing by the fetcher
+    """
+
     def __init__(self, datafile_queue, data_queue, options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.datafile_queue = datafile_queue
@@ -378,12 +404,19 @@ class DataReader(Thread):
 
 
 class DataFetcher(Thread):
-    def __init__(self, data_queue, work_queue, options, **kwargs):
+    """Bulk Fetching of Records
+
+    This class does a bulk fetch of records to make the comparison of
+    records more efficient. It takes the response and bundles it up with
+    the source to be sent to the worker
+    """
+
+    def __init__(self, es, data_queue, work_queue, options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.data_queue = data_queue
         self.work_queue = work_queue
         self.options = options
-        self.es = connectElastic(options.es_uri)
+        self.es = es
         self.fetcher_threads = []
         self._shutdown = False
         self._finish = False
@@ -519,6 +552,13 @@ class DataFetcher(Thread):
 
 
 class DataWorker(Thread):
+    """Class to focus on entry comparison and instruction creation
+
+    This class takes the input entry and latest entry as found by the fetcher
+    and creates one or more elasticsearch update requests to be sent by the
+    shipper
+    """
+
     def __init__(self, work_queue, insert_queue,
                  statTracker, options, **kwargs):
         Thread.__init__(self, **kwargs)
@@ -731,12 +771,16 @@ class DataWorker(Thread):
 
 
 class DataShipper(Thread):
-    def __init__(self, insert_queue, bulkErrorEvent, options, **kwargs):
+    """Thread that ships commands to elasticsearch cluster_stats
+    """
+
+    def __init__(self, es, insert_queue, bulkErrorEvent,
+                 options, **kwargs):
         Thread.__init__(self, **kwargs)
         self.insert_queue = insert_queue
         self.options = options
         self.bulkErrorEvent = bulkErrorEvent
-        self.es = connectElastic(self.options.es_uri)
+        self.es = es
         self._finish = False
 
     def finish(self):
@@ -793,6 +837,7 @@ class DataProcessor(Process):
         self._complete = multiprocessing.Value('b', False)
         self.shutdownEvent = shutdownEvent
         self.bulkErrorEvent = bulkErrorEvent
+        self.es = None
 
         # Queue for individual csv entries
         self.data_queue = queue.Queue(maxsize=10000)
@@ -819,13 +864,8 @@ class DataProcessor(Process):
         self.pause_request.value = False
 
     def update_index_list(self):
-        try:
-            es = connectElastic(self.options.es_uri)
-        except elasticsearch.exceptions.TransportError as e:
-            LOGGER.exception("Unable to make ES connection")
-
         index_list = \
-            es.indices.get_alias(name=self.options.indexNames.orig_search)
+            self.es.indices.get_alias(name=self.options.indexNames.orig_search)
         self.options.INDEX_LIST = sorted(index_list.keys(), reverse=True)
         self.options.rolledOver = True
 
@@ -930,7 +970,8 @@ class DataProcessor(Process):
 
         LOGGER.debug("Starting Fetchers")
         for _ in range(self.options.fetcher_threads):
-            fetcher_thread = DataFetcher(self.data_queue,
+            fetcher_thread = DataFetcher(self.es,
+                                         self.data_queue,
                                          self.work_queue,
                                          self.options)
             fetcher_thread.start()
@@ -938,7 +979,8 @@ class DataProcessor(Process):
 
         LOGGER.debug("Starting Shippers")
         for _ in range(self.options.shipper_threads):
-            shipper_thread = DataShipper(self.insert_queue,
+            shipper_thread = DataShipper(self.es,
+                                         self.insert_queue,
                                          self.bulkErrorEvent,
                                          self.options)
             shipper_thread.start()
@@ -946,6 +988,12 @@ class DataProcessor(Process):
 
     def run(self):
         os.setpgrp()
+        try:
+            self.es = connectElastic(self.options.es_uri)
+        except elasticsearch.exceptions.TransportError as e:
+            LOGGER.critical("Unable to establish elastic connection")
+            return
+
         self.startup_rest()
 
         LOGGER.debug("Starting Reader")
