@@ -5,13 +5,13 @@ import json
 import datetime
 
 tokens = [
-    'COLON', 
-    'WORD', 
-    'QUOTED', 
+    'COLON',
+    'WORD',
+    'QUOTED',
     'NOT',
-    'OR', 
-    'AND', 
-    'LPAREN', 
+    'OR',
+    'AND',
+    'LPAREN',
     'RPAREN',
     'FUZZY',
     'REGEX',
@@ -107,7 +107,7 @@ daterange : WORD COLON DATE
           | WORD COLON DATE COLON DATE
 
 termquery : QUOTED
-          | WORD 
+          | WORD
 
 """
 
@@ -122,9 +122,9 @@ class String(object):
     def __repr__(self):
         return self.string
 
-no_parts = [ 
+no_parts = [
                 'details.registrant_fax',
-                'details.registrant_faxExt',   
+                'details.registrant_faxExt',
                 'details.registrant_telephone',
                 'details.registrant_telephoneExt',
                 'details.administrativeContact_fax',
@@ -140,8 +140,8 @@ date_keywords = {
                 }
 
 original_keywords = [
-                'domainName', 
-                'administrativeContact_email', 
+                'domainName',
+                'administrativeContact_email',
                 'administrativeContact_name',
                 'administrativeContact_organization',
                 'administrativeContact_street1',
@@ -168,7 +168,7 @@ original_keywords = [
                 'registrant_postalCode',
                 'registrant_country',
                 'registrant_fax',
-                'registrant_faxExt',   
+                'registrant_faxExt',
                 'registrant_telephone',
                 'registrant_telephoneExt',
                 'nameServers',
@@ -177,13 +177,13 @@ original_keywords = [
                     ]
 
 special_keywords = {
-                'email_local': [ 
-                           "details.administrativeContact_email.local", 
-                           "details.registrant_email.local", 
+                'email_local': [
+                           "details.administrativeContact_email.local",
+                           "details.registrant_email.local",
                          ],
-                'email_domain': [ 
-                           "details.administrativeContact_email.domain", 
-                           "details.registrant_email.domain", 
+                'email_domain': [
+                           "details.administrativeContact_email.domain",
+                           "details.registrant_email.domain",
                          ],
                    }
 
@@ -194,15 +194,15 @@ shortcut_keywords = {
                            'details.administrativeContact_street3',
                            'details.administrativeContact_street4',
                             ],
-                'registrant_street': [ 
+                'registrant_street': [
                            'details.registrant_street1',
                            'details.registrant_street2',
                            'details.registrant_street3',
                            'details.registrant_street4',
                             ],
                 'dn': ["domainName"],
-                'email': [ "details.administrativeContact_email", 
-                           "details.registrant_email", 
+                'email': [ "details.administrativeContact_email",
+                           "details.registrant_email",
                          ],
                 'name': ['details.administrativeContact_name',
                          'details.registrant_name'
@@ -325,9 +325,9 @@ def create_specific_word_subquery(key, value):
     q = {
         'multi_match': {
             "query": value,
-            "fields": fields1 
+            "fields": fields1
         }
-    } 
+    }
 
     return q
 
@@ -459,7 +459,7 @@ def p_specific_quoted(t):
 
     if 'query' not in q:
         t[0] = {'query': {'bool': {'must': [q]}}}
-    else:  
+    else:
         t[0] = {'query': {'bool': {'must': [q['query']]}}}
 
 def create_wildreg_query(key, value, qtype):
@@ -501,7 +501,7 @@ def create_wildreg_query(key, value, qtype):
 
     if 'query' not in q:
         return {'query': {'bool': {'must': [q]}}}
-    else:  
+    else:
         return {'query': {'bool': {'must': [q['query']]}}}
 
 
@@ -529,7 +529,7 @@ def create_daterange_query(key, start, end):
     qf = {
     'query':{
         'bool': {
-            'filter': { 
+            'filter': {
                 'range': {
                     key: {
                         'gte': start.strftime('%Y-%m-%d %H:%M:%S'),
@@ -582,23 +582,23 @@ def p_termquery_quoted(t):
         if len(terms) > 1:
             spns = []
             for p in terms:
-                spns.append({'span_term': {'_all': p}})
+                spns.append({'span_term': {'pydat_all': p}})
             query = {'span_near': {'clauses': spns, 'slop': 1, 'in_order': 'true'}}
         else:
-            query = {'term': {'_all': term}}
+            query = {'term': {'pydat_all': term}}
     else:
         if ll == 'email':
             fields = [
                        ("details.administrativeContact_email.parts", 1.5),
                        ("details.registrant_email.parts", 1.5),
-                       ("_all", 1.0)
+                       ("pydat_all", 1.0)
                      ]
         elif ll == 'domain':
             fields = [
                        ("domainName.parts", 2.0),
                        ("details.administrativeContact_email.parts", 1.5),
                        ("details.registrant_email.parts", 1.5),
-                       ("_all", 1.0)
+                       ("pydat_all", 1.0)
                      ]
 
         queries = []
@@ -623,17 +623,17 @@ def p_termquery_word(t):
     query = None
     ll = looks_like(term)
     if ll is None:
-        query = {'match': {'_all': term}}
+        query = {'match': {'pydat_all': term}}
     else:
         if ll == 'email':
-            fields = [ "details.administrativeContact_email.parts^2", 
-                       "details.registrant_email.parts^2", 
-                       "_all" ] 
+            fields = [ "details.administrativeContact_email.parts^2",
+                       "details.registrant_email.parts^2",
+                       "pydat_all" ]
         elif ll == 'domain':
             fields = [ "domainName.parts^3",
-                       "details.administrativeContact_email.parts^2", 
-                       "details.registrant_email.parts^2", 
-                       "_all"]
+                       "details.administrativeContact_email.parts^2",
+                       "details.registrant_email.parts^2",
+                       "pydat_all"]
 
         query = {
             "multi_match": {
@@ -655,7 +655,7 @@ def remove_escapes(t):
             if p[0] == '\\':
                 unescaped_string += p[1]
             else:
-                unescaped_string += p 
+                unescaped_string += p
     return unescaped_string
 
 def p_error(t):

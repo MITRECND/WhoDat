@@ -419,7 +419,7 @@ class DataReader(Thread):
             header = next(dnsreader)
         except Exception as e:
             LOGGER.exception("Unable to iterate through csv file %s"
-                             % filename)
+                             % (filename))
             return
 
         try:
@@ -1104,10 +1104,15 @@ def optimizeIndex(es, index, refresh_interval="300s"):
         pass
 
 
-def configTemplate(es, data_template, options):
+def configTemplate(es, major, data_template, options):
     if data_template is not None:
         data_template["template"] = options.indexNames.template_pattern
         data_template["aliases"][options.indexNames.search] = {}
+        if major == 5:
+            # Disable "_all" field it is handled customly, instead
+            data_template["mappings"]["_default_"]["_all"] = {
+                "enabled": False
+            }
         es.indices.put_template(name=options.indexNames.template_name,
                                 body=data_template)
 
@@ -1353,16 +1358,11 @@ def main():
     # Shove it into options
     options.indexNames = indexNames
 
-    # Setup Stats Queue and Data Queue
+    # Setup Data Queue
     datafile_queue = jmpQueue(maxsize=10000)
 
-    # Verify elasticsearch python library version
+    # Grab elasticsearch python library version
     major = elasticsearch.VERSION[0]
-    if major != 5:
-        myLogger.error(("Python ElasticSearch library version must coorespond "
-                        "to version of ElasticSearch being used -- Library "
-                        "major version: %d" % (major)))
-        sys.exit(1)
 
     # Verify connectivity and version(s) of cluster
     try:
@@ -1380,11 +1380,19 @@ def main():
                             "version"))
         sys.exit(1)
 
+    es_major = 0
     for version in es_versions:
+        if version[0] > es_major:
+            es_major = version[0]
         if version[0] < 5 or (version[0] >= 5 and version[1] < 2):
             myLogger.error(("Destination ElasticSearch version must be "
                             "5.2 or greater"))
             sys.exit(1)
+
+    if es_major != major:
+        myLogger.error(("Python library installed does not "
+                       "match with greatest (major) version in cluster"))
+        sys.exit(1)
 
     # Setup template
     data_template = None
@@ -1403,7 +1411,7 @@ def main():
             sys.exit(1)
 
     if options.config_template_only:
-        configTemplate(es, data_template, options)
+        configTemplate(es, major, data_template, options)
         sys.exit(0)
 
     metadata = None
@@ -1429,7 +1437,7 @@ def main():
         version_identifier = options.identifier
 
         # Setup the template
-        configTemplate(es, data_template, options)
+        configTemplate(es, major, data_template, options)
 
         # Create the metadata index with only 1 shard, even with
         # thousands of imports this index shouldn't warrant multiple shards
@@ -1469,7 +1477,7 @@ def main():
         options.firstImport = True
     else:  # Data exists in the cluster
         try:
-            result = es.get(index=indexNames.meta, id=0)
+            result = es.get(index=indexNames.meta, doc_type=DOC_TYPE, id=0)
             if result['found']:
                 metadata = result['_source']
             else:
@@ -1537,6 +1545,7 @@ def main():
         options.identifier = version_identifier
         try:
             previous_record = es.get(index=indexNames.meta,
+                                     doc_type=DOC_TYPE,
                                      id=version_identifier)['_source']
         except Exception as e:
             myLogger.exception(("Unable to retrieve information "

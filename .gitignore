@@ -1,3 +1,4 @@
 pydat/pydat/custom_settings.py
 *.pyc
 *.swp
+*.vscode

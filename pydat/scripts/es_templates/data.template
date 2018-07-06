@@ -132,35 +132,33 @@
     },
     "mappings" : {
       "_default_" : {
-        "_all" : {
-          "enabled" : true,
-          "analyzer": "all_analyzer",
-          "term_vector": "with_positions_offsets_payloads"
-        },
         "properties" : {
+          "pydat_all": {
+            "type": "text",
+            "analyzer": "all_analyzer",
+            "term_vector": "with_positions_offsets_payloads"
+          },
           "dataFirstSeen" : {
-            "type" : "long",
-            "include_in_all": "false"
+            "type" : "long"
           },
           "dataVersion" : {
-            "type" : "long",
-            "include_in_all": "false"
+            "type" : "long"
           },
           "updateVersion" : {
-            "type" : "long",
-            "include_in_all": "false"
+            "type" : "long"
           },
           "dataUniqueID" : {
-            "type" : "keyword",
-            "include_in_all": "false"
+            "type" : "keyword"
           },
           "tld": {
                 "type": "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
           },
           "domainName" : {
             "type" : "keyword",
             "normalizer": "lowercase_fold",
+            "copy_to": "pydat_all",
             "fields": {
                 "parts": {
                             "type": "text",
@@ -175,7 +173,6 @@
           "details" : {
             "properties" : {
               "Audit_auditUpdatedDate" : {
-                "include_in_all": "false",
                 "type": "date",
                 "format": "yyyy-MM-dd HH:mm:ss zzz",
                 "fields": {
@@ -188,12 +185,13 @@
               "administrativeContact_email" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
-                    "local": { 
+                    "local": {
                                 "type": "text",
                                 "analyzer": "email_local_analyzer"
                     },
-                    "domain": { 
+                    "domain": {
                                 "type": "text",
                                 "analyzer": "email_domain_analyzer"
                     },
@@ -206,6 +204,7 @@
               "administrativeContact_name" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -216,6 +215,7 @@
               "administrativeContact_organization" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -226,6 +226,7 @@
               "administrativeContact_street1" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -236,6 +237,7 @@
               "administrativeContact_street2" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -246,6 +248,7 @@
               "administrativeContact_street3" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -256,6 +259,7 @@
               "administrativeContact_street4" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -266,6 +270,7 @@
               "administrativeContact_city" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -276,6 +281,7 @@
               "administrativeContact_state" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -286,6 +292,7 @@
               "administrativeContact_postalCode" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -296,6 +303,7 @@
               "administrativeContact_country" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -305,29 +313,34 @@
               },
               "administrativeContact_fax" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "administrativeContact_faxExt" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "administrativeContact_telephone" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "administrativeContact_telephoneExt" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "contactEmail" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
-                    "local": { 
+                    "local": {
                                 "type": "text",
                                 "analyzer": "email_local_analyzer"
                     },
-                    "domain": { 
+                    "domain": {
                                 "type": "text",
                                 "analyzer": "email_domain_analyzer"
                     },
@@ -338,20 +351,18 @@
                 }
               },
               "createdDate" : {
-                "include_in_all": "false",
                 "type" : "keyword"
               },
               "updatedDate" : {
-                "include_in_all": "false",
                 "type" : "keyword"
               },
               "expiresDate" : {
-                "include_in_all": "false",
                 "type" : "keyword"
               },
               "nameServers" : {
                 "type" : "text",
                 "analyzer": "array_analyzer",
+                "copy_to": "pydat_all",
                 "fields": {
                     "raw": {
                         "type": "keyword",
@@ -366,12 +377,13 @@
               "registrant_email" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
-                    "local": { 
+                    "local": {
                                 "type": "text",
                                 "analyzer": "email_local_analyzer"
                     },
-                    "domain": { 
+                    "domain": {
                                 "type": "text",
                                 "analyzer": "email_domain_analyzer"
                     },
@@ -384,6 +396,7 @@
               "registrant_name" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -394,6 +407,7 @@
               "registrant_organization" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -404,6 +418,7 @@
               "registrant_street1" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -414,6 +429,7 @@
               "registrant_street2" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -424,6 +440,7 @@
               "registrant_street3" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -434,6 +451,7 @@
               "registrant_street4" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -444,6 +462,7 @@
               "registrant_city" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -454,6 +473,7 @@
               "registrant_state" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -464,6 +484,7 @@
               "registrant_postalCode" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -474,6 +495,7 @@
               "registrant_country" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -483,23 +505,28 @@
               },
               "registrant_fax" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "registrant_faxExt" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "registrant_telephone" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "registrant_telephoneExt" : {
                 "type" : "keyword",
-                "normalizer": "lowercase_fold"
+                "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all"
               },
               "registrarName" : {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
@@ -508,7 +535,6 @@
                 }
               },
               "standardRegCreatedDate" : {
-                "include_in_all": "false",
                 "type": "date",
                 "format": "yyyy-MM-dd HH:mm:ss zzz||yyyy-MM-dd HH:mm:ss",
                 "fields": {
@@ -519,7 +545,6 @@
                 }
               },
               "standardRegExpiresDate" : {
-                "include_in_all": "false",
                 "type": "date",
                 "format": "yyyy-MM-dd HH:mm:ss zzz||yyyy-MM-dd HH:mm:ss",
                 "fields": {
@@ -530,7 +555,6 @@
                 }
               },
               "standardRegUpdatedDate" : {
-                "include_in_all": "false",
                 "type": "date",
                 "format": "yyyy-MM-dd HH:mm:ss zzz||yyyy-MM-dd HH:mm:ss",
                 "fields": {
@@ -546,6 +570,7 @@
               "whoisServer": {
                 "type" : "keyword",
                 "normalizer": "lowercase_fold",
+                "copy_to": "pydat_all",
                 "fields": {
                     "parts": {
                         "type": "text",
