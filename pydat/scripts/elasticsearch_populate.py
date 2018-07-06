@@ -1080,30 +1080,6 @@ def parse_domain(domainName):
     return (parts[0], parts[1])
 
 
-def unOptimizeIndex(es, index, template):
-    try:
-        body = {"settings": {
-                "index": {"number_of_replicas":
-                          template['settings']['number_of_replicas'],
-                          "refresh_interval":
-                          template['settings']["refresh_interval"]}}}
-
-        es.indices.put_settings(index=index, body=body)
-    except Exception as e:
-        pass
-
-
-def optimizeIndex(es, index, refresh_interval="300s"):
-    try:
-        body = {"settings": {
-                "index": {"number_of_replicas": 0,
-                          "refresh_interval": refresh_interval}}}
-
-        es.indices.put_settings(index=index, body=body)
-    except Exception as e:
-        pass
-
-
 def configTemplate(es, major, data_template, options):
     if data_template is not None:
         data_template["template"] = options.indexNames.template_pattern
@@ -1188,9 +1164,6 @@ def rolloverIndex(roll, es, options, pipelines):
             es.indices.refresh(index=orig_name)
         except Exception as e:
             LOGGER.exception("Unable to refresh rolled over index")
-
-        if options.optimize_import:
-            optimizeIndex(es, write_alias)
 
         # Index rolled over, restart processing
         for proc in pipelines:
@@ -1287,13 +1260,6 @@ def main():
                               "have, e.g., if you have 10 pydat-<number> "
                               "indices it results in a request for 500 "
                               "documents"))
-    parser.add_argument("--optimize-import", action="store_true",
-                        dest="optimize_import", default=False,
-                        help=("If enabled, will change ES index settings to "
-                              "speed up bulk imports, but if the cluster has "
-                              "a failure, data might be lost permanently! "
-                              "This also makes rolling indexes over less "
-                              "consistent!"))
     parser.add_argument("--rollover-size", action="store", type=int,
                         dest="rollover_docs", default=50000000,
                         help=("Set the number of documents after which point "
@@ -1520,12 +1486,6 @@ def main():
                 sys.exit(1)
 
     options.previousVersion = previousVersion
-
-    # Change Index settings to better suit bulk indexing
-    if options.optimize_import:
-        optimizeIndex(es, indexNames.orig_write)
-        optimizeIndex(es, indexNamess.delta_write)
-
     options.updateVersion = 0
 
     if options.exclude != "":
@@ -1688,10 +1648,6 @@ def main():
             # especially since the interrupt code (below) does effectively
             # the same thing
 
-            # Change settings back
-            if options.optimize_import:
-                unOptimizeIndex(es, indexNames.search, data_template)
-
             statTracker.shutdown()
             statTracker.join()
 
@@ -1791,10 +1747,6 @@ def main():
                               "sync"), exc_info=True)
 
         myLogger.info("Finalizing settings")
-        # Make sure to de-optimize the indexes for import
-        if options.optimize_import:
-            unOptimizeIndex(es, indexNames.search, data_template)
-
         try:
             datafile_queue.close()
         except Exception as e:
