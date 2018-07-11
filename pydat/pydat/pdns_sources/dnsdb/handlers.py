@@ -34,6 +34,15 @@ def _format_results(results, fmt, dynamic_data):
         data = list(set(data[1:]))
         results['data'] = data
     elif fmt == 'csv':
+        DEFAULT_KEYS = ['rrtype',
+                        'rrname',
+                        'rdata',
+                        'bailiwick',
+                        'count',
+                        'time_first',
+                        'time_last',
+                        'zone_time_first',
+                        'zone_time_last']
         compiled_data = []
         header_keys = set()
         for rrtype in results['data']:
@@ -41,8 +50,11 @@ def _format_results(results, fmt, dynamic_data):
                 compiled_data.append(d)
                 header_keys = header_keys.union(set(d.keys()))
 
+        header_keys = sorted(list(header_keys))
+        if sorted(DEFAULT_KEYS) == header_keys:
+            header_keys = DEFAULT_KEYS
         csv_out = cStringIO.StringIO()
-        writer = csv.DictWriter(csv_out, sorted(list(header_keys)))
+        writer = csv.DictWriter(csv_out, header_keys)
         writer.writeheader()
         writer.writerows(compiled_data)
         csv_data = csv_out.getvalue()

@@ -8,11 +8,11 @@ config.addConfig('ssl_verify', False, True,
 
 
 fields = formFields("dnsdb")
-fields.addBaseField("limit", "ChoiceNumberField", 100,
+fields.addBaseField("limit", "ChoiceNumberField", 500,
                          parameters={"label": "Limit",
                                      "required": False,
                                      "choices": [(10,10),(20,20),(50,50),(100,100),(200,200),(500,500),(1000,1000)],
-                                     "initial": 100})
+                                     "initial": 500})
 
 fields.addBaseField("absolute", "BooleanField", False,
                     parameters={ "label": "Absolute",
