@@ -171,6 +171,7 @@ original_keywords = [
                 'registrant_faxExt',
                 'registrant_telephone',
                 'registrant_telephoneExt',
+                'contactEmail',
                 'nameServers',
                 'registrarName',
                 'whoisServer'
@@ -180,10 +181,12 @@ special_keywords = {
                 'email_local': [
                            "details.administrativeContact_email.local",
                            "details.registrant_email.local",
+                           "details.contactEmail.local",
                          ],
                 'email_domain': [
                            "details.administrativeContact_email.domain",
                            "details.registrant_email.domain",
+                           "details.contactEmail.domain",
                          ],
                    }
 
@@ -203,6 +206,7 @@ shortcut_keywords = {
                 'dn': ["domainName"],
                 'email': [ "details.administrativeContact_email",
                            "details.registrant_email",
+                           "details.contactEmail",
                          ],
                 'name': ['details.administrativeContact_name',
                          'details.registrant_name'
@@ -591,6 +595,7 @@ def p_termquery_quoted(t):
             fields = [
                        ("details.administrativeContact_email.parts", 1.5),
                        ("details.registrant_email.parts", 1.5),
+                       ("details.contactEmail.parts", 1.5),
                        ("pydat_all", 1.0)
                      ]
         elif ll == 'domain':
@@ -598,6 +603,7 @@ def p_termquery_quoted(t):
                        ("domainName.parts", 2.0),
                        ("details.administrativeContact_email.parts", 1.5),
                        ("details.registrant_email.parts", 1.5),
+                       ("details.contactEmail.parts", 1.5),
                        ("pydat_all", 1.0)
                      ]
 
@@ -628,11 +634,13 @@ def p_termquery_word(t):
         if ll == 'email':
             fields = [ "details.administrativeContact_email.parts^2",
                        "details.registrant_email.parts^2",
+                       "details.contactEmail.parts^2",
                        "pydat_all" ]
         elif ll == 'domain':
             fields = [ "domainName.parts^3",
                        "details.administrativeContact_email.parts^2",
                        "details.registrant_email.parts^2",
+                       "details.contactEmail.parts^2",
                        "pydat_all"]
 
         query = {
