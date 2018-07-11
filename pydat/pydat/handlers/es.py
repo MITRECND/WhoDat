@@ -133,7 +133,7 @@ def lastVersion():
         lastVersion = cache.get('lastVersion')
         if lastVersion is None:
             es = es_connector()
-            result = es.get(index=META_INDEX, id=0)
+            result = es.get(index=META_INDEX, doc_type="doc", id=0)
             if result['found']:
                 cache.set('lastVersion',
                           result['_source']['lastVersion'], CACHE_TIME)
@@ -195,7 +195,7 @@ def metadata(version=None):
             res = []
     else:
         version = int(version)
-        res = es.get(index=META_INDEX, id=version)
+        res = es.get(index=META_INDEX, doc_type="doc", id=version)
         if res['found']:
             res = [res['_source']]
         else:
