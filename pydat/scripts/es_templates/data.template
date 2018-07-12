@@ -1,5 +1,4 @@
 {
-    "template": "",
     "aliases": {
     },
     "settings" : {
@@ -131,7 +130,7 @@
         }
     },
     "mappings" : {
-      "_default_" : {
+      "doc" : {
         "properties" : {
           "pydat_all": {
             "type": "text",

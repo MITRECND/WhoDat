@@ -1082,13 +1082,22 @@ def parse_domain(domainName):
 
 def configTemplate(es, major, data_template, options):
     if data_template is not None:
-        data_template["template"] = options.indexNames.template_pattern
-        data_template["aliases"][options.indexNames.search] = {}
+        # Process version specific template info
         if major == 5:
-            # Disable "_all" field it is handled customly, instead
-            data_template["mappings"]["_default_"]["_all"] = {
+            # ES5 Templates use the "template" field
+            data_template["template"] = options.indexNames.template_pattern
+            # Disable "_all" field since it is handled customly, instead
+            data_template["mappings"]["doc"]["_all"] = {
                 "enabled": False
             }
+        else:
+            data_template["index_patterns"] = \
+                [options.indexNames.template_pattern]
+
+        # Shared template info
+        data_template["aliases"][options.indexNames.search] = {}
+
+        # Actually configure template
         es.indices.put_template(name=options.indexNames.template_name,
                                 body=data_template)
 
