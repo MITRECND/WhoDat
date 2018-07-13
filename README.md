@@ -192,6 +192,74 @@ You can then launch pyDat by running
 
     docker run -d --name pydat -p 80:80 -v <path/to/custom_settings.py>:/opt/WhoDat/pydat/pydat/custom_settings.py mitrecnd/pydat
 
+### Docker Compose
+
+To run pydat with compose your `docker-compose.yml` file could look like:
+
+```yaml
+version: '2'
+services:
+    pydat:
+        image: mitrecnd/pydat
+        volumes:
+            - "./custom_settings.py:/opt/WhoDat/pydat/pydat/custom_settings.py"
+        ports:
+            - 80:80
+
+volumes:
+  pydat-data:
+```
+
+Note that the above config assumes that a `custom_settings.py` file exists in the
+same directory as the compose file.
+
+#### Docker Compose Test Setup
+
+If you want to test pydat with a local docker-ized instance of ES, here is an
+example compose configuration:
+
+```yaml
+version: '2'
+services:
+    elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.3.1
+        environment:
+          - cluster.name=pydat
+          - bootstrap.memory_lock=true
+          - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+        ulimits:
+          memlock:
+            soft: -1
+            hard: -1
+        mem_limit: 1g
+        volumes:
+            - pydat-data:/usr/share/elasticsearch/data
+        ports:
+            - 127.0.0.1:9200:9200
+    pydat:
+        image: mitrecnd/pydat
+        volumes:
+            - "./custom_settings.py:/opt/WhoDat/pydat/pydat/custom_settings.py"
+        ports:
+            - 0.0.0.0:8888:80
+
+volumes:
+  pydat-data:
+```
+
+Along with the contents of its cooresponding `custom_settings.py` file:
+
+```python
+DEBUG = True
+ALLOWED_HOSTS = ['*']
+ES_URI = 'elasticsearch:9200'
+```
+
+Note that the ElasticSearch instance is only accessible via localhost, while
+pydat will be listening on all interfaces on port 8888. Also, further note that
+while this is fine for small data sets, a production-level cluster is
+recommended for hosting full quarterly dumps.
+
 ## pyDat API
 
 Starting with pyDat 2.0 there's a scriptable API that allows you to make search requests and obtain JSON data. The following endpoints are exposed:
