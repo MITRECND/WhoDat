@@ -146,7 +146,7 @@ data in an ElasticSearch data store . Beyond the data in ElasticSearch you will 
 
 ### Populating ElasticSearch with whoisxmlapi data (Ubuntu 16.04.3 LTS)
 
-- Install ElasticSearch. Using [Docker](https://hub.docker.com/_/elasticsearch/) is the easiest mechanism
+- Install ElasticSearch. Using [Docker](https://www.docker.elastic.co/) is the easiest mechanism
 - Download latest trimmed (smallest possible) whoisxmlapi quarterly DB dump.
 - Extract the csv files.
 - Use the included script in the scripts/ directory:
@@ -205,9 +205,6 @@ services:
             - "./custom_settings.py:/opt/WhoDat/pydat/pydat/custom_settings.py"
         ports:
             - 80:80
-
-volumes:
-  pydat-data:
 ```
 
 Note that the above config assumes that a `custom_settings.py` file exists in the
@@ -262,7 +259,7 @@ recommended for hosting full quarterly dumps.
 
 ## pyDat API
 
-Starting with pyDat 2.0 there's a scriptable API that allows you to make search requests and obtain JSON data. The following endpoints are exposed:
+The following endpoints are exposed:
 
 >
     ajax/metadata/
@@ -302,7 +299,7 @@ Example Queries:
 
     curl http://pydat.myorg.domain/ajax/domains/domainName/google.com/
 
-## Advanced Syntax Endpoint
+### Advanced Syntax Endpoint
 
     ajax/query
 
