@@ -22,8 +22,6 @@ import Queue as queue
 import elasticsearch
 from elasticsearch import helpers
 
-LOGGER = None  # defined in main
-
 VERSION_KEY = 'dataVersion'
 UPDATE_KEY = 'updateVersion'
 FIRST_SEEN = 'dataFirstSeen'
@@ -170,6 +168,71 @@ class indexFormatter(object):
         self.template_name = "%s-template" % prefix
 
 
+class _mpLoggerClient(object):
+    """class returned by mpLogger.getLogger
+
+    This class mimics how logger should act by providing the same/similar
+    facilities
+    """
+
+    def __init__(self, name, logQueue, **kwargs):
+        self.name = name
+        self.logQueue = logQueue
+        self._logger = logging.getLogger()
+        self._prefix = None
+
+    @property
+    def prefix(self):
+        return self._prefix
+
+    @prefix.setter
+    def prefix(self, value):
+        if not isinstance(value, basestring):
+            raise TypeError("Expected a string type")
+        self._prefix = value
+
+    def log(self, lvl, msg, *args, **kwargs):
+        if self.prefix is not None:
+            msg = self.prefix + msg
+
+        if kwargs.get('exc_info', False) is not False:
+            if (not (isinstance(kwargs['exc_info'], tuple) and
+                     len(kwargs['exc_info']) == 3)):
+                kwargs['exc_info'] = sys.exc_info()
+            (etype, eclass, tb) = kwargs['exc_info']
+            exc_msg = ''.join(traceback.format_exception(etype,
+                                                         eclass,
+                                                         tb))
+            kwargs['_exception_'] = exc_msg
+
+        if kwargs.get('_exception_', None) is not None:
+            msg += "\n%s" % (kwargs['_exception_'])
+
+        (name, line, func) = self._logger.findCaller()
+        log_data = (self.name, lvl, name, line, msg, args, None,
+                    func, kwargs.get('extra', None))
+        self.logQueue.put(log_data)
+
+    def debug(self, msg, *args, **kwargs):
+        self.log(logging.DEBUG, msg, *args, **kwargs)
+
+    def info(self, msg, *args, **kwargs):
+        self.log(logging.INFO, msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        self.log(logging.WARNING, msg, *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        self.log(logging.ERROR, msg, *args, **kwargs)
+
+    def critical(self, msg, *args, **kwargs):
+        self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+    def exception(self, msg, *args, **kwargs):
+        kwargs['_exception_'] = traceback.format_exc()
+        self.log(logging.ERROR, msg, *args, **kwargs)
+
+
 class mpLogger(Thread):
     """Multiprocessing 'safe' logger implementation
 
@@ -193,6 +256,9 @@ class mpLogger(Thread):
         if self._logger is None:
             self._logger = logging.getLogger()
         return self._logger
+
+    def getLogger(self, name=__name__):
+        return _mpLoggerClient(name=name, logQueue=self.logQueue)
 
     def join(self):
         time.sleep(.1)
@@ -249,44 +315,6 @@ class mpLogger(Thread):
                     break
                 time.sleep(.1)
 
-    def log(self, lvl, msg, *args, **kwargs):
-            if kwargs.get('exc_info', False) is not False:
-                if (not (isinstance(kwargs['exc_info'], tuple) and
-                         len(kwargs['exc_info']) == 3)):
-                    kwargs['exc_info'] = sys.exc_info()
-                (etype, eclass, tb) = kwargs['exc_info']
-                exc_msg = ''.join(traceback.format_exception(etype,
-                                                             eclass,
-                                                             tb))
-                kwargs['_exception_'] = exc_msg
-
-            if kwargs.get('_exception_', None) is not None:
-                msg += "\n%s" % (kwargs['_exception_'])
-
-            (name, line, func) = self.logger.findCaller()
-            log_data = (self.name, lvl, name, line, msg, args, None,
-                        func, kwargs.get('extra', None))
-            self.logQueue.put(log_data)
-
-    def debug(self, msg, *args, **kwargs):
-        self.log(logging.DEBUG, msg, *args, **kwargs)
-
-    def info(self, msg, *args, **kwargs):
-        self.log(logging.INFO, msg, *args, **kwargs)
-
-    def warning(self, msg, *args, **kwargs):
-        self.log(logging.WARNING, msg, *args, **kwargs)
-
-    def error(self, msg, *args, **kwargs):
-        self.log(logging.ERROR, msg, *args, **kwargs)
-
-    def critical(self, msg, *args, **kwargs):
-        self.log(logging.CRITICAL, msg, *args, **kwargs)
-
-    def exception(self, msg, *args, **kwargs):
-        kwargs['_exception_'] = traceback.format_exc()
-        self.log(logging.ERROR, msg, *args, **kwargs)
-
 
 class FileReader(Thread):
     """Simple data file organizer
@@ -316,6 +344,7 @@ class FileReader(Thread):
         except Exception as e:
             LOGGER.error("Unknown exception in File Reader")
         finally:
+            LOGGER.debug("Setting FileReaderDone event")
             self.eventTracker.setFileReaderDone()
 
     def scan_directory(self, directory):
@@ -382,6 +411,7 @@ class DataReader(Thread):
                 continue
             except Exception as e:
                 LOGGER.exception("Unhandled Exception")
+        LOGGER.debug("Reader exiting")
 
     def check_header(self, header):
         for field in header:
@@ -880,16 +910,12 @@ class DataProcessor(Process):
         self.eventTracker = eventTracker
         self.es = None
         self.myid = pipeline_id
+        self.logger = logger
 
-        # Queue for individual csv entries
-        self.data_queue = queue.Queue(maxsize=10000)
-        # Queue for current/new entry comparison
-        self.work_queue = queue.Queue(maxsize=10000)
-        # Queue for shippers to send data
-        self.insert_queue = queue.Queue(maxsize=10000)
-
-        global LOGGER
-        LOGGER = logger
+        # These are created when the process starts up
+        self.data_queue = None
+        self.work_queue = None
+        self.insert_queue = None
 
     @property
     def paused(self):
@@ -931,7 +957,7 @@ class DataProcessor(Process):
             self._paused.value = False
 
     def shutdown(self):
-        LOGGER.debug("Pipeline %d shutting down reader" % (self.myid))
+        LOGGER.debug("Shutting down reader")
         self.reader_thread.shutdown()
         while self.reader_thread.is_alive():
             try:
@@ -940,7 +966,7 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Pipeline %d shutting down fetchers" % (self.myid))
+        LOGGER.debug("Shutting down fetchers")
         for fetcher in self.fetcher_threads:
             fetcher.shutdown()
             # Ensure put is not blocking shutdown
@@ -951,7 +977,7 @@ class DataProcessor(Process):
                 except queue.Empty:
                     break
 
-        LOGGER.debug("Pipeline %d draining work queue" % (self.myid))
+        LOGGER.debug("Draining work queue")
         # Drain the work queue
         while not self.work_queue.empty():
             try:
@@ -960,7 +986,7 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Pipeline %d shutting down worker thread" % (self.myid))
+        LOGGER.debug("Shutting down worker thread")
         self.worker_thread.shutdown()
         while self.worker_thread.is_alive():
             try:
@@ -969,7 +995,7 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Pipeline %d draining insert queue" % (self.myid))
+        LOGGER.debug("Draining insert queue")
         # Drain the insert queue
         while not self.insert_queue.empty():
             try:
@@ -978,34 +1004,31 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        LOGGER.debug("Pipeline %d waiting for shippers to finish"
-                     % (self.myid))
+        LOGGER.debug("Waiting for shippers to finish")
         # Shippers can't be forced to shutdown
         for shipper in self.shipper_threads:
             shipper.finish()
             shipper.join()
 
-        LOGGER.debug("Pipeline %d shutdown Complete" % (self.myid))
+        LOGGER.debug("Shutdown Complete")
 
     def finish(self):
-        LOGGER.debug("Pipeline %d waiting for fetchers to finish"
-                     % (self.myid))
+        LOGGER.debug("Waiting for fetchers to finish")
         for fetcher in self.fetcher_threads:
             fetcher.finish()
             fetcher.join()
 
-        LOGGER.debug("Pipeline %d waiting for worker to finish" % (self.myid))
+        LOGGER.debug("Waiting for worker to finish")
         self.worker_thread.finish()
         self.worker_thread.join()
 
-        LOGGER.debug("Pipeline %d waiting for shippers to finish"
-                     % (self.myid))
+        LOGGER.debug("Waiting for shippers to finish")
         for shipper in self.shipper_threads:
             shipper.finish()
             shipper.join()
 
     def startup_rest(self):
-        LOGGER.debug("Pipeline %d starting Worker" % (self.myid))
+        LOGGER.debug("Starting Worker")
         self.worker_thread = DataWorker(self.work_queue,
                                         self.insert_queue,
                                         self.statTracker,
@@ -1014,7 +1037,7 @@ class DataProcessor(Process):
         self.worker_thread.daemon = True
         self.worker_thread.start()
 
-        LOGGER.debug("Pipeline %d starting Fetchers" % (self.myid))
+        LOGGER.debug("starting Fetchers")
         for _ in range(self.options.fetcher_threads):
             fetcher_thread = DataFetcher(self.es,
                                          self.data_queue,
@@ -1024,7 +1047,7 @@ class DataProcessor(Process):
             fetcher_thread.start()
             self.fetcher_threads.append(fetcher_thread)
 
-        LOGGER.debug("Pipeline %d starting Shippers" % (self.myid))
+        LOGGER.debug("Starting Shippers")
         for _ in range(self.options.shipper_threads):
             shipper_thread = DataShipper(self.es,
                                          self.insert_queue,
@@ -1035,16 +1058,26 @@ class DataProcessor(Process):
 
     def run(self):
         os.setpgrp()
+        global LOGGER
+        LOGGER = self.logger.getLogger()
+        LOGGER.prefix = "(Pipeline %d) " % (self.myid)
+
+        # Queue for individual csv entries
+        self.data_queue = queue.Queue(maxsize=10000)
+        # Queue for current/new entry comparison
+        self.work_queue = queue.Queue(maxsize=10000)
+        # Queue for shippers to send data
+        self.insert_queue = queue.Queue(maxsize=10000)
+
         try:
             self.es = connectElastic(self.options.es_uri)
         except elasticsearch.exceptions.TransportError as e:
-            LOGGER.critical(("Pipeline %d unable to establish elastic "
-                             "connection") % (self.myid))
+            LOGGER.critical("Unable to establish elastic connection")
             return
 
         self.startup_rest()
 
-        LOGGER.debug("Pipeline %d starting Reader" % (self.myid))
+        LOGGER.debug("Starting Reader")
         self.reader_thread = DataReader(self.datafile_queue,
                                         self.data_queue,
                                         self.eventTracker,
@@ -1054,6 +1087,7 @@ class DataProcessor(Process):
         # Wait to shutdown/finish
         while 1:
             if self.eventTracker.shutdown:
+                LOGGER.debug("Shutdown event received")
                 self.shutdown()
                 break
 
@@ -1065,8 +1099,7 @@ class DataProcessor(Process):
 
             self.reader_thread.join(.1)
             if not self.reader_thread.isAlive():
-                LOGGER.debug("Pipeline %d Reader thread exited, finishing up"
-                             % (self.myid))
+                LOGGER.debug("Reader thread exited, finishing up")
                 self.finish()
                 break
 
@@ -1321,8 +1354,11 @@ def main():
     # Setup logger
     logger = mpLogger(name="populater", debug=options.debug)
     logger.start()
+
     global LOGGER
-    LOGGER = logger
+    LOGGER = logger.getLogger()
+    LOGGER.prefix = "(Main) "
+
     # Local Logger instance since myLogger relies on a queue
     # This can cause an issue if exiting since it doesn't give
     # it enough time to run through the queue
