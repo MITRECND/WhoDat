@@ -382,10 +382,6 @@ class DataReader(Thread):
         self.eventTracker = eventTracker
         self._shutdown = False
         self._pause = False
-        self._finish = False
-
-    def finish(self):
-        self._finish = True
 
     def shutdown(self):
         self._shutdown = True
@@ -406,6 +402,7 @@ class DataReader(Thread):
                     self.datafile_queue.task_done()
             except queue.Empty as e:
                 if self.eventTracker.fileReaderDone:
+                    LOGGER.debug("FileReaderDone Event seen")
                     break
                 time.sleep(.01)
                 continue
@@ -459,9 +456,11 @@ class DataReader(Thread):
             for row in dnsreader:
                 while self._pause:
                     if self._shutdown:
+                        LOGGER.debug("Shutdown received while paused")
                         break
                     time.sleep(.5)
                 if self._shutdown:
+                    LOGGER.debug("Shutdown received")
                     break
                 self.data_queue.put({'header': header, 'row': row})
         except unicodecsv.Error as e:
@@ -945,6 +944,8 @@ class DataProcessor(Process):
                 self._paused.value = True
             except Exception as e:
                 LOGGER.exception("Unable to pause reader thread")
+        else:
+            LOGGER.debug("Pause requested when reader thread not alive")
 
     def _unpause(self):
         if self.reader_thread.isAlive():
@@ -955,6 +956,8 @@ class DataProcessor(Process):
             self.update_index_list()
             self.startup_rest()
             self._paused.value = False
+        else:
+            LOGGER.debug("Pause requested when reader thread not alive")
 
     def shutdown(self):
         LOGGER.debug("Shutting down reader")
@@ -1026,6 +1029,8 @@ class DataProcessor(Process):
         for shipper in self.shipper_threads:
             shipper.finish()
             shipper.join()
+
+        LOGGER.debug("Finish Complete")
 
     def startup_rest(self):
         LOGGER.debug("Starting Worker")
@@ -1104,7 +1109,7 @@ class DataProcessor(Process):
                 break
 
             time.sleep(.1)
-
+        LOGGER.debug("Pipeline Shutdown")
         self._complete.value = True
 
 
