@@ -175,10 +175,11 @@ class _mpLoggerClient(object):
     facilities
     """
 
-    def __init__(self, name, logQueue, **kwargs):
+    def __init__(self, name, logQueue, debug, **kwargs):
         self.name = name
         self.logQueue = logQueue
         self._logger = logging.getLogger()
+        self._debug = debug
         self._prefix = None
 
     @property
@@ -192,7 +193,7 @@ class _mpLoggerClient(object):
         self._prefix = value
 
     def log(self, lvl, msg, *args, **kwargs):
-        if self.prefix is not None:
+        if self.prefix is not None and self._debug:
             msg = self.prefix + msg
 
         if kwargs.get('exc_info', False) is not False:
@@ -258,7 +259,9 @@ class mpLogger(Thread):
         return self._logger
 
     def getLogger(self, name=__name__):
-        return _mpLoggerClient(name=name, logQueue=self.logQueue)
+        return _mpLoggerClient(name=name,
+                               logQueue=self.logQueue,
+                               debug=self._debug)
 
     def join(self):
         time.sleep(.1)
