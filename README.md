@@ -24,7 +24,7 @@ Python implementation keep reading...
 
 **PreReqs to run with ElasticSearch**:
 
-- ElasticSearch installed somewhere
+- ElasticSearch installed somewhere (versions 5.2 -> 6.x are supported, up to 6.3.1 tested)
 - python elasticsearch library (pip install elasticsearch -- ensure proper version is installed for your version of ES)
 - python lex yacc library (pip install ply)
 - below specified prereqs too
@@ -153,6 +153,17 @@ data in an ElasticSearch data store . Beyond the data in ElasticSearch you will 
 
 >
     ./elasticsearch_populate.py -u localhost:9200 -f ~/whois/data/1.csv -i '1' -v -s -x Audit_auditUpdatedDate,updatedDate,standardRegUpdatedDate,expiresDate,standardRegExpiresDate
+
+### Upgrading ElasticSearch 5.x -> 6.x
+
+If you started with Elasticsearch 5.x and upgrade your cluster to 6.x, you
+should run the population script with the `--config-template-only` flag to update
+the backend template. This will not change the way the data is configured and
+serves only to eliminate deprecation warnings that your cluster will
+throw otherwise
+
+>
+    ./elasticsearch_populate -u localhost:9200 --config-template-only
 
 ## Installation
 
