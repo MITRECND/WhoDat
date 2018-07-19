@@ -1,6 +1,6 @@
 '''
-pdns module for DNSDB 
-    -obtains the 2 methods for handling passive and reverse-passive 
+pdns module for DNSDB
+    -obtains the 2 methods for handling passive and reverse-passive
      requests to the dnsdb API
 '''
 import cgi
@@ -15,8 +15,9 @@ from django.conf import settings
 
 from dnsdb import config
 
+
 def _format_results(results, fmt, dynamic_data):
-    if fmt =='json':
+    if fmt == 'json':
         data = []
         for rrtype in results['data']:
             for d in results['data'][rrtype]:
@@ -27,9 +28,9 @@ def _format_results(results, fmt, dynamic_data):
         data = []
         for rrtype in results['data'].keys():
             for record in results['data'][rrtype]:
-                if not isinstance(record[filt_key], basestring): #it's a list
+                if not isinstance(record[filt_key], basestring):  # it's a list
                     data.extend(record[filt_key])
-                else: #it's just a string
+                else:  # it's just a string
                     data.append(record[filt_key])
         data = list(set(data[1:]))
         results['data'] = data
@@ -66,6 +67,7 @@ def _format_results(results, fmt, dynamic_data):
 
     return results
 
+
 def validate_ip(input_ip):
     ip = ""
     mask = None
@@ -77,18 +79,18 @@ def validate_ip(input_ip):
     else:
         ip = input_ip
 
-    #Validate ip part
+    # Validate ip part
     try:
         socket.inet_pton(socket.AF_INET6, ip)
         version = 6
-    except: #invalid ipv6
+    except Exception as e:  # invalid ipv6
         try:
             socket.inet_pton(socket.AF_INET, ip)
         except Exception, e:
             raise TypeError("Invalid IP Address")
 
     output_ip = ip
-    #Validate mask if present
+    # Validate mask if present
     if mask is not None:
         try:
             mask = int(mask)
@@ -98,21 +100,23 @@ def validate_ip(input_ip):
                 raise ValueError("IP Mask too large for v4")
             elif version == 6 and mask > 128:
                 raise ValueError("IP Mask too large for v6")
-        except:
+        except Exception as e:
             raise TypeError("Unable to process mask")
         output_ip += ",%d" % mask
     return output_ip
 
+
 def validate_hex(input_hex):
     try:
         output_hex = "%x" % int(input_hex, 16)
-    except:
+    except Exception as e:
         raise TypeError("Not hex")
 
-    if len(output_hex) % 2 == 1: #make hex string always pairs of hex values
+    if len(output_hex) % 2 == 1:  # make hex string always pairs of hex values
         output_hex = "0" + output_hex
 
     return output_hex
+
 
 def _verify_type(value, type):
     if type == 'ip':
@@ -135,7 +139,7 @@ def _verify_type(value, type):
 
 
 def pdns_request_handler(domain, result_format, **dynamic_data):
-    results = {'success': False }
+    results = {'success': False}
 
     if not config.myConfig['apikey']:
         results['error'] = 'No DNSDB key.'
@@ -147,7 +151,7 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
 
     results['data'] = {}
     wildcard = "*."
-    
+
     if dynamic_data['absolute']:
         wildcard = ""
 
@@ -161,9 +165,9 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
             headers = {'Accept': 'application/json',
                        'X-API-Key': config.myConfig['apikey']}
             r = requests.get(url,
-                            proxies=settings.PROXIES,
-                            headers=headers,
-                            verify=config.myConfig["ssl_verify"])
+                             proxies=settings.PROXIES,
+                             headers=headers,
+                             verify=config.myConfig["ssl_verify"])
         except Exception as e:
                 results['error'] = str(e)
                 return results
@@ -177,11 +181,11 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
                 try:
                     tmp = json.loads(line)
                 except Exception as e:
-                    results['error'] = "%s: %s" % (
-                                                    str(e),
-                                                    cgi.escape(line, quote=True))
+                    results['error'] = \
+                        "%s: %s" % (str(e), cgi.escape(line, quote=True))
                     return results
-                        # Convert epoch timestamps to human readable.
+
+                # Convert epoch timestamps to human readable.
                 for key in ['time_first', 'time_last']:
                     if key in tmp:
                         tmp[key] = time.strftime("%Y-%m-%d %H:%M:%S",
@@ -211,13 +215,14 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
     return results
 
 
+def pdns_reverse_request_handler(search_value,
+                                 result_format,
+                                 **dynamic_fields):
+    """method to allow for custom pdns reverse requests handler
+       for DNSDB as a pdns source
 
-'''method to allow for custom pdns reverse requests handler
-   for DNSDB as a pdns source
-
-   Note: the method name must be "pdns_reverse_request_handler"
-'''
-def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
+    Note: the method name must be "pdns_reverse_request_handler"
+    """
     results = {'success': False}
 
     if not config.myConfig['apikey']:
@@ -225,11 +230,11 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
         return results
 
     try:
-       value = _verify_type(search_value, dynamic_fields['type'])
+        value = _verify_type(search_value, dynamic_fields['type'])
     except Exception as e:
         results['error'] = 'Unable to verify input'
         return results
-  
+
     # If 'any' is in rrtypes and anything else too, just default to 'any'
     if 'any' in dynamic_fields['rrtypes']:
         dynamic_fields['rrtypes'] = ['any']
@@ -237,8 +242,8 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
     results['data'] = {}
     for rrtype in dynamic_fields['rrtypes']:
         url = "https://api.dnsdb.info/lookup/rdata/" \
-                + dynamic_fields['type'] +"/" \
-                + urllib.quote(value)  + "/" \
+                + dynamic_fields['type'] + "/" \
+                + urllib.quote(value) + "/" \
                 + rrtype \
                 + "?limit=" + str(dynamic_fields['limit'])
         try:
@@ -262,8 +267,8 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
                 try:
                     tmp = json.loads(line)
                 except Exception as e:
-                    results['error'] = "%s: %s" % (str(e),
-                                                    cgi.escape(line, quote=True))
+                    results['error'] = \
+                        "%s: %s" % (str(e), cgi.escape(line, quote=True))
                     return results
 
                 # Convert epoch timestamps to human readable.
@@ -273,7 +278,7 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
                                                  time.gmtime(tmp[key]))
 
                 rrtype = tmp['rrtype']
-                #Strip the MX weight
+                # Strip the MX weight
                 if rrtype == 'MX':
                     tmp['rdata'] = [tmp['rdata'].split()[1]]
                 else:
@@ -296,4 +301,3 @@ def pdns_reverse_request_handler(search_value, result_format, **dynamic_fields):
         results = _format_results(results, result_format, dynamic_fields)
 
     return results
-
