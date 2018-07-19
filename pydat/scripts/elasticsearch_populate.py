@@ -97,12 +97,12 @@ class StatTracker(Thread):
     def run(self):
         while 1:
             try:
-                (typ, field) = self._stat_queue.get_nowait()
+                (typ, field) = self._stat_queue.get(True, 0.2)
             except queue.Empty:
                 if self._shutdown:
                     break
-                time.sleep(.1)
                 continue
+
             if typ == 'stat':
                 if field not in self._stats:
                     LOGGER.error("Unknown field %s" % (field))
@@ -248,7 +248,7 @@ class mpLogger(Thread):
         self._debug = debug
         self.daemon = True
         self.name = name
-        self.logQueue = mpQueue()
+        self.logQueue = jmpQueue()
         self._logger = None
         self._stop = False
 
@@ -263,10 +263,11 @@ class mpLogger(Thread):
                                logQueue=self.logQueue,
                                debug=self._debug)
 
+    def stop(self):
+        self._stop = True
+
     def join(self):
-        time.sleep(.1)
-        while not self.logQueue.empty():
-            time.sleep(.1)
+        self.logQueue.join()
 
     def run(self):
         default_level = logging.INFO
@@ -308,15 +309,17 @@ class mpLogger(Thread):
 
         while 1:
             try:
-                raw_record = self.logQueue.get_nowait()
-                if logger.isEnabledFor(raw_record[1]):
-                    logger.handle(logger.makeRecord(*raw_record))
+                raw_record = self.logQueue.get(True, 0.2)
+                try:
+                    if logger.isEnabledFor(raw_record[1]):
+                        logger.handle(logger.makeRecord(*raw_record))
+                finally:
+                    self.logQueue.task_done()
             except EOFError:
                 break
             except queue.Empty:
                 if self._stop:
                     break
-                time.sleep(.1)
 
 
 class FileReader(Thread):
@@ -347,6 +350,7 @@ class FileReader(Thread):
         except Exception as e:
             LOGGER.error("Unknown exception in File Reader")
         finally:
+            self.datafile_queue.join()
             LOGGER.debug("Setting FileReaderDone event")
             self.eventTracker.setFileReaderDone()
 
@@ -398,7 +402,7 @@ class DataReader(Thread):
     def run(self):
         while not self._shutdown:
             try:
-                datafile = self.datafile_queue.get_nowait()
+                datafile = self.datafile_queue.get(True, 0.2)
                 try:
                     self.parse_csv(datafile)
                 finally:
@@ -407,8 +411,6 @@ class DataReader(Thread):
                 if self.eventTracker.fileReaderDone:
                     LOGGER.debug("FileReaderDone Event seen")
                     break
-                time.sleep(.01)
-                continue
             except Exception as e:
                 LOGGER.exception("Unhandled Exception")
         LOGGER.debug("Reader exiting")
@@ -517,6 +519,7 @@ class DataFetcher(Thread):
                     continue
                 except Exception as e:
                     LOGGER.exception("Unhandled Exception")
+                    continue
 
                 try:
                     entry = self.parse_entry(work['row'], work['header'])
@@ -1118,7 +1121,11 @@ class DataProcessor(Process):
 
 def parse_domain(domainName):
     parts = domainName.rsplit('.', 1)
-    return (parts[0], parts[1])
+    try:
+        return (parts[0], parts[1])
+    except IndexError as e:
+        LOGGER.exception("Unable to parse domain '%s'" % (domainName))
+        raise
 
 
 def configTemplate(es, major, data_template, options):
