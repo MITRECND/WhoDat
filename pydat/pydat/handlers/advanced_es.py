@@ -16,7 +16,8 @@ tokens = [
     'FUZZY',
     'REGEX',
     'WILDCARD',
-    'DATE'
+    'DATE',
+    'NULL'
 ]
 
 regex_pattern = r'(r"(\\.|[^\t\n\r\f\v"])+")|' + r"(r'(\\.|[^\t\n\r\f\v'])+')"
@@ -55,6 +56,10 @@ def t_OR(t):
 
 @TOKEN('AND')
 def t_AND(t):
+    return t
+
+@TOKEN('!NULL!')
+def t_NULL(t):
     return t
 
 t_ignore = " \t\n"
@@ -102,6 +107,7 @@ specific : FUZZY WORD COLON WORD
          | WORD COLON QUOTED
          | WORD COLON REGEX
          | WORD COLON WILDCARD
+         | WORD COLON NULL
 
 daterange : WORD COLON DATE
           | WORD COLON DATE COLON DATE
@@ -465,6 +471,34 @@ def p_specific_quoted(t):
         t[0] = {'query': {'bool': {'must': [q]}}}
     else:
         t[0] = {'query': {'bool': {'must': [q['query']]}}}
+
+
+def p_field_missing(t):
+    'specific : WORD COLON NULL'
+
+    key = t[1]
+
+    fields = []
+    if key in special_keywords:
+        fields = special_keywords[key]
+    else:
+        if key in shortcut_keywords:
+            fields = shortcut_keywords[key]
+        elif key in original_keywords:
+            if key != 'domainName':
+                key = 'details.' + key
+            fields = [key]
+        else:
+            raise KeyError("Unknown field")
+
+    print(fields)
+    must_nots = []
+    for f in fields:
+        mn = {'exists': { "field": f}}
+        must_nots.append(mn)
+
+    t[0] = {'query': {'bool': {'must_not': must_nots}}}
+
 
 def create_wildreg_query(key, value, qtype):
     fields1 = []
