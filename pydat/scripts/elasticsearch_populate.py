@@ -255,7 +255,7 @@ class mpLogger(Thread):
     @property
     def logger(self):
         if self._logger is None:
-            self._logger = logging.getLogger()
+            self._logger = logging.getLogger(self.name)
         return self._logger
 
     def getLogger(self, name=__name__):
@@ -467,6 +467,10 @@ class DataReader(Thread):
                 if self._shutdown:
                     LOGGER.debug("Shutdown received")
                     break
+                if row is None or not row:
+                    LOGGER.warning("Skipping empty row in file %s"
+                                   % (filename))
+                    continue
                 self.data_queue.put({'header': header, 'row': row})
         except unicodecsv.Error as e:
             LOGGER.exception("CSV Parse Error in file %s - line %i\n"
