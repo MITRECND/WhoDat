@@ -80,6 +80,14 @@ html, body {
     width: 50%;
 }
 
+.adv_table1{
+    width: 100%;
+}
+
+.adv_table1 input[type="text"] {
+    width: 95%;
+}
+
 #stats {
     float:right;
     width: 50%;
@@ -243,6 +251,10 @@ tr td.oldVersion {
     background-color: #fece2f !important;
 }
 
+#page #dnsdata {
+    word-break: break-all;
+    word-break: break-word;
+}
 
 /***pdns.html***/
 #noresults{
@@ -255,4 +267,8 @@ tr td.oldVersion {
 
 #pdns .dnsres a {
     color: black;
+}
+
+#pdns_fields {
+    width: 100%;
 }
