@@ -184,7 +184,8 @@ def metadata(version=None):
         if res is None:
             res = es.search(index=META_INDEX,
                             body={"query": {"match_all": {}},
-                                  "sort": "metadata"})
+                                  "sort": "metadata",
+                                  "size": 999})
             cache.set('all_metadata', res, CACHE_TIME)
 
         if res['hits']['total'] > 0:
