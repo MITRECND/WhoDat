@@ -4,6 +4,7 @@ $(document).ready(function() {
 
     $('#pdns').tabs();
 
+    /*
 	$('#tab-DNSDB').tabs();
 	$('#tab-PassiveTotal').tabs();
 
@@ -38,4 +39,5 @@ $(document).ready(function() {
     tabName.css('top', '13px');
     $("#pdns-DNSDB").append(tabName);
     $("#pdns-PassiveTotal").append(tabName);
+    */
 });

@@ -1,6 +1,10 @@
 $(document).ready(function() {
     //Associate toggle with click
+	$(".accordion" ).accordion({heightStyle: "content", collapsible: true});
+
     $("#searchIcon").on("click", function() { search_toggle();}); 
+
+    $('.tooltip').tooltip();
 
     $("#" + active + "_link").addClass("tab_active");
 
@@ -13,8 +17,8 @@ $(document).ready(function() {
     });
 
     $(".search_form [name='fmt']").change(function(){
-        //Limit only needs to be toggled for Domain JSON and LIST
-         if ($(this).find("option:selected").val() != "normal"){
+        //Limit only needs to be turned off for regular/web
+         if ($(this).find("option:selected").val() != "none"){
                  $(".form_limit").removeClass("novis").show();
          }else{
                  $(".form_limit").removeClass("novis").addClass("novis");
@@ -27,6 +31,8 @@ $(document).ready(function() {
             $(this).parents('tbody').find('.form_filter').addClass("novis");
         }
     }); 
+
+    $(".search_form [name='fmt']").change();
 
 });
 
