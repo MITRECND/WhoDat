@@ -198,9 +198,10 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
                 if result_format in ['none', 'list']:
                     if tmp['rrname'][-1] == ".":
                         tmp['rrname'] = tmp['rrname'][:-1]
-                    for i in range(len(tmp['rdata'])):
-                        if tmp['rdata'][i][-1] == ".":
-                            tmp['rdata'][i] = tmp['rdata'][i][:-1]
+
+                    for (idx, rdat) in enumerate(list(tmp['rdata'])):
+                        if rdat and rdat[-1] == ".":
+                            tmp['rdata'][idx] = rdat[:-1]
 
                 try:
                     results['data'][rrtype].append(tmp)
