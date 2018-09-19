@@ -1,7 +1,7 @@
-# pyDat with ElasticSearch
+# pyDat Advanced Search
 
-When used with an ElasticSearch backend, pyDat exposes a new search interface
-that allows for more customized queries to be made.
+pyDat an advanced search interface that allows for more customized queries
+to be made.
 
 ## Intro to Advanced Search
 
@@ -319,6 +319,20 @@ sequence with a special character might not work as expected. For the most
 part, this does not apply to searches for things that look like domain names
 (e.g., "google.com" -- and this is due to the way ElasticSearch recognizes the
 '**.**' character in domain names).
+
+### NULL Queries
+
+As privacy concerns reduce the amount of visibile data, the abaility to
+pare down data has become considerably more important, to aid to this a new
+keyword/token has been added: `!!NULL!!`. The null token allows one to search
+for fields that are not filled. For example:
+
+>
+    registrant_name: !!NULL!!
+
+The above query would return all records where the registrant_name was empty.
+Note that this should be used along with other queries and is less useful
+on its own
 
 ### Shortcut Searches
 

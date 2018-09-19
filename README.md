@@ -20,14 +20,18 @@ For more information on the PHP implementation please see the
 [readme](../master/legacy_whodat/README.md). For more information on the
 Python implementation keep reading...
 
-## ElasticSearch
+## PreReqs
 
-**PreReqs to run with ElasticSearch**:
+pyDat is a python 2.7 application that requires the following to run:
 
 - ElasticSearch installed somewhere (versions 5.2 -> 6.x are supported, up to 6.3.1 tested)
-- python elasticsearch library (pip install elasticsearch -- ensure proper version is installed for your version of ES)
-- python lex yacc library (pip install ply)
-- below specified prereqs too
+- python packages:
+  - requests
+  - unicodecsv
+  - markdown
+  - django
+  - elasticsearch (version must correspond to cluster version)
+  - ply
 
 ## pyDat
 
@@ -47,7 +51,10 @@ elasticsearch_populate -h
                                     (-i IDENTIFIER | -r | -z | --config-template-only)
                                     [-v] [--vverbose] [-s]
                                     [-x EXCLUDE | -n INCLUDE] [-o COMMENT]
-                                    [-u [ES_URI [ES_URI ...]]] [-p INDEX_PREFIX]
+                                    [-u [ES_URI [ES_URI ...]]]
+                                    [--es-user ES_USER] [--es-pass ES_PASS]
+                                    [--es-ask-pass] [--es-enable-ssl ES_CACERT]
+                                    [--es-disable-sniffing] [-p INDEX_PREFIX]
                                     [-B BULK_SIZE] [-b BULK_FETCH_SIZE]
                                     [--rollover-size ROLLOVER_DOCS]
                                     [--pipelines PIPELINES]
@@ -91,6 +98,15 @@ elasticsearch_populate -h
     -u [ES_URI [ES_URI ...]], --es-uri [ES_URI [ES_URI ...]]
                             Location(s) of ElasticSearch Server (e.g.,
                             foo.server.com:9200) Can take multiple endpoints
+    --es-user ES_USER     Username for ElasticSearch when Basic Authis enabled
+    --es-pass ES_PASS     Password for ElasticSearch when Basic Authis enabled
+    --es-ask-pass         Prompt for ElasticSearch password
+    --es-enable-ssl ES_CACERT
+                            The path, on disk to the cacert of the ElasticSearch
+                            server to enable ssl/https support
+    --es-disable-sniffing
+                            Disable ES sniffing, useful when ssl
+                            hostnameverification is not working properly
     -p INDEX_PREFIX, --index-prefix INDEX_PREFIX
                             Index prefix to use in ElasticSearch (default: pydat)
     -B BULK_SIZE, --bulk-size BULK_SIZE
@@ -140,9 +156,7 @@ certain fields you don't find important.
 ### Running pyDat
 
 pyDat does not provide any data on its own. You must provide your own whois
-data in an ElasticSearch data store . Beyond the data in ElasticSearch you will need
-[Django](https://djangoproject.com), [unicodecsv](https://pypi.python.org/pypi/unicodecsv),
-[requests](https://pypi.python.org/pypi/requests) (at least 2.2.1) and [markdown](https://pypi.python.org/pypi/Markdown).
+data in an ElasticSearch data store.
 
 ### Populating ElasticSearch with whoisxmlapi data (Ubuntu 16.04.3 LTS)
 
@@ -337,7 +351,7 @@ a cron job. For more information please see the [PHP implementation](../master/w
 
 ## Legal Stuff
 
-pyDat is copyright The MITRE Corporation 2016.
+pyDat is copyright The MITRE Corporation 2018.
 
 The PHP implementation is copyright Chris Clark, 2013. Contact him at
 Chris@xenosys.org.
