@@ -5,6 +5,7 @@ import os
 import unicodecsv
 import time
 import argparse
+import getpass
 from threading import Thread
 import multiprocessing
 from multiprocessing import (Process,
@@ -28,18 +29,6 @@ FIRST_SEEN = 'dataFirstSeen'
 
 DOC_TYPE = "doc"
 META_DOC_TYPE = "doc"
-
-
-def connectElastic(uri):
-    es = elasticsearch.Elasticsearch(uri,
-                                     sniff_on_start=True,
-                                     max_retries=100,
-                                     retry_on_timeout=True,
-                                     sniff_on_connection_fail=True,
-                                     sniff_timeout=1000,
-                                     timeout=100)
-
-    return es
 
 
 class StatTracker(Thread):
@@ -1085,7 +1074,7 @@ class DataProcessor(Process):
         self.insert_queue = queue.Queue(maxsize=10000)
 
         try:
-            self.es = connectElastic(self.options.es_uri)
+            self.es = elasticsearch.Elasticsearch(**self.options.es_args)
         except elasticsearch.exceptions.TransportError as e:
             LOGGER.critical("Unable to establish elastic connection")
             return
@@ -1306,6 +1295,26 @@ def main():
                         help=("Location(s) of ElasticSearch Server (e.g., "
                               "foo.server.com:9200) Can take multiple "
                               "endpoints"))
+    parser.add_argument("--es-user", action="store", dest="es_user",
+                        default=None,
+                        help=("Username for ElasticSearch when Basic Auth"
+                              "is enabled"))
+    parser.add_argument("--es-pass", action="store", dest="es_pass",
+                        default=None,
+                        help=("Password for ElasticSearch when Basic Auth"
+                              "is enabled"))
+    parser.add_argument("--es-ask-pass", action="store_true",
+                        dest="es_ask_pass", default=False,
+                        help=("Prompt for ElasticSearch password"))
+    parser.add_argument("--es-enable-ssl", action="store",
+                        dest="es_cacert", default=None,
+                        help=("The path, on disk to the cacert of the "
+                              "ElasticSearch server to enable ssl/https "
+                              "support"))
+    parser.add_argument("--es-disable-sniffing", action="store_true",
+                        dest="es_disable_sniffing", default=False,
+                        help=("Disable ES sniffing, useful when ssl hostname"
+                              "verification is not working properly"))
     parser.add_argument("-p", "--index-prefix", action="store",
                         dest="index_prefix", default='pydat',
                         help=("Index prefix to use in ElasticSearch "
@@ -1357,6 +1366,35 @@ def main():
 
     options = parser.parse_args()
 
+    options.es_args = {
+        'hosts': options.es_uri,
+        'sniff_on_start': (not options.es_disable_sniffing),
+        'sniff_on_connection_fail': (options.es_disable_sniffing),
+        'sniff_timeout': (None if options.es_disable_sniffing else 1000),
+        'max_retries': 100,
+        'retry_on_timeout': True,
+        'timeout': 100
+    }
+
+    if options.es_ask_pass:
+        try:
+            options.es_pass = getpass.getpass("Enter ElasticSearch Password: ")
+        except Exception as e:
+            print("Unable to get password")
+            sys.exit(1)
+
+    if options.es_user is not None and options.es_pass is None:
+        print("Password must be supplied along with a username")
+        sys.exit(1)
+
+    if options.es_user is not None and options.es_pass is not None:
+        options.es_args['http_auth'] = (options.es_user,
+                                        options.es_pass)
+
+    if options.es_cacert is not None:
+        options.es_args['use_ssl'] = True
+        options.es_args['ca_certs'] = options.es_cacert
+
     if options.vverbose:
         options.verbose = True
 
@@ -1396,7 +1434,7 @@ def main():
 
     # Verify connectivity and version(s) of cluster
     try:
-        es = connectElastic(options.es_uri)
+        es = elasticsearch.Elasticsearch(**options.es_args)
     except elasticsearch.exceptions.TransportError as e:
         myLogger.exception("Unable to connect to ElasticSearch")
         sys.exit(1)

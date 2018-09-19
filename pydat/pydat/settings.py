@@ -12,9 +12,13 @@ DEBUG = False
 
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
-HANDLER='es'
+HANDLER = 'es'
 ES_URI = 'localhost:9200'
 ES_INDEX_PREFIX = 'pydat'
+ES_USER = None
+ES_PASS = None
+ES_CACERT = None
+
 
 PROXIES = {}
 
@@ -31,11 +35,10 @@ PDNS_MOD_PKG_BASE = "pdns_sources"
 # kept up to date as more searches are allowed.
 # Array of tuples (field_name, Friendly Display Name)
 # domainName should always be first
-SEARCH_KEYS = [ ('domainName', 'Domain'), 
-                ('registrant_name', 'Registrant Name'), 
-                ('contactEmail', 'Contact Email'), 
-                ('registrant_telephone', 'Telephone')
-              ]
+SEARCH_KEYS = [('domainName', 'Domain'),
+               ('registrant_name', 'Registrant Name'),
+               ('contactEmail', 'Contact Email'),
+               ('registrant_telephone', 'Telephone')]
 
 
 ADMINS = (
@@ -46,13 +49,13 @@ MANAGERS = ADMINS
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '',                      # Or path to database file if using sqlite3.
+        'ENGINE': 'django.db.backends.',
+        'NAME': '',
         # The following settings are not used with sqlite3:
         'USER': '',
         'PASSWORD': '',
-        'HOST': '',                      # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
-        'PORT': '',                      # Set to empty string for default.
+        'HOST': '',
+        'PORT': '',
     }
 }
 
@@ -109,8 +112,10 @@ STATICFILES_DIRS = [
     # Don't forget to use absolute paths, not relative paths.
 ]
 
-#recursively search pydat.pdns_modules for any templates that reside in modules
-for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE), topdown=True):
+# Recursively search pydat.pdns_modules for any templates
+# that reside in modules
+for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE),
+                                    topdown=True):
     for dir_ in dirs:
         if "static" in dir_:
             STATICFILES_DIRS.append(os.path.join(dirpath, dir_))
@@ -142,40 +147,36 @@ ROOT_URLCONF = 'pydat.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'pydat.wsgi.application'
 
-#add pdns template directories to the django directory list
+# Add pdns template directories to the django directory list
 _TEMPLATE_DIRS_ = [os.path.join(SITE_ROOT, "templates")]
 
-#recursively search pydat.pdns_modules for any templates that reside in modules
-for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE), topdown=True):
+# Recursively search pydat.pdns_modules for any templates that
+# reside in modules
+for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE),
+                                    topdown=True):
     for dir_ in dirs:
         if "templates" in dir_:
             _TEMPLATE_DIRS_.append(os.path.join(dirpath, dir_))
 
 
-#insert the core django template directory at the front of
-#django template directory list (django searches directories in order)
+# Insert the core django template directory at the front of
+# Django template directory list (django searches directories in order)
 _TEMPLATE_DIRS_.insert(0, os.path.join(SITE_ROOT, 'templates'))
 
-TEMPLATES = [
-        {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": _TEMPLATE_DIRS_,
-        "OPTIONS":{
-                "context_processors":[
-                            'django.contrib.auth.context_processors.auth',
-                            'django.template.context_processors.debug',
-                            'django.template.context_processors.i18n',
-                            'django.template.context_processors.media',
-                            'django.template.context_processors.static',
-                            'django.template.context_processors.tz',
-                            'django.contrib.messages.context_processors.messages',
-                            'django.template.context_processors.csrf'
-                ],
-                'debug': DEBUG,
-            },
-
-        },
-]
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "DIRS": _TEMPLATE_DIRS_,
+    "OPTIONS": {
+        "context_processors": [
+            'django.contrib.auth.context_processors.auth',
+            'django.template.context_processors.debug',
+            'django.template.context_processors.i18n',
+            'django.template.context_processors.media',
+            'django.template.context_processors.static',
+            'django.template.context_processors.tz',
+            'django.contrib.messages.context_processors.messages',
+            'django.template.context_processors.csrf'],
+        'debug': DEBUG}}]
 
 INSTALLED_APPS = [
     'django.contrib.auth',

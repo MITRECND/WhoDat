@@ -8,19 +8,22 @@
 # won't need to merge future updates of settings.py.
 
 # Set this to True if you want to see full debug output in your browser.
-#DEBUG = False
+# DEBUG = False
 
 # If DEBUG is set to False this must be set to the hosts that are allowed
 # to access the application
-#ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['*']
 
-#Default settings for elasticsearch
-#Uncomment to change
-#ES_URI = 'localhost:9200'
-#ES_INDEX_PREFIX = 'pydat'
+# Default settings for elasticsearch
+# Uncomment to change
+# ES_URI = 'localhost:9200'
+# ES_INDEX_PREFIX = 'pydat'
+# ES_USER = None
+# ES_PASS = None
+# ES_CACERT = None
 
-#Fill in with pdns sources within the custom_settings.py. 
-#PDNS_SOURCES ={}
+# Fill in with pdns sources within the custom_settings.py.
+# PDNS_SOURCES = {}
 
 
 '''
@@ -30,12 +33,12 @@ Requirements for PDNS_SOURCES dictionary:
      dnsdb source is a package called "dnsdb" and within it there
      is "dnsdb.py" module
     -pdns entries must have key/value pairs for the following keys:
-       -active               (pdns module/source is active or not)
-       -type                 (a tag to use as a label for pdns results sets.
-                             This value will be attached to any pdns results
-                             right before they are sent to a template rendering)
-       -table_template       (the name of the table template for the pdns source
-                             to use in rendering pdns data)
+       -active          (pdns module/source is active or not)
+       -type            (a tag to use as a label for pdns results sets.
+                         This value will be attached to any pdns results
+                         right before they are sent to a template rendering)
+       -table_template  (the name of the table template for the pdns source
+                         to use in rendering pdns data)
 
     -any additional key/value pairs may be added for specific variables used
      for that particular module
@@ -47,8 +50,8 @@ PDNS_SOURCES ={
         "active": True,
         "type":"DNSDB",
         "table_template": "dnsdb.html",
-        "dnsdb_headers":{}, 
-        "ssl_verify":True        
+        "dnsdb_headers":{},
+        "ssl_verify":True
     },
     "passivetotal":{
         "active": False,
@@ -60,16 +63,16 @@ PDNS_SOURCES ={
 '''
 
 # If you need to use a proxy set it here.
-#PROXIES = {
-#  "http": "http://127.0.0.1",
-#  "https": "https://127.0.0.1"
-#}
+# PROXIES = {
+#     "http": "http://127.0.0.1",
+#     "https": "https://127.0.0.1"
+# }
 
 # Verify SSL certificates in external calls
-#SSL_VERIFY = True
+# SSL_VERIFY = True
 
 # Limit all db queries to this many documents.
-#LIMIT = 10000
+# LIMIT = 10000
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),

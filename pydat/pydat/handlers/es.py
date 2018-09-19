@@ -19,10 +19,20 @@ class ElasticsearchError(Exception):
 
 
 def es_connector():
+    security_args = dict()
+
+    if settings.ES_USER is not None and settings.ES_PASS is not None:
+        security_args['http_auth'] = (settings.ES_USER,
+                                      settings.ES_PASS)
+    if settings.ES_CACERT is not None:
+        security_args['use_ssl'] = True
+        security_args['ca_certs'] = settings.ES_CACERT
+
     try:
         es = Elasticsearch(settings.ES_URI,
                            max_retries=100,
-                           retry_on_timeout=True)
+                           retry_on_timeout=True,
+                           **security_args)
         return es
     except Exception as e:
         raise
