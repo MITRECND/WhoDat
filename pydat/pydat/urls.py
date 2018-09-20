@@ -8,11 +8,11 @@ urlpatterns = [
   url(r'^domains/(?P<key>.*)/(?P<value>.*)/$', views.domains),
   url(r'^domains/$', views.domains, name='domains'),
 
-  url(r'^pdns_results/(?P<domain>.*)/$', views.pdns, name='pdns_rest'),
+  url(r'^pdns_results/(?P<search_value>.*)/$', views.pdns, name='pdns_rest'),
   url(r'^pdns_results/$', views.pdns, name='pdns_results'),
   url(r'^pdns_search/$', views.pdns_index, name='pdns'),
 
-  url(r'^pdnsr_results/(?P<key>.*)/(?P<value>.*)/$', views.pdns_r, name='pdns_r_rest'),
+  url(r'^pdnsr_results/(?P<search_value>.*)/$', views.pdns_r, name='pdns_r_rest'),
   url(r'^pdnsr_results/$', views.pdns_r, name='pdns_r_results'),
   url(r'^pdnsr_search/$', views.rpdns_index, name='pdns_r'),
 
@@ -38,14 +38,10 @@ urlpatterns = [
 
   url(r'^ajax/resolve/(?P<domainName>.*)/$', ajax.resolve),
   url(r'^ajax/resolve/$', ajax.resolve, name='ajax_resolve'),
+
+  url(r'^advdomains/$', views.advdomains, name='advdomains'),
+  url(r'^ajax/query/$', ajax.advanced_search, name='ajax_advanced'),
+  url(r'^ajax/advDataTable/$', ajax.advDataTable, name='ajax_advDataTable'),
+  url(r'^stats/$', views.stats, name='stats'),
+  url(r'^help/$', views.help, name='help'),
 ]
-
-if settings.HANDLER == 'es': #Enable ES specific urls
-    urlpatterns.extend([
-      url(r'^advdomains/$', views.advdomains, name='advdomains'),
-      url(r'^ajax/query/$', ajax.advanced_search, name='ajax_advanced'),
-      url(r'^ajax/advDataTable/$', ajax.advDataTable, name='ajax_advDataTable'),
-      url(r'^stats/$', views.stats, name='stats'),
-      url(r'^help/$', views.help, name='help'),
-    ])
-

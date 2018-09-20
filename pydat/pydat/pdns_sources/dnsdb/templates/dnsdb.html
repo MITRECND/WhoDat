@@ -1,0 +1,86 @@
+{% if results.data %}
+    <div id = "dnsdb-tab">
+        {% if fmt == "none" %}
+            <ul>
+                {% for rrtype, entry in results.data.items %}
+                    <li><a href="#tab-{{ forloop.counter }}">{{ rrtype }}</a></li>
+                {% endfor %}
+            </ul>
+
+            {% for rrtype, entry in results.data.items %}
+                <div id = "tab-{{ forloop.counter }}">
+                    <table class = "dnsdb-dnsres dnsres">
+                      <thead>
+                        <tr>
+                          <th class='rrname'>rrname</th>
+                          <th class='rdata'>rdata</th>
+                          <th>First Seen</th>
+                          <th>Last Seen</th>
+                          <th class ='count'>Count</th>
+                          <th>Actively Resolve</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for item in entry %}
+                        <tr>
+                          <td class='rrname'>
+                            <a href="{% url 'pdns_rest' item.rrname %}">{{ item.rrname }}</a>
+                          </td>
+                          <td class='rdata'>
+                            {% if item.rrtype == 'A' %}
+                              {% for rd in item.rdata %}
+                              <a href="{% url 'pdns_r_rest' rd %}">{{ rd }}</a><br>
+                              {% endfor %}
+                            {% else %}
+                              {% for rd in item.rdata %}
+                              {{ rd }}<br>
+                              {% endfor %}
+                            {% endif %}
+                          </td>
+                          <td>
+                            {% if item.time_first  %}
+                                {{ item.time_first }}
+                            {% else %}
+                                Unknown
+                            {% endif %}
+                          </td>
+                          <td>
+                            {% if item.time_last  %}
+                                {{ item.time_last }}
+                            {% else %}
+                                Unknown
+                            {% endif %}
+                          </td>
+                          <td class = 'count'>
+                            {{ item.count }}
+                          </td>
+                          <td>
+                            <span class="link resolve" domainName="{{ item.rrname }}">Resolve</span>
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div id="dnsdb-data">
+                <table>
+                    {% for line in results.data %}
+                    <tr>
+                        <td> {{ line }} </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        {% endif %}
+    </div>
+{% elif results.error %}
+    <span class='error'>
+        {{results.error}}
+    </span>
+{% else %}
+    <div id = 'noresults'>
+        <h2>No Results Found</h2>
+    </div>
+{% endif %}

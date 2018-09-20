@@ -1,7 +1,0 @@
-pymongo
-requests
-unicodecsv
-markdown
-django<=1.11.12
-elasticsearch>=2.0.0,<3.0.0
-ply

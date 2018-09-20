@@ -5,8 +5,11 @@ from django.conf import settings
 from django.shortcuts import render, HttpResponse
 from django.http import QueryDict
 import urllib
+import unicodecsv as csv
+import cStringIO
 
-from pydat.forms import domain_form, advdomain_form, pdns_form, pdns_r_form, validate_ip, validate_hex
+from pydat.forms import (domain_form, advdomain_form, pdns_form_dynamic,
+                         rpdns_form_dynamic)
 from pydat.handlers import handler
 from pydat.handlers import passive
 
@@ -19,8 +22,8 @@ def __renderErrorResponse__(request, view, message, data=None):
     return render(request, view, context=context)
     
 
-def __renderErrorPage__(request, message, data = None):
-    d = {'error' : message}
+def __renderErrorPage__(request, message, data=None):
+    d = {'error': message}
     if data is not None:
         d.update(data)
 
@@ -30,23 +33,23 @@ def __renderErrorPage__(request, message, data = None):
 def __createRequestContext__(data=None):
     #Default to adding search forms to every context
     search_f = domain_form()
-    pdns_f = pdns_form()
-    pdns_r_f = pdns_r_form()
+    pdns_f_dyn = pdns_form_dynamic()
+    rpdns_f_dyn = rpdns_form_dynamic()
     advdomain_f = advdomain_form()
 
-    ctx_var = { 'domain_form' : search_f,
+    ctx_var = { 'domain_form': search_f,
                 'advdomain_form': advdomain_f,
-                'pdns_form': pdns_f,
-                'pdns_r_form': pdns_r_f,
+                'pdns_form_dynamic': pdns_f_dyn,
+                'rpdns_form_dynamic': rpdns_f_dyn,   
                 'latest_version': handler.lastVersion(),
-                'handler': settings.HANDLER
-              } 
+                'handler': settings.HANDLER, 
+                'pdns_sources':[mod_data.config for mod_data in passive.PDNS_HANDLER_MODS.values()]
+            }
 
     if settings.HANDLER == 'es':
         ctx_var['health'] = handler.cluster_health().capitalize()
         ctx_var['record_count'] = handler.record_count()
-        ctx_var['last_import'] = handler.lastVersion()
-        ctx_var['scripting'] = settings.ES_SCRIPTING_ENABLED
+        ctx_var['last_import'] = handler.lastUpdate()
 
     if data is not None:
         ctx_var.update(data)
@@ -65,12 +68,12 @@ def index(request):
         legacy = False
     else:
         legacy = True
-    context = __createRequestContext__(data = { 'legacy_search': legacy})
-    return render(request, 'domain.html', context=context)
+    context = __createRequestContext__(data={'legacy_search': legacy})
+    return render(request,'domain.html', context=context)
 
 def pdns_index(request):
     context = __createRequestContext__()
-    return render(request, 'pdns.html', context=context)
+    return render(request,'pdns.html', context=context)
 
 def rpdns_index(request):
     context = __createRequestContext__()
@@ -89,10 +92,13 @@ def stats(request):
     if lastten[0]['metadata'] == 0:
         lastten = lastten[1:]
 
-    context = __createRequestContext__(data = {'domainStats': stats['domainStats'],
-                                                        'histogram': stats['histogram'],
-                                                        'lastten': lastten,
-                                                        'lastimport': lastimport})
+    context = __createRequestContext__(data = {
+                                                'domainStats': stats['domainStats'], 
+                                                'histogram': stats['histogram'],
+                                                'lastten': lastten,
+                                                'lastimport': lastimport
+                                            }
+                                    )
     return render(request, 'stats.html', context=context)
 
 def help(request):
@@ -117,35 +123,33 @@ def advdomains(request):
     elif request.method == "GET":
         search_f = advdomain_form(QueryDict(''))
         search_f.data['query'] = request.GET.get('query', None)
-        search_f.data['fmt'] = request.GET.get('fmt','normal')
+        search_f.data['fmt'] = request.GET.get('fmt','none')
         search_f.data['limit'] = request.GET.get('limit', settings.LIMIT)
         search_f.data['filt'] = request.GET.get('filt', settings.SEARCH_KEYS[0][0])
-        if settings.ES_SCRIPTING_ENABLED:
-            search_f.data['unique'] = request.GET.get('unique', False)
+        search_f.data['unique'] = request.GET.get('unique', False)
     else:
-        #return __renderErrorPage__(request, 'Bad Method')
-        return __renderErrorResponse__(request, 'domain.html', 'Bad Method')
+        return __renderErrorResponse__(
+                                        request,
+                                        'domain.html',
+                                        'Bad Method')
 
     if not search_f.is_valid():
-        return __renderErrorResponse__(request, 'domain.html', '', {'advdomain_form': search_f, 'legacy_search': False})
-        #return __renderErrorPage__(request, '', {'advdomain_form': search_f})
-        #context = __createRequestContext__(data = { 'advdomain_form': search_f } )
-        #return render(request, 'domain.html', context=context)
+        return __renderErrorResponse__(
+                                        request,
+                                        'domain.html',
+                                        '',
+                                        {'advdomain_form': search_f, 'legacy_search': False})
 
-    fmt = search_f.cleaned_data['fmt'] or 'normal'
+    fmt = search_f.cleaned_data['fmt'] or 'none'
     search_string = search_f.cleaned_data['query']
-    if settings.ES_SCRIPTING_ENABLED:
-        query_unique = str(search_f.cleaned_data['unique']).lower()
-    else:
-        query_unique = 'false'
-
+    query_unique = str(search_f.cleaned_data['unique']).lower()
     
-    if fmt == 'normal':
-        context = __createRequestContext__(data = { 'search_string': urllib.quote(search_string) or '',
-                                                             'query_unique': query_unique,
-                                                             'advdomain_form': search_f,
-                                                             'legacy_search': False,
-               })
+    if fmt == 'none':
+        context = __createRequestContext__(data = {'search_string': urllib.quote(search_string) or '',
+                                                   'query_unique': query_unique,
+                                                   'advdomain_form': search_f,
+                                                   'legacy_search': False,
+                                                   'fmt': fmt})
 
         return render(request, 'domain_results.html', context=context)
     else:
@@ -163,18 +167,50 @@ def advdomains(request):
             query_unique = True
         else:
             query_unique = False
-        results = handler.advanced_search(search_string, 0, limit, query_unique)
+        results = handler.advanced_search(
+                                            search_string,
+                                            0,
+                                            limit,
+                                            query_unique)
         if not results['success']:
-            #return __renderErrorPage__(request, results['message'])
-            return __renderErrorResponse__(request, 'domain.html', results['message'])
-        if fmt=='json':
-            return HttpResponse(json.dumps(results), content_type='application/json')
+            return __renderErrorResponse__(
+                                            request,
+                                            'domain.html',
+                                            results['message'])
+
+        if len(results['data']) == 0:
+            return __renderErrorResponse__(request, 'domain.html', 'No results')
+
+        if fmt =='json':
+            data = [json.dumps(d) for d in results['data']]
         elif fmt == 'list':
-            data = '\n'.join([d[filt_key] for d in results['data']])
-            return HttpResponse(data, content_type='text/plain')
+            data = [d[filt_key] for d in results['data']]
+        elif fmt == 'csv':
+            raw_data = results['data']
+            header_keys = set()
+            for row in raw_data:
+                header_keys = header_keys.union(set(row.keys()))
+            csv_out = cStringIO.StringIO()
+            writer = csv.DictWriter(csv_out, sorted(list(header_keys)))
+            writer.writeheader()
+            writer.writerows(raw_data)
+            csv_data = csv_out.getvalue()
+            csv_out.close()
+            data = csv_data.split('\n')
         else:
-            #return __renderErrorPage__(request, 'Invalid Format.')
-            return __renderErrorResponse__(request, 'domain.html',  'Invalid Format')
+            return __renderErrorResponse__(request,
+                                           'domain.html',
+                                           'Invalid Format')
+
+        context = __createRequestContext__(data={'search_string': urllib.quote(search_string) or '',
+                                                 'query_unique': str(query_unique).lower(),
+                                                 'advdomain_form': search_f,
+                                                 'legacy_search': False,
+                                                 'fmt': fmt,
+                                                 'data': data})
+
+        return render(request, 'domain_results.html', context=context)
+
 
 def domains(request, key=None, value=None):
     if request.method == "POST":
@@ -193,7 +229,7 @@ def domains(request, key=None, value=None):
         return __renderErrorPage__(request, 'Bad Method.')
 
     if not search_f.is_valid():
-        return __renderErrorResponse__(request, 'domain.html', '', {'domain_form' : search_f})
+        return __renderErrorResponse__(request, 'domain.html', '', {'domain_form': search_f})
 
     key = urllib.unquote(search_f.cleaned_data['key'])
     value = urllib.unquote(search_f.cleaned_data['value'])
@@ -222,14 +258,16 @@ def domains(request, key=None, value=None):
             low_version_js = 'null'
         if high_version == None:
             high_version_js = 'null'
-        context = __createRequestContext__(data = { 'key': urllib.quote(key),
-                                                             'value': urllib.quote(value),
-                                                             'low_version': low_version_js,
-                                                             'high_version': high_version_js,
-                                                             'domain_form': search_f,
-                                                             'legacy_search': True,
-               })
-        return render(request, 'domain_results.html', context=context)
+        context = __createRequestContext__(data = { 
+                                                'key': urllib.quote(key),
+                                                'value': urllib.quote(value),
+                                                'low_version': low_version_js,
+                                                'high_version': high_version_js,
+                                                'domain_form': search_f,
+                                                'legacy_search': True,}
+                                          )
+        return render(request,'domain_results.html', context=context)
+
 
     else:
         results = handler.search(key, value, filt=filt, limit=limit, low = low_version)
@@ -244,121 +282,117 @@ def domains(request, key=None, value=None):
             return __renderErrorPage__(request, 'Invalid Format.')
         
 
-def pdns(request, domain = None):
+def pdns(request, search_value=None):
     if request.method == 'POST':
-        pdns_f = pdns_form(request.POST)
+        pdns_f_dyn = pdns_form_dynamic(request.POST)
     elif request.method == 'GET':
-        pdns_f = pdns_form(QueryDict(''))
-        pdns_f.data['domain'] = domain
-        pdns_f.data['limit'] = request.GET.get('limit', settings.DNSDB_PAGE_LIMITS[settings.DNSDB_PAGE_LIMIT_DEFAULT])
-        pdns_f.data['rrtypes'] = request.GET.getlist('rrtypes', [settings.RRTYPE_KEYS[0][0]])
-        pdns_f.data['fmt'] = request.GET.get('fmt', 'normal')
-        pdns_f.data['absolute'] = request.GET.get('absolute', False)
-        pdns_f.data['pretty'] = request.GET.get('pretty', True)
-        pdns_f.data['filt'] = request.GET.get('filt', 'rrname')
+        pdns_f_dyn = pdns_form_dynamic(QueryDict(''))
+        pdns_f_dyn.data['search_value'] = search_value
+        pdns_f_dyn.data['result_format'] = request.GET.get('result_format', 'none')
+
+        # Filling form with all empty fields for a forward passive-DNS request
+        for passive_field in passive.PDNS_UI_FIELDS_BASE + passive.PDNS_UI_FIELDS_FORWARD:
+            pdns_f_dyn.data[passive_field.django_field_name] = request.GET.get(
+                passive_field.django_field_name,
+                passive_field.field_value_default)
+
     else:
-        return __renderErrorPage__(request, 'Bad Method')
+        return __renderErrorResponse__(request,
+                                       'pdns.html',
+                                       'Bad Method')
 
-    if not pdns_f.is_valid():
-        return __renderErrorPage__(request, '', {'pdns_form': pdns_f})
+    if not pdns_f_dyn.is_valid():
+        return __renderErrorResponse__(request,
+                                   'pdns.html',
+                                   'Unable to verify form data',
+                                    data = {"passive_form": pdns_f_dyn})
+    
+    # Get clean values for all common passive form fields
+    search_value = pdns_f_dyn.cleaned_data['search_value']
+    result_format = pdns_f_dyn.cleaned_data['result_format']
 
-    domain = pdns_f.cleaned_data['domain']
-    fmt = pdns_f.cleaned_data['fmt']
-    absolute = pdns_f.cleaned_data['absolute']
-    limit = pdns_f.cleaned_data['limit']
-    rrtypes = pdns_f.cleaned_data['rrtypes']
-    pretty = pdns_f.cleaned_data['pretty']
-    filt_key = pdns_f.cleaned_data['filt']
 
-    if limit is None:
-        limit = settings.DNSDB_PAGE_LIMITS[settings.DNSDB_PAGE_LIMIT_DEFAULT]
+    dynamic_fields = {}
+    # Obtain cleaned data for every passive-DNS field
+    for passive_field in passive.PDNS_UI_FIELDS_BASE + passive.PDNS_UI_FIELDS_FORWARD:
+        if passive_field.source_name not in dynamic_fields:
+            dynamic_fields[passive_field.source_name] = {}
 
-    if absolute is None:
-        absolute = False
+        cleaned_value = pdns_f_dyn.cleaned_data[passive_field.django_field_name]
+        # If user did not enter a required field, grab a defined default value
+        if not cleaned_value:
+            cleaned_value = passive_field.field_value_default
 
-    results = passive.request_pdns(domain, absolute, rrtypes, limit, pretty)
-    if fmt == 'normal':
-        if results['success']:
-            context = __createRequestContext__({'results': results,
-                                                         'inverse': False,
-                                                         'pdns_form': pdns_f,
-                                                        })
-            return render(request, 'pdns_results.html', context=context)
-        else:
-            return __renderErrorPage__(request, results['error'], {'pdns_form': pdns_f})
-    elif fmt == 'json':
-        return HttpResponse(json.dumps(results), content_type='application/json')
-    elif fmt == 'list':
-        data = ''
-        for set_ in results['sets']:
-            # Only handle DNSDB in list format.
-            if set_['type'] != 'DNSDB':
-                continue
-            for rrtype in set_['data'].keys():
-                for record in set_['data'][rrtype]:
-                    if not isinstance(record[filt_key], basestring): #it's a list
-                        for item in record[filt_key]:
-                            data += '\n%s' % item
-                    else: #it's just a string
-                        data += '\n%s' % record[filt_key]
-        data = data[1:]
-        return HttpResponse(data, content_type='text/plain')
-    else:
-        return __renderErrorPage__(request, 'Invalid Format.')
+        dynamic_fields[passive_field.source_name][passive_field.field_key] = cleaned_value
 
-def pdns_r(request, key = None, value = None):
+    results = passive.request_pdns(search_value, result_format, dynamic_fields)
+
+    if not results['success']:
+        return __renderErrorResponse__(request,
+                                       'pdns.html',
+                                       results['error'],
+                                       data = {'passive_form': pdns_f_dyn ,})
+
+    context = __createRequestContext__(data={'results': results['responses'],
+                                             'inverse': False,
+                                             'pdns_form_dynamic': pdns_f_dyn,
+                                             'fmt': result_format})
+
+    return render(request, 'pdns_results.html', context=context)
+
+
+def pdns_r(request, search_value = None):
     if request.method == 'POST':
-        pdns_r_f = pdns_r_form(request.POST)
-    elif request.method == 'GET': #Craft a form to make it easier to validate
-        pdns_r_f = pdns_r_form(QueryDict(''))
-        pdns_r_f.data['key'] = key
-        pdns_r_f.data['value']= value
-        pdns_r_f.data['rrtypes'] = request.GET.getlist('rrtypes', [settings.RRTYPE_KEYS[0][0]])
-        pdns_r_f.data['fmt'] = request.GET.get('fmt','normal')
-        pdns_r_f.data['limit'] = request.GET.get('limit', settings.DNSDB_PAGE_LIMITS[settings.DNSDB_PAGE_LIMIT_DEFAULT])
-        pdns_r_f.data['pretty'] = request.GET.get('pretty', True)
-        pdns_r_f.data['filt'] = request.GET.get('filt', 'rrname')
+        rpdns_f_dyn = rpdns_form_dynamic(request.POST)
+    elif request.method == 'GET': # Craft a form to make it easier to validate
+        rpdns_f_dyn = rpdns_form_dynamic(QueryDict(''))
+        rpdns_f_dyn.data['search_value']= search_value
+        rpdns_f_dyn.data['result_format'] = request.GET.get('result_format','none')
+
+        # Filling form with all empty fields for a reverse passive-DNS request
+        for passive_field in passive.PDNS_UI_FIELDS_BASE + passive.PDNS_UI_FIELDS_REVERSE:
+            rpdns_f_dyn.data[passive_field.django_field_name] = request.GET.get(
+                passive_field.django_field_name,
+                passive_field.field_value_default)
     else:
-        return __renderErrorPage__(request, 'Unsupported Method.')
+        return __renderErrorResponse__(request,
+                                      'rpdns.html',
+                                      'Unsupported Method')
 
-    if not pdns_r_f.is_valid():
-        return __renderErrorPage__(request, '', {'pdns_r_form' : pdns_r_f})
+    if not rpdns_f_dyn.is_valid():
+        return __renderErrorResponse__(request,
+                                       'rpdns.html',
+                                       'Unable to verify form data',
+                                        data={'passive_form': rpdns_f_dyn})
 
-    key = pdns_r_f.cleaned_data['key']
-    value = pdns_r_f.cleaned_data['value']
-    fmt = pdns_r_f.cleaned_data['fmt']
-    limit = pdns_r_f.cleaned_data['limit']
-    pretty = pdns_r_f.cleaned_data['pretty']
-    filt_key = pdns_r_f.cleaned_data['filt']
-    rrtypes = pdns_r_f.cleaned_data['rrtypes']
+    # Get clean values for all common reverse passive form fields
+    search_value = rpdns_f_dyn.cleaned_data['search_value']
+    result_format = rpdns_f_dyn.cleaned_data['result_format']
+  
+    dynamic_fields = {}
+    # Obtain cleaned data for every reverse passive-DNS field
+    for passive_field in passive.PDNS_UI_FIELDS_BASE + passive.PDNS_UI_FIELDS_REVERSE:
+        if passive_field.source_name not in dynamic_fields:
+            dynamic_fields[passive_field.source_name] = {}
 
+        cleaned_value = rpdns_f_dyn.cleaned_data[passive_field.django_field_name]
+        # If user did not enter a required field, grab field defined default value
+        if not cleaned_value:
+           cleaned_value = passive_field.field_value_default
 
-    if limit is None:
-        limit = settings.DNSDB_PAGE_LIMITS[settings.DNSDB_PAGE_LIMIT_DEFAULT]
+        dynamic_fields[passive_field.source_name][passive_field.field_key] = cleaned_value
 
-    results = passive.request_pdns_reverse(key, value, rrtypes, limit, pretty)
-    if fmt == 'normal':
-        if results['success']:
-            context = __createRequestContext__({'results': results, 'inverse': True, 'pdns_r_form': pdns_r_f})
-            return render(request, 'pdns_results.html', context=context)
-        else:
-            return __renderErrorPage__(request, results['error'], {'pdns_r_form':pdns_r_f})
-    elif fmt == 'json':
-        return HttpResponse(json.dumps(results), content_type='application/json')
-    elif fmt == 'list':
-        data = ''
-        for set_ in results['sets']:
-            # Only handle DNSDB in list format.
-            if set_['type'] != 'DNSDB':
-                continue
-            for rrtype in set_['data'].keys():
-                for record in set_['data'][rrtype]:
-                    if not isinstance(record[filt_key], basestring): #it's a list
-                        for item in record[filt_key]:
-                            data += '\n%s' % item
-                    else: #it's just a string
-                        data += '\n%s' % record[filt_key]
-        data = data[1:]
-        return HttpResponse(data, content_type='text/plain')
-    else:
-        return __renderErrorPage__(request, 'Invalid Format.')
+    results = passive.request_pdns_reverse(search_value, result_format, dynamic_fields)
+
+    if not results['success']:
+        return __renderErrorResponse__(request,
+                                       'rpdns.html',
+                                       results['error'],
+                                       data = {'rpdns_form_dynamic': rpdns_f_dyn})
+
+    context = __createRequestContext__(data={'results': results['responses'],
+                                             'inverse': True,
+                                             'rpdns_form_dynamic': rpdns_f_dyn,
+                                             'fmt': result_format})
+
+    return render(request,'rpdns_results.html', context=context)

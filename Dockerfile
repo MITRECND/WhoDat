@@ -2,7 +2,7 @@ FROM httpd:2.4
 
 MAINTAINER mitrecnd, http://github.com/mitrecnd
 
-ENV WSGI_VERSION="4.4.13" PATH=$PATH:/opt/WhoDat/pydat/scripts
+ENV WSGI_VERSION="4.6.4" PATH=$PATH:/opt/WhoDat/pydat/scripts
 
 COPY . /opt/WhoDat/
 ADD https://bootstrap.pypa.io/get-pip.py /tmp/
@@ -21,7 +21,7 @@ RUN \
     apt-get install -y python python-dev $buildDeps && \
     /tmp/get-pip.py && \
     rm /tmp/get-pip.py && \
-    pip install -r /opt/WhoDat/docker/requirements.txt && \
+    pip install -r /opt/WhoDat/requirements.es5.txt && \
     cd /tmp/ && \
     tar -zxf ${WSGI_VERSION}.tar.gz && \
     rm ${WSGI_VERSION}.tar.gz && \

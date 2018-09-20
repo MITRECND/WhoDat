@@ -5,18 +5,19 @@ import json
 import datetime
 
 tokens = [
-    'COLON', 
-    'WORD', 
-    'QUOTED', 
+    'COLON',
+    'WORD',
+    'QUOTED',
     'NOT',
-    'OR', 
-    'AND', 
-    'LPAREN', 
+    'OR',
+    'AND',
+    'LPAREN',
     'RPAREN',
     'FUZZY',
     'REGEX',
     'WILDCARD',
-    'DATE'
+    'DATE',
+    'NULL'
 ]
 
 regex_pattern = r'(r"(\\.|[^\t\n\r\f\v"])+")|' + r"(r'(\\.|[^\t\n\r\f\v'])+')"
@@ -26,7 +27,7 @@ wildcard_pattern = r'(w"([^\t\n\r\f\v"])+")|' + r"(w'([^\t\n\r\f\v'])+')"
 # Regex precendence is functions in file order followed by regex string with decreasing complexity
 t_QUOTED =  r'"(\\[\\"~:\(\)]|[^\t\n\r\f\v\\"~:\(\)])+"|' + r"'(\\[\\~':\(\)]|[^\t\n\r\f\v\\'~:\(\)])*'"
 t_WORD =    r'((\\[\\~:\(\)])|[^\s\\~:\(\)\'"])+'
-t_DATE =    r'[0-9]{4}-((0[1-9])|1[1-2])-((0[1-9])|([1-2][0-9])|(3[0-1]))'
+t_DATE =    r'[0-9]{4}-((0[1-9])|1[0-2])-((0[1-9])|([1-2][0-9])|(3[0-1]))'
 t_FUZZY =   r'~[0-9]?'
 t_COLON =   r':'
 t_LPAREN =  r'\('
@@ -57,6 +58,10 @@ def t_OR(t):
 def t_AND(t):
     return t
 
+@TOKEN('!NULL!')
+def t_NULL(t):
+    return t
+
 t_ignore = " \t\n"
 
 #def t_newline(t):
@@ -64,8 +69,10 @@ t_ignore = " \t\n"
 #    t.lexer.lineno += t.value.count("\n")
 
 def t_error(t):
-    raise ValueError("Illegal sequence: %s" % t.value)
-    #t.lexer.skip(1)
+    if t is not None:
+        raise ValueError("Unexpected character(s)/sequence at position %d: %s" % (t.lexpos, t.value))
+    else:
+        raise ValueError("Unable to parse input")
 
 # Build the lexer
 import ply.lex as lex
@@ -100,12 +107,13 @@ specific : FUZZY WORD COLON WORD
          | WORD COLON QUOTED
          | WORD COLON REGEX
          | WORD COLON WILDCARD
+         | WORD COLON NULL
 
 daterange : WORD COLON DATE
           | WORD COLON DATE COLON DATE
 
 termquery : QUOTED
-          | WORD 
+          | WORD
 
 """
 
@@ -119,11 +127,10 @@ class String(object):
 
     def __repr__(self):
         return self.string
-    
 
-no_parts = [ 
+no_parts = [
                 'details.registrant_fax',
-                'details.registrant_faxExt',   
+                'details.registrant_faxExt',
                 'details.registrant_telephone',
                 'details.registrant_telephoneExt',
                 'details.administrativeContact_fax',
@@ -139,8 +146,8 @@ date_keywords = {
                 }
 
 original_keywords = [
-                'domainName', 
-                'administrativeContact_email', 
+                'domainName',
+                'administrativeContact_email',
                 'administrativeContact_name',
                 'administrativeContact_organization',
                 'administrativeContact_street1',
@@ -167,22 +174,25 @@ original_keywords = [
                 'registrant_postalCode',
                 'registrant_country',
                 'registrant_fax',
-                'registrant_faxExt',   
+                'registrant_faxExt',
                 'registrant_telephone',
                 'registrant_telephoneExt',
+                'contactEmail',
                 'nameServers',
                 'registrarName',
                 'whoisServer'
                     ]
 
 special_keywords = {
-                'email_local': [ 
-                           "details.administrativeContact_email.local", 
-                           "details.registrant_email.local", 
+                'email_local': [
+                           "details.administrativeContact_email.local",
+                           "details.registrant_email.local",
+                           "details.contactEmail.local",
                          ],
-                'email_domain': [ 
-                           "details.administrativeContact_email.domain", 
-                           "details.registrant_email.domain", 
+                'email_domain': [
+                           "details.administrativeContact_email.domain",
+                           "details.registrant_email.domain",
+                           "details.contactEmail.domain",
                          ],
                    }
 
@@ -193,15 +203,16 @@ shortcut_keywords = {
                            'details.administrativeContact_street3',
                            'details.administrativeContact_street4',
                             ],
-                'registrant_street': [ 
+                'registrant_street': [
                            'details.registrant_street1',
                            'details.registrant_street2',
                            'details.registrant_street3',
                            'details.registrant_street4',
                             ],
                 'dn': ["domainName"],
-                'email': [ "details.administrativeContact_email", 
-                           "details.registrant_email", 
+                'email': [ "details.administrativeContact_email",
+                           "details.registrant_email",
+                           "details.contactEmail",
                          ],
                 'name': ['details.administrativeContact_name',
                          'details.registrant_name'
@@ -254,113 +265,40 @@ def p_query_group(t):
 def p_query_not(t):
     'query : NOT query'
 
-    query = { "bool": { "must_not": [] }}
-    filt = {'not': {}}
-
-    q = t[2]
-
-    #Negate the query if it exists
-    qq = q['query']['filtered']['query']
-    if 'match_all' not in qq:
-        query["bool"]["must_not"].append(qq)
-
-    #Negate the filter if it exists
-    qf = q['query']['filtered']['filter']
-    if 'match_all' not in qf:
-        keys = qf.keys()
-        if len(keys) > 1:
-            #As far as I can tell, this should never have more than one key ...
-            raise NotImplementedError("This condition was not accounted for, please forward what sort of query you were using to the developer")
-        elif len(keys) == 1:
-            filt['not'][keys[0]] = qf[keys[0]]
-
-    if len(filt['not'].keys()) == 0:
-        filt = {'match_all': {}}
-
-    if len(query['bool']['must_not']) == 0:
-        query = {'match_all': {}}
-
-
     t[0] = {
         "query": {
-            "filtered": {
-                "query": query,
-                "filter": filt
+            "bool": {
+                "must_not" : [{'bool': t[2]['query']['bool']}],
             }
         }
     }
 
-def create_combined_and(queries):
-    query = { "bool": { "must": [] }}
-    filt = {'and': []}
-
-    for q in queries:
-        qq = q['query']['filtered']['query']
-        if 'match_all' not in qq:
-            query["bool"]["must"].append(qq)
-        qf = q['query']['filtered']['filter']
-        if 'match_all' not in qf:
-            filt['and'].append(qf)
-
-    if len(filt['and']) == 0:
-        filt = {'match_all': {}}
-    elif len(filt['and']) == 1:
-        filt = filt['and'][0]
-
-    if len(query['bool']['must']) == 0:
-        query = {'match_all': {}}
-    elif len(query['bool']['must']) == 1:
-        query = query['bool']['must'][0]
-    
-
+def create_combined_and(query1, query2):
     return {
         "query": {
-            "filtered": {
-                "query": query,
-                "filter": filt
+            "bool": {
+                "must": [{'bool': query1['query']['bool']}, {'bool': query2['query']['bool']}]
             }
         }
     }
 
 def p_query_query(t):
     'query : query query %prec AND'
-    t[0] = create_combined_and((t[1], t[2]))
+    t[0] = create_combined_and(t[1], t[2])
 
 def p_query_and_query(t):
     'query : query AND query'
-    t[0] = create_combined_and((t[1], t[3]))
+    t[0] = create_combined_and(t[1], t[3])
 
 
 def p_query_or_query(t):
     'query : query OR query'
 
-    query = {"bool": {"should": [], "disable_coord": "true"}}
-    filt = {"or": []}
-
-    #If both queries are lacking a 'query' field combine the filters
-    if ('match_all' in t[1]['query']['filtered']['query'] and 'match_all' in t[3]['query']['filtered']['query']):
-        query = {'match_all': {}}
-        for q in (t[1], t[3]):
-            qf = q['query']['filtered']['filter']
-            filt['or'].append(qf)
-    #If both queries are lacking a filter, combine the queries
-    elif ('match_all' in t[1]['query']['filtered']['filter'] and 'match_all' in t[3]['query']['filtered']['filter']):
-        filt = {'match_all': {}}
-        for q in (t[1], t[3]):
-            qq = q['query']['filtered']['query']
-            query['bool']['should'].append(qq)
-    #Otherwise we need to combine queries under a larger query
-    else:
-        filt = {"match_all": {}}
-        for q in (t[1], t[3]):
-            query['bool']['should'].append(q['query'])
-        
-
     t[0] = {
         "query": {
-            "filtered": {
-                "query": query,
-                "filter": filt
+            "bool": {
+                "should": [{'bool': t[1]['query']['bool']}, {'bool': t[3]['query']['bool']}],
+                "disable_coord": "true"
             }
         }
     }
@@ -397,9 +335,9 @@ def create_specific_word_subquery(key, value):
     q = {
         'multi_match': {
             "query": value,
-            "fields": fields1 
+            "fields": fields1
         }
-    } 
+    }
 
     return q
 
@@ -418,7 +356,7 @@ def p_specific_fuzzy_word(t):
     sub_query = create_specific_word_subquery(key, value)
     sub_query['multi_match']['fuzziness'] = fuzzy
 
-    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': sub_query}}}
+    t[0] = {'query': {'bool': {'must': [sub_query]}}}
 
 def p_specific_word(t):
     'specific : WORD COLON WORD'
@@ -429,7 +367,7 @@ def p_specific_word(t):
 
     sub_query = create_specific_word_subquery(key, value)
 
-    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': sub_query}}}
+    t[0] = {'query': {'bool': {'must': [sub_query]}}}
 
 def p_specific_fuzzy_quoted(t):
     'specific : FUZZY WORD COLON QUOTED'
@@ -473,7 +411,7 @@ def p_specific_fuzzy_quoted(t):
         }
     }
 
-    t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
+    t[0] = {'query': {'bool': {'must': [q]}}}
 
 
 def p_specific_quoted(t):
@@ -530,9 +468,37 @@ def p_specific_quoted(t):
         q['dis_max'] = {'queries': shds}
 
     if 'query' not in q:
-        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
-    else:  
-        t[0] = {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
+        t[0] = {'query': {'bool': {'must': [q]}}}
+    else:
+        t[0] = {'query': {'bool': {'must': [q['query']]}}}
+
+
+def p_field_missing(t):
+    'specific : WORD COLON NULL'
+
+    key = t[1]
+
+    fields = []
+    if key in special_keywords:
+        fields = special_keywords[key]
+    else:
+        if key in shortcut_keywords:
+            fields = shortcut_keywords[key]
+        elif key in original_keywords:
+            if key != 'domainName':
+                key = 'details.' + key
+            fields = [key]
+        else:
+            raise KeyError("Unknown field")
+
+    print(fields)
+    must_nots = []
+    for f in fields:
+        mn = {'exists': { "field": f}}
+        must_nots.append(mn)
+
+    t[0] = {'query': {'bool': {'must_not': must_nots}}}
+
 
 def create_wildreg_query(key, value, qtype):
     fields1 = []
@@ -572,9 +538,9 @@ def create_wildreg_query(key, value, qtype):
         q['dis_max'] = {'queries': shds}
 
     if 'query' not in q:
-        return {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q}}}
-    else:  
-        return {'query': {'filtered': {'filter': {'match_all': {}}, 'query': q['query']}}}
+        return {'query': {'bool': {'must': [q]}}}
+    else:
+        return {'query': {'bool': {'must': [q['query']]}}}
 
 
 def p_specific_wildcard(t):
@@ -600,16 +566,15 @@ def create_daterange_query(key, start, end):
     key = date_keywords[key]
     qf = {
     'query':{
-        'filtered': {
-            'filter': { 
+        'bool': {
+            'filter': {
                 'range': {
                     key: {
                         'gte': start.strftime('%Y-%m-%d %H:%M:%S'),
                         'lt': end.strftime('%Y-%m-%d %H:%M:%S'),
                     }
                 }
-            },
-            'query': {'match_all': {}},
+            }
             }
         }
     }
@@ -655,23 +620,25 @@ def p_termquery_quoted(t):
         if len(terms) > 1:
             spns = []
             for p in terms:
-                spns.append({'span_term': {'_all': p}})
+                spns.append({'span_term': {'pydat_all': p}})
             query = {'span_near': {'clauses': spns, 'slop': 1, 'in_order': 'true'}}
         else:
-            query = {'term': {'_all': term}}
+            query = {'term': {'pydat_all': term}}
     else:
         if ll == 'email':
             fields = [
                        ("details.administrativeContact_email.parts", 1.5),
                        ("details.registrant_email.parts", 1.5),
-                       ("_all", 1.0)
+                       ("details.contactEmail.parts", 1.5),
+                       ("pydat_all", 1.0)
                      ]
         elif ll == 'domain':
             fields = [
                        ("domainName.parts", 2.0),
                        ("details.administrativeContact_email.parts", 1.5),
                        ("details.registrant_email.parts", 1.5),
-                       ("_all", 1.0)
+                       ("details.contactEmail.parts", 1.5),
+                       ("pydat_all", 1.0)
                      ]
 
         queries = []
@@ -687,7 +654,7 @@ def p_termquery_quoted(t):
 
         query = {'dis_max': {'queries': queries}}
 
-    t[0] = {"query": {"filtered": {"query": query, "filter": {"match_all":{}}}}}
+    t[0] = {"query": {"bool": {"must": [query]}}}
 
 def p_termquery_word(t):
     '''termquery : WORD'''
@@ -696,17 +663,19 @@ def p_termquery_word(t):
     query = None
     ll = looks_like(term)
     if ll is None:
-        query = {'match': {'_all': term}}
+        query = {'match': {'pydat_all': term}}
     else:
         if ll == 'email':
-            fields = [ "details.administrativeContact_email.parts^2", 
-                       "details.registrant_email.parts^2", 
-                       "_all" ] 
+            fields = [ "details.administrativeContact_email.parts^2",
+                       "details.registrant_email.parts^2",
+                       "details.contactEmail.parts^2",
+                       "pydat_all" ]
         elif ll == 'domain':
             fields = [ "domainName.parts^3",
-                       "details.administrativeContact_email.parts^2", 
-                       "details.registrant_email.parts^2", 
-                       "_all"]
+                       "details.administrativeContact_email.parts^2",
+                       "details.registrant_email.parts^2",
+                       "details.contactEmail.parts^2",
+                       "pydat_all"]
 
         query = {
             "multi_match": {
@@ -715,7 +684,7 @@ def p_termquery_word(t):
             }
         }
 
-    t[0] = {"query": {"filtered": {"query": query, "filter": {"match_all":{}}}}}
+    t[0] = {"query": {"bool": {"must": [query]}}}
 
 
 def remove_escapes(t):
@@ -728,12 +697,12 @@ def remove_escapes(t):
             if p[0] == '\\':
                 unescaped_string += p[1]
             else:
-                unescaped_string += p 
+                unescaped_string += p
     return unescaped_string
 
 def p_error(t):
     if t is not None:
-        raise ValueError("Syntax error at '%s'" % t)
+        raise ValueError("Syntax error at position %d: %s" % (t.lexpos, t.value))
     else:
         raise ValueError("Syntax error")
 

@@ -1,29 +1,24 @@
-pyDat with ElasticSearch
-==================================
+# pyDat Advanced Search
 
-When used with an ElasticSearch backend, pyDat exposes a new search interface
-that allows for more customized queries to be made.
+pyDat an advanced search interface that allows for more customized queries
+to be made.
 
-Intro to Advanced Search
-------------------------------
+## Intro to Advanced Search
 
+-------
 This syntax allows a user to search for generic terms across all entries or to
 search specific fields for data, crafting potentially complex queries to find
 data.
 
 Here's a simple, example search:
 
-```
-gmail.com
-```
+    gmail.com
 
 Searching for just that phrase will instruct pyDat to return pretty much any
 entry that has gmail or com in it (which would be alot!). Instead, one could
 search for:
 
-```
-"gmail.com"
-```
+    "gmail.com"
 
 By quoting the search phrase, pyDat will now search for that phrase in its
 entirety so any entry that has "gmail.com" will be returned. But since
@@ -36,7 +31,7 @@ Okay, with the basics out of the way, let's get a bit more advanced, say we to
 find the whois entry for the domain gmail.com but don't want the clutter of
 domains that use a gmail email address. We could search for:
 
-``` domainName:"gmail.com" ```
+    domainName:"gmail.com"
 
 Instead of searching the entirety of a record, pyDat will now scope your search
 to only the domainName field. Again, quotes are used to instruct pyDat that
@@ -47,62 +42,49 @@ definitely have .com. What you'll  also notice, though, is that the 'score'
 value displayed by pyDat for those entries will be considerably lower than the
 'score' for gmail.com.
 
-Combining Queries
-----------------------
+### Combining Queries
 
 Extending the above, you can combine search terms to make more advanced search
 queries. For example, if you're looking for any domain with 'foo' in it, which
 also has an email address (registrant or administrative contact) that contains
 'bar' in it you could do the following:
 
-```
-domainName:foo email:bar
-```
+    domainName:foo email:bar
 
 By default, multiple conditions are *and*'d together. But if you want to search
 for things using an *or* condition, you can use the keyword '**OR**'. As an
 example, if you want to search for an entry with 'foo' in the domain and either
 'bar' *or* 'bah' in the email you can do the following:
 
-```
-domainName:foo (email:bar OR email:bah)
-```
+    domainName:foo (email:bar OR email:bah)
 
 Since *and* conditions are given priority, the **OR** conditions must be put in
 parens and generally it's better to put **OR** conditions in parens for the
 sake of clarity. The '**AND**' keyword can be further used to increase clarity,
 but is unnecessary:
 
-```
-domainName:foo AND (email:bar OR email:bah)
-```
+    domainName:foo AND (email:bar OR email:bah)
 
-Negating Queries
----------------------
+### Negating Queries
 
 If a user wants to exclude certain paramters, it is possible by prepending a
 query with '**NOT**' to negate the query.
 
-```
-email:"domains@google.com" AND NOT domainName:"google.com"
-```
+    email:"domains@google.com" AND NOT domainName:"google.com"
 
 The above example would find all domains that have an email address of
 'domains@google.com' but would exclude the domain 'google.com'. Note that the
 **NOT** keyword has higher precedence than **AND** or **OR** so queries will be
 negated before they are combined.
 
-Fuzzy Searching
---------------------
+### Fuzzy Searching
 
 ElasticSearch's '*fuzzy*' searching capability allows you to find terms that
 are similar to your search term. This is exposed in the query syntax using the
 '**~**' character and works on specified fields (this feature will not work on
 generic searches). Here's an example:
 
-```
-~domainName:foo
-```
+    ~domainName:foo
 
 The above query will do a search on the domainName field for the value foo, but
 will do a fuzzy search with fuzziness (or the Levenshtein edit distance if you
@@ -112,65 +94,57 @@ manually, you can add '**0**', '**1**', or '**2**' to the '**~**' character.
 
 For example:
 
-```
-~2domainName:google
-```
+    ~2domainName:google
 
 The above will do a fuzzy search on the domainName field using a fuzziness
 value of 2 and will return any whois records that have a domain name that is 2
 edits away from '*google*'.
 
-**Note: ElasticSearch limits fuzziness to 2 at the max, internally. Entering 3
+*Note*: ElasticSearch limits fuzziness to 2 at the max, internally. Entering 3
 through 9 will not raise an error but will be the same as entering '2'.  the
 AUTO option uses '0' for terms that are 1 character long, '1' for terms that
 are between 1 and 5 characters and '2' for terms that are longer than 5
 characters. These are generally good values.**
 
-Getting Particular
----------------------
+### Getting Particular
 
 The new query syntax supports regex and wildcard searches on specific fields
 using a special syntax.
 
-**Note that fuzzy searching (as detailed above) is not supported for wildcard
-and regex searches, nor would it really make any sense.**
+*Note*: fuzzy searching (as detailed above) is not supported for wildcard
+and regex searches, nor would it really make any sense.
 
-### WildCard Searches
+#### WildCard Searches
 
 WildCard searches are done using quoted strings that start with a '**w**'
 
 For example:
 
-```
-w'fo?.com'
-```
+    w'fo?.com'
 
 Further, the wildcard syntax interprets two special characters, '**?**' and
 '\*'. The '**?**' symbol represents a single character, while the '\*'
 character represents any number of characters. So, the search specified above
-would find foo.com but also any entry that is preceded by 'fo', following by
-any single character and then followed by '.com', e.g., fop.com, fon.com, etc.
+would find `foo.com` but also any entry that is preceded by '`fo`', following by
+any single character and then followed by '.com', e.g., `fop.com`, `fon.com`, etc.
 
-### Regex Searches
+#### Regex Searches
 
 Similar to WildCard searches, the regex syntax allows for regex searches to be
 applied to specified fields using quoted strings that start with a '**r**'.
 
 For example:
 
-```
-r'foo[0-9]+\.com'
-```
+    r'foo[0-9]+\.com'
 
 Further, the regex syntax should accept any special characters that
 ElasticSearch will accept.
 
-**Note: Regex searches should be a last resort,  as they can be computationally
+*Note*: Regex searches should be a last resort,  as they can be computationally
 expensive and tax a cluster unnecessarily. Consider using a wildcard search or
-refining your search terms when possible.**
+refining your search terms when possible.
 
-Date Searches
------------------
+### Date Searches
 
 There are three date fields that can be searched (assuming there is data
 populated in the backend):
@@ -181,52 +155,37 @@ populated in the backend):
 
 The syntax for date searches are as follows:
 
-```
-&lt;key&gt;:YYYY-mm-dd
-```
+    <key>:YYYY-mm-dd
 
 As an example to search for entries that have a created date of January 2nd
 2003, you search search for:
 
-```
-created:2003-01-02
-```
+    created:2003-01-02
 
 To search between a range of dates, you can do the following:
 
-```
-&lt;key&gt;:YYYY-mm-dd:YYYY-mm-dd
-```
+    <key>:YYYY-mm-dd:YYYY-mm-dd
 
 So to find all entries created between January 2nd 2003 and February 1st 2003,
 you'd do:
 
-```
-created:2003-01-02:2003-02-01
-```
+    created:2003-01-02:2003-02-01
 
 Combining date searches is the same as combining other searches. For example
 you can do:
 
-```
-created:2003-01-01 expires:2022-01-30:2023-01-20
-```
+    created:2003-01-01 expires:2022-01-30:2023-01-20
 
 This includes using parentheses and the '**OR**' keyword:
 
-```
-created:2003-01-01 OR created:2004-01-02
-```
+    created:2003-01-01 OR created:2004-01-02
 
 While date searches can be useful, they are best used in conjunction with other
 queries such as:
 
-```
-domainName:w'fo???.com' created:2014-01-02:2014-01-25
-```
+    domainName:w'fo???.com' created:2014-01-02:2014-01-25
 
-Understanding Scoring
----------------------------
+## Understanding Scoring
 
 Scores returned by pyDat are the same scores returned by ElasticSearch. The
 important thing to understand about ElasticSearch scores is that they are
@@ -241,16 +200,13 @@ considerably lower than that of the first result.
 Scores that match the same will have the same score. If, for example, you are
 searching for an email address:
 
-```
-email:foo@gmail.com
-```
+    email:foo@gmail.com
 
 If the top results all have the same score, that means each of them matched
 your query equally. Results after that might drop of drastically indicating
 that only those top results might actually be relevant to your query.
 
-Recognized Keys
---------------------
+## Recognized Keys
 
 The following is a list of keys that are recognized for searching specific
 fields:
@@ -290,47 +246,45 @@ fields:
 - **registrarName**
 - **whoisServer**
 - **administrativeContact_street**
-	-- shortcut for all 4 administrative street entries
+    -- shortcut for all 4 administrative street entries
 - **registrant_street**
-	-- shortcut for all 4 registrant street entries
+    -- shortcut for all 4 registrant street entries
 - **dn**
-	-- shortcut for domainName
+    -- shortcut for domainName
 - **email**
-	-- shortcut for both emails above
+    -- shortcut for both emails above
 - **name**
-	-- shortcut for both names above
+    -- shortcut for both names above
 - **organization**
-	-- shortcut for both organizations above
+    -- shortcut for both organizations above
 - **street**
-	-- shortcut for all 8 streets above
+    -- shortcut for all 8 streets above
 - **city**
-	-- shortcut for both cities above
+    -- shortcut for both cities above
 - **state**
-	-- shortcut for both states above
+    -- shortcut for both states above
 - **postalCode**
-	-- shortcut for both postal codes above
+    -- shortcut for both postal codes above
 - **country**
-	-- shortcut for both countries above
+    -- shortcut for both countries above
 - **telephone**
-	-- shortcut for both telephone numbers above
+    -- shortcut for both telephone numbers above
 - **telephoneExt**
-	-- shortcut for both telephone extensions above
+    -- shortcut for both telephone extensions above
 - **fax**
-	-- shortcut for both faxes above
+    -- shortcut for both faxes above
 - **faxExt**
-	-- shortcut for both fax extensions above
+    -- shortcut for both fax extensions above
 - **ns**
-	-- shortcut for nameServers
+    -- shortcut for nameServers
 - **registrar**
-	-- shortcut for registrarName
+    -- shortcut for registrarName
 - **email_local**
-	-- Searches only the local part of an email (everything before the '**@**' symbol)
+    -- Searches only the local part of an email (everything before the "**@**" symbol)
 - **email_domain**
-	-- Searches only the domain part of an email (everything after the '**@**' symbol)
+    -- Searches only the domain part of an email (everything after the '**@**' symbol)
 
-
-Caveats/Things to Consider
----------
+## Caveats/Things to Consider
 
 ### Case (In)Sensitivity
 
@@ -341,13 +295,9 @@ regex or wildcard search is pointless as they will never match. This also
 applies to the commonly used character set *\[A-Z\]*. As examples, the
 following queries will never match:
 
-```
-w'F?o.com'
-```
+    w'F?o.com'
 
-```
-r'foo[A-Z]+.com'
-```
+    r'foo[A-Z]+.com'
 
 The above queries will never return a result as everything in the ElasticSearch
 backend is down-cased when it is processed. Keep this in mind when using regex
@@ -370,6 +320,20 @@ part, this does not apply to searches for things that look like domain names
 (e.g., "google.com" -- and this is due to the way ElasticSearch recognizes the
 '**.**' character in domain names).
 
+### NULL Queries
+
+As privacy concerns reduce the amount of visibile data, the abaility to
+pare down data has become considerably more important, to aid to this a new
+keyword/token has been added: `!!NULL!!`. The null token allows one to search
+for fields that are not filled. For example:
+
+>
+    registrant_name: !!NULL!!
+
+The above query would return all records where the registrant_name was empty.
+Note that this should be used along with other queries and is less useful
+on its own
+
 ### Shortcut Searches
 
 Most shortcut searches (using any of the fields above listed as shortcut for
@@ -389,17 +353,12 @@ Further specifying a fuzzy search on a quoted string will not search the same
 way as a non-fuzzy search on a quoted string, nor will it return the same
 results as two fuzzy searches in the same field. For example:
 
-```
-name:"john smith"
-```
-
-```
-~name:john ~name:smith
-```
-
-```
-~name:"john smith"
-```
+>
+    name:"john smith"
+>
+    ~name:john ~name:smith
+>
+    ~name:"john smith"
 
 The above queries will all return different data, with the last one being the
 most generic and probably returning the most data.

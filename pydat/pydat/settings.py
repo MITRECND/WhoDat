@@ -12,61 +12,34 @@ DEBUG = False
 
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
-HANDLER = 'mongo'
-
-MONGO_HOST = 'localhost'
-MONGO_PORT = 27017
-MONGO_DATABASE = 'whois'
-COLL_WHOIS = 'whois'
-
+HANDLER = 'es'
 ES_URI = 'localhost:9200'
-ES_INDEX_PREFIX = 'whois'
-ES_SCRIPTING_ENABLED = False
+ES_INDEX_PREFIX = 'pydat'
+ES_USER = None
+ES_PASS = None
+ES_CACERT = None
+
 
 PROXIES = {}
-
-DNSDB_HEADERS = {}
-PASSIVETOTAL_KEY = None
-
-# Verify SSL certificates in DNSDB calls.
-SSL_VERIFY = True
 
 # Elasticsearch limits regular queries to 10000 entries
 LIMIT = 10000
 
+PDNS_SOURCES = {}
+
+# Dynamic Passive DNS settings
+# Path to pdns source modules
+PDNS_MOD_PKG_BASE = "pdns_sources"
+
 # These keys are the ones we allow you to search on. This list must be
 # kept up to date as more searches are allowed.
-# Array of tuples (mongo_field_name, Friendly Display Name)
+# Array of tuples (field_name, Friendly Display Name)
 # domainName should always be first
-SEARCH_KEYS = [ ('domainName', 'Domain'), 
-                ('registrant_name', 'Registrant Name'), 
-                ('contactEmail', 'Contact Email'), 
-                ('registrant_telephone', 'Telephone')
-              ]
+SEARCH_KEYS = [('domainName', 'Domain'),
+               ('registrant_name', 'Registrant Name'),
+               ('contactEmail', 'Contact Email'),
+               ('registrant_telephone', 'Telephone')]
 
-#Types that are searchable via DNSDB, update to taste
-RRTYPE_KEYS = [ ('any', 'Any'),
-                ('a', 'A'),
-                ('aaaa', 'AAAA'),
-                ('cname', 'CNAME'),
-                ('txt', 'TXT'),
-                ('mx', 'MX'),
-                ('ns', 'NS'),
-                ('ptr', 'PTR'),
-              ]
-
-RDATA_KEYS = [
-              ('ip', 'IP'), 
-              ('name', 'Domain'),
-              ('raw', 'Raw (Hex)'),
-             ]
-
-#Array of values to use as limits for DNSDB lookups
-DNSDB_PAGE_LIMITS = [10, 20, 50, 100, 200, 500, 1000]
-#Index of above array that should be used as default value
-DNSDB_PAGE_LIMIT_DEFAULT = 3 # 100
-#Maximum Value for Requests
-DNSDB_LIMIT = 1000
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
@@ -76,13 +49,13 @@ MANAGERS = ADMINS
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '',                      # Or path to database file if using sqlite3.
+        'ENGINE': 'django.db.backends.',
+        'NAME': '',
         # The following settings are not used with sqlite3:
         'USER': '',
         'PASSWORD': '',
-        'HOST': '',                      # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
-        'PORT': '',                      # Set to empty string for default.
+        'HOST': '',
+        'PORT': '',
     }
 }
 
@@ -139,6 +112,14 @@ STATICFILES_DIRS = [
     # Don't forget to use absolute paths, not relative paths.
 ]
 
+# Recursively search pydat.pdns_modules for any templates
+# that reside in modules
+for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE),
+                                    topdown=True):
+    for dir_ in dirs:
+        if "static" in dir_:
+            STATICFILES_DIRS.append(os.path.join(dirpath, dir_))
+
 # List of finder classes that know how to find static files in
 # various locations.
 STATICFILES_FINDERS = [
@@ -154,7 +135,7 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    #'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     # Uncomment the next line for simple clickjacking protection:
@@ -166,28 +147,36 @@ ROOT_URLCONF = 'pydat.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'pydat.wsgi.application'
 
+# Add pdns template directories to the django directory list
+_TEMPLATE_DIRS_ = [os.path.join(SITE_ROOT, "templates")]
 
-_TEMPLATE_DIRS_ =[os.path.join(SITE_ROOT, 'templates')]
-TEMPLATES = [
-        {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": _TEMPLATE_DIRS_,
-        "OPTIONS":{
-                "context_processors":[
-                            'django.contrib.auth.context_processors.auth',
-                            'django.template.context_processors.debug',
-                            'django.template.context_processors.i18n',
-                            'django.template.context_processors.media',
-                            'django.template.context_processors.static',
-                            'django.template.context_processors.tz',
-                            'django.contrib.messages.context_processors.messages',
-                            'django.template.context_processors.csrf'
-                ],
-                'debug': DEBUG,
-            },
+# Recursively search pydat.pdns_modules for any templates that
+# reside in modules
+for dirpath, dirs, files in os.walk(os.path.join(SITE_ROOT, PDNS_MOD_PKG_BASE),
+                                    topdown=True):
+    for dir_ in dirs:
+        if "templates" in dir_:
+            _TEMPLATE_DIRS_.append(os.path.join(dirpath, dir_))
 
-        },
-]
+
+# Insert the core django template directory at the front of
+# Django template directory list (django searches directories in order)
+_TEMPLATE_DIRS_.insert(0, os.path.join(SITE_ROOT, 'templates'))
+
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "DIRS": _TEMPLATE_DIRS_,
+    "OPTIONS": {
+        "context_processors": [
+            'django.contrib.auth.context_processors.auth',
+            'django.template.context_processors.debug',
+            'django.template.context_processors.i18n',
+            'django.template.context_processors.media',
+            'django.template.context_processors.static',
+            'django.template.context_processors.tz',
+            'django.contrib.messages.context_processors.messages',
+            'django.template.context_processors.csrf'],
+        'debug': DEBUG}}]
 
 INSTALLED_APPS = [
     'django.contrib.auth',
@@ -236,11 +225,3 @@ LOGGING = {
 csfile = os.path.join(SITE_ROOT, 'custom_settings.py')
 if os.path.exists(csfile):
     execfile(csfile)
-
-#Set the mongo read preference if it isn't already
-if HANDLER == 'mongo':
-    try:
-        MONGO_READ_PREFERENCE
-    except NameError:
-            from pymongo import ReadPreference
-            MONGO_READ_PREFERENCE = ReadPreference.PRIMARY

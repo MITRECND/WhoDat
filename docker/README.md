@@ -43,9 +43,9 @@ Note that you will still need to create and pass in a custom_setings.py configur
 Image Organization
 ------------------
 
-This image is based on Apache's httpd image with all required dependencies to use pyDat with MongoDB or ElasticSearch. 
+This image is based on Apache's httpd image with all required dependencies to use pyDat with ElasticSearch.
 
-The repo has been installed into /opt/WhoDat but a soft link has been created at /pydat which points to /opt/WhoDat/pydat/pydat to make it easier to add a custom_settings file. 
+The repo has been installed into /opt/WhoDat but a soft link has been created at /pydat which points to /opt/WhoDat/pydat/pydat to make it easier to add a custom_settings file.
 
 The PATH has also been modified to include the scripts directory allowing you to directly execute the populate scripts from the command line:
 

@@ -12,12 +12,17 @@
 
 {% block js %}
     <script type="text/javascript" src="{% static '/js/pdns.js' %}"></script>
+    {% for pdns_source in pdns_sources %}
+        {% with "/js/"|add:pdns_source.name|add:".js" as pdns_js %}
+            <script type="text/javascript" src="{% static pdns_js  %}"></script>
+        {% endwith %}
+    {% endfor %}
 {% endblock %}
 
 {% block searchBar %}
-    {% include 'rpdns_form.html' %}
+    {% include 'rpdns_form_dynamic.html' %}
 {% endblock %}
 
 {% block page %}
-    {% include 'pdns_table.html' %}
+    {% include 'pdns_table.html' with direction="reverse" %}
 {% endblock %}

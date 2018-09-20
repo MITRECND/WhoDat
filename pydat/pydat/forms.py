@@ -1,18 +1,25 @@
+import sys
 import socket
 from django import forms
 from django.conf import settings
 from pydat.handlers import handler
+from pydat.handlers.passive import PDNS_UI_FIELDS_BASE, PDNS_UI_FIELDS_FORWARD, PDNS_UI_FIELDS_REVERSE
 import urllib
 
 class domain_form(forms.Form):
     key = forms.ChoiceField(label="Key")
     value = forms.CharField(label="Value")
-    latest = forms.BooleanField(label="Latest", initial=False, required=False)
     filt = forms.ChoiceField(label="Filter")
     fmt = forms.ChoiceField(label="Format")
-    limit = forms.IntegerField(label="Limit", min_value=1,
-                               max_value=settings.LIMIT,
-                               initial=settings.LIMIT)
+    latest = forms.BooleanField(
+                            label="Latest",
+                            initial=False,
+                            required=False)
+    limit = forms.IntegerField(
+                            label="Limit",
+                            min_value=1,
+                            max_value=settings.LIMIT,
+                            initial=settings.LIMIT)
 
     def __init__(self, *args, **kwargs):
         super(domain_form, self).__init__(*args, **kwargs)
@@ -47,19 +54,31 @@ class domain_form(forms.Form):
 
 
 class advdomain_form(forms.Form):
-    query = forms.CharField(label='Search', widget=forms.TextInput(attrs={'size': '60'}))
-    filt = forms.ChoiceField(label="Filter", required=False)
-    fmt = forms.ChoiceField(label="Format", required=False)
-    limit = forms.IntegerField(label="Limit", min_value=1,
-                               max_value=settings.LIMIT,
-                               initial=settings.LIMIT,
-                                required=False)
-    unique = forms.BooleanField(label="Unique", initial=False, required=False)
+    query = forms.CharField(
+                        label='Search',
+                        widget=forms.TextInput())
+    filt = forms.ChoiceField(
+                        label="Filter",
+                        required=False)
+    fmt = forms.ChoiceField(
+                        label="Format",
+                        required=False)
+    limit = forms.IntegerField(
+                        label="Limit",
+                        min_value=1,
+                        max_value=settings.LIMIT,
+                        initial=settings.LIMIT,
+                        required=False)
+    unique = forms.BooleanField(
+                        label="Unique",
+                        initial=False,
+                        required=False)
 
     def __init__(self, *args, **kwargs):
         super(advdomain_form, self).__init__(*args, **kwargs)
-        self.fields['fmt'].choices = [('normal', 'Web'),
+        self.fields['fmt'].choices = [('none', 'Web'),
                                       ('json', 'JSON'),
+                                      ('csv', 'CSV'),
                                       ('list', 'List')]
         nonelist = [('none', 'None')]
         nonelist.extend(settings.SEARCH_KEYS)
@@ -67,8 +86,9 @@ class advdomain_form(forms.Form):
         self.fields['filt'].choices = settings.SEARCH_KEYS
 
         for field in self.fields.values():
-            field.error_messages = {'required':'%s is required' % field.label, 
-                                    'invalid_choice': '%s is invalid' % field.label}
+            field.error_messages = {
+                            'required':'%s is required' % field.label, 
+                            'invalid_choice': '%s is invalid' % field.label}
 
     def clean_unique(self):
         if 'unique' not in self.cleaned_data or self.cleaned_data['unique'] is None:
@@ -88,8 +108,16 @@ class advdomain_form(forms.Form):
             raise forms.ValidationError("Unable to parse query: %s" % result) 
         return query
 
-#Allows you to provide a drop down of numbers but support non listed number
 class ChoiceNumberField(forms.ChoiceField):
+    """Allows you to provide a drop down of numbers but support non listed number
+
+       This class is based on forms.ChoiceField, but extended to support
+       arbitrary values
+
+       Keyword arguments:
+       maximum -- maximum value
+       minimum -- minimum value
+    """
     minimum = 0
     maximum = 0
 
@@ -115,142 +143,76 @@ class ChoiceNumberField(forms.ChoiceField):
         except Exception, e:
             raise forms.ValidationError("Unable to process number")
 
-class pdns_super(forms.Form):
-    fmt = forms.ChoiceField(label="Format")
-    limit = ChoiceNumberField(label="Limit", maximum=settings.DNSDB_LIMIT, minimum=1)
-    absolute = forms.BooleanField(label="Absolute", initial=False, required=False)
-    pretty = forms.BooleanField(label='Pretty', initial=True, required=False)
-    filt = forms.ChoiceField(label="Filter")
-    rrtypes = forms.MultipleChoiceField(label="RR Types",
-                                        widget=forms.SelectMultiple)
+forms.ChoiceNumberField = ChoiceNumberField
+
+
+
+class pdns_super_dynamic(forms.Form):
+    # Format field is common to all passive-DNS forms and reverse passive-DNS forms
+    result_format = forms.ChoiceField(label="Format")
 
     def __init__(self, *args, **kwargs):
-        super(pdns_super, self).__init__(*args, **kwargs)
-        self.fields['fmt'].choices = [('normal', 'Web'),
-                                      ('json', 'JSON'),
-                                      ('list', 'List')]
-        self.fields['limit'].choices = [(val, val) for val in settings.DNSDB_PAGE_LIMITS]
-        self.initial['limit'] = settings.DNSDB_PAGE_LIMITS[settings.DNSDB_PAGE_LIMIT_DEFAULT]
+        super(pdns_super_dynamic, self).__init__(*args, **kwargs)
+        self.fields['result_format'].choices =[('none','Web'),
+                                               ('json','JSON'),
+                                               ('csv', 'CSV'),
+                                               ('list','List')]
 
-        self.fields['filt'].choices = [('rrname', 'RRName'), 
-                                       ('rdata', 'RData')]
+        self.add_passive_fields(PDNS_UI_FIELDS_BASE)
 
-        self.fields['rrtypes'].choices = settings.RRTYPE_KEYS
-        self.initial['rrtypes'] = [settings.RRTYPE_KEYS[0][0]]
+    def add_passive_fields(self, passive_fields):
+        # For every defined base field from the passive-DNS packages
+        for passive_field in passive_fields:
+            try:
+                self.fields[passive_field.django_field_name] = getattr(forms,
+                    passive_field.field_type)()
 
-        for field in self.fields.values():
-            field.error_messages = {'required':'%s is required' % field.label,
-                                    'invalid_choice': '%s is invalid' % field.label}
+                for parameter_key, parameter_value in passive_field.parameters.items():
+                    # Unique case, have to convert the string variable to widget object
+                    # (this cannot handle widgets with attribute arguments though,
+                    # not sure how to handle that without excessive code and and string parsing)
+                    if parameter_key == "widget":
+                        parameter_value = getattr(forms, parameter_value.split(".")[1])()
 
-    def clean_absolute(self):
-        if 'absolute' not in self.cleaned_data or self.cleaned_data['absolute'] is None:
-            return False
-        else:
-            return self.cleaned_data['absolute']
-
-    def clean_pretty(self):
-        if 'pretty' not in self.cleaned_data or self.cleaned_data['pretty'] is None:
-            return True
-        else:
-            return self.cleaned_data['pretty']
-
-    def clean_limit(self):
-        limit = int(self.cleaned_data['limit'])
-        if limit < 1:
-            raise forms.ValidationError("Limit too small")
-        elif limit > settings.DNSDB_LIMIT:
-            raise forms.ValidationError("Limit too large")
-        return limit
+                    # Django forms hold "initial" value parameters in dictionary
+                    if parameter_key == "initial":
+                        self.initial[passive_field.django_field_name] = parameter_value
+                    else:
+                        # Set parameter via normal route
+                        setattr(self.fields[passive_field.django_field_name], parameter_key, parameter_value)
+            except AttributeError:
+                sys.exit("\nCritical Error: Error creating django form field. The type of field specified in the passive DNS configuration (settings.py) may not be a django field type OR a specified parameter of the field may be wrong\n")
 
 
-
-class pdns_form(pdns_super):
-    domain = forms.CharField(label="Domain")
+class pdns_form_dynamic(pdns_super_dynamic):
+    # Fields common to all forward passive-DNS requests
+    search_value = forms.CharField(label="Domain",
+                                   widget=forms.TextInput(attrs={'size': 60}))
 
     def __init__(self, *args, **kwargs):
-        super(pdns_form, self).__init__(*args, **kwargs)
+        super(pdns_form_dynamic, self).__init__(*args, **kwargs)
 
-    def clean_domain(self):
-        domain = self.cleaned_data['domain']
-        if isinstance(domain, unicode):
-            domain = domain.encode("idna")
-            return domain
-        return domain
+        # Add fields that are specific to forward passive-DNS requests
+        # for every defined base field from the passive-DNS packages
+        self.add_passive_fields(PDNS_UI_FIELDS_FORWARD)
 
 
-class pdns_r_form(pdns_super):
-    key = forms.ChoiceField(label="Type")
-    value = forms.CharField(label="Query")
+    def clean_search_value(self):
+        search_value = self.cleaned_data['search_value']
+        if isinstance(search_value, unicode):
+            search_value = search_value.encode("idna")
+            return search_value
+        return search_value
+
+
+class rpdns_form_dynamic(pdns_super_dynamic):
+    # Field common to all reverse passive-DNS requests
+    search_value = forms.CharField(label="Query",
+                                   widget=forms.TextInput(attrs={'size': 60}))
 
     def __init__(self, *args, **kwargs):
-        super(pdns_r_form, self).__init__(*args, **kwargs)
-        self.fields['key'].choices = settings.RDATA_KEYS
+        super(rpdns_form_dynamic, self).__init__(*args, **kwargs)
 
-    def clean_value(self):
-        if 'key' not in self.cleaned_data:
-            raise forms.ValidationError('Unable to parse query')
-    
-        key = self.cleaned_data['key']
-        value = self.cleaned_data['value']
-        if key == "ip": 
-            (status, output) = validate_ip(value)
-            if not status:
-                raise forms.ValidationError(output)
-            value = output
-        elif key == "raw":
-            output = validate_hex(value)
-            if output is None:
-                raise forms.ValidationError("Invalid Hex")
-            value = output
-        elif key == "name":
-            if isinstance(value, unicode):
-                value = value.encode("idna")
-        return value
-
-
-def validate_ip(input_ip):
-    ip = ""
-    mask = None
-    version = 4
-    if input_ip.count("/") > 0:
-        if input_ip.count("/") > 1:
-            return (False, "Invalid IP Syntax")
-        (ip, mask) = input_ip.split("/")
-    else:
-        ip = input_ip
-    
-    #Validate ip part
-    try:
-        socket.inet_pton(socket.AF_INET6, ip)
-        version = 6
-    except: #invalid ipv6
-        try:
-            socket.inet_pton(socket.AF_INET, ip)
-        except Exception, e:
-            return (False, "Invalid IP Address")
-
-    output_ip = ip
-    #Validate mask if present
-    if mask is not None:
-        try:
-            mask = int(mask) 
-            if mask < 1:
-                return (False, "Mask must be at least 1")
-            elif version == 4 and mask > 32:
-                return (False, "IP Mask too large for v4")
-            elif version == 6 and mask > 128:
-                return (False, "IP Mask too large for v6")
-        except:
-            return (False, "Unable to process mask")
-        output_ip += ",%d" % mask
-    return (True, output_ip)
-
-def validate_hex(input_hex):
-    try:
-        output_hex = "%x" % int(input_hex, 16)
-    except:
-        return None
-    if len(output_hex) % 2 == 1: #make hex string always pairs of hex values
-        output_hex = "0" + output_hex
-
-    return output_hex
+        # Add fields that are specific to reverse passive-DNS requests
+        # for every defined base field from the passive-DNS packages
+        self.add_passive_fields(PDNS_UI_FIELDS_REVERSE)

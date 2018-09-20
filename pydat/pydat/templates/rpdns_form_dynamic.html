@@ -1,0 +1,55 @@
+<div id="rpdns_form">
+{% if rpdns_form_dynamic %}
+	<div id="rpdns_fields">
+		<form action = "{% url 'pdns_r_results' %}" method= "POST" id = "form2", class="pdns_search_form">
+		{% csrf_token %}
+			<table id = "domain_field_header">
+			<tbody>
+				<tr>
+					<td>
+						<label>
+							<span style="font-weight: bold;">
+								{{ rpdns_form_dynamic.search_value.label }}
+							</span>
+						</label>
+					</td>
+					<td>
+						{{ rpdns_form_dynamic.search_value }}
+					</td>
+					<td>
+						{{ rpdns_form_dynamic.result_format.label }}
+					</td>
+					<td>
+						{{ rpdns_form_dynamic.result_format }}
+					</td>
+					<td>
+	                    <input type="submit" value="Search"/>
+	                </td>
+				</tr>
+			</tbody>	
+			</table>
+			<div class="accordion">
+				{% for pdns_source in pdns_sources %}
+					<h1> 
+						<span style="font-weight: bold;">{{ pdns_source.displayName }} Options</span>
+					</h1>
+                    {% with pdns_source.name|add:"_form_reverse.html" as form_template %}
+                    {% include form_template %}
+                    {% endwith %}
+				{% endfor %}
+			</div>
+		</form>
+	</div>
+	 <div class='errors'>
+		{% for field in rpdns_form_dynamic %}
+			{% if field.errors %}
+				{% for error in field.errors %}
+				<span class='error'>
+					{{ error }}
+				</span>
+				{% endfor %}
+			{% endif %}
+		{% endfor %}
+	</div>
+{% endif %}
+</div>

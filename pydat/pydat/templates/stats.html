@@ -147,7 +147,8 @@
 
     <div id='tldStats'>
         <h1>Top-Level Domain Stats</h1>
-        <table>
+        <table id=tld_table>
+            <thead>
             <tr>
                 <th>
                     TLD
@@ -156,9 +157,11 @@
                     Entries
                 </th>
                 <th>
-                    Unique
+                    Unique (Estimated)
                 </tr>
             </tr>
+            </thead>
+            <tbody>
             {% for tld,values in domainStats.items %}
                 <tr>
                     <td>{{ tld }}</td>
@@ -166,6 +169,8 @@
                     <td>{{ values.1 }}</td>
                 </tr>
             {% endfor %}
+            </tbody>
         </table>
     </div>
+    <br>
 {% endblock %}
