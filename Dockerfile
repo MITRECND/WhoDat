@@ -2,7 +2,7 @@ FROM httpd:2.4
 
 MAINTAINER mitrecnd, http://github.com/mitrecnd
 
-ENV WSGI_VERSION="4.4.13" PATH=$PATH:/opt/WhoDat/pydat/scripts
+ENV WSGI_VERSION="4.6.4" PATH=$PATH:/opt/WhoDat/pydat/scripts
 
 COPY . /opt/WhoDat/
 ADD https://bootstrap.pypa.io/get-pip.py /tmp/
