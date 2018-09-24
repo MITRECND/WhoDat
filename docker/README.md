@@ -6,9 +6,6 @@ This is the configuration dirctory for the Docker image of [pyDat](https://githu
 ### Base Docker Image
 * [httpd:2.4](https://index.docker.io/_/httpd/)
 
-### Image Size
-[![](https://badge.imagelayers.io/mitrecnd/pydat:latest.svg)](https://imagelayers.io/?images=mitrecnd/pydat:latest 'Get your own badge on imagelayers.io')
-
 ### Image Tags
 ```bash
 $ docker images
@@ -51,10 +48,4 @@ The PATH has also been modified to include the scripts directory allowing you to
 
 ```
 $ docker run --rm -it -v /path/to/whois/files:/whois mitrecnd/pydat elasticsearch_populate.py  -d /whois -i 1 -o "First Import" -u es:9200
-```
-
-If you're hosting an elasticsearch node via docker, you can use docker's link feature to allow the pydat docker image to access your deployed elasticsearch node:
-
-```
-$ docker run --rm -it --link elasticsearch-node:es -v /path/to/whois/files:/whois mitrecnd/pydat elasticsearch_populate.py  -d /whois -i 1 -o "First Import" -u es:9200
 ```
