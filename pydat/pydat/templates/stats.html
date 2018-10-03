@@ -58,7 +58,7 @@
             }
         ]
 
-     }; 
+     };
     </script>
 {% endblock %}
 
@@ -68,7 +68,9 @@
 {% endblock %}
 
 {% block page %}
-
+    <div id='cacheInfo'>
+        Page Created {{creation}}
+    </div>
     <div id='latestImportContainer'>
         <h1>Latest Import</h1>
         <div id='importTables'>
@@ -107,7 +109,7 @@
                         {% for key in lastimport.included_keys %}
                             <tr><td> {{ key }} </td></tr>
                         {% endfor %}
-                   {% else %} 
+                   {% else %}
                         {% for key in lastimport.excluded_keys %}
                             <tr><td> {{ key }} </td></tr>
                         {% endfor %}
@@ -125,8 +127,8 @@
                 </table>
             </div>
         </div>
-    </div> 
-    
+    </div>
+
 
     <div id='ltChartContainer'>
         <h1> Import Statistics </h1>

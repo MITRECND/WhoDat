@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.cache import cache
 from handlers.advanced_es import yacc
 from datetime import date
+import time
 import collections
 
 
@@ -94,12 +95,12 @@ def cluster_stats():
         results = es.search(index=SEARCH_INDEX, body=query)
         # Cache for an hour since this is a relatively expensive query
         # whose results shouldn't change often
+        results['cache_time'] = time.time()
         cache.set('cluster_stats', results, 3600)
-    else:
-        results = cache.get('cluster_stats')
 
     stats = {'domainStats': {},
-             'histogram': {}}
+             'histogram': {},
+             'creation': results['cache_time']}
 
     try:
         for bucket in results['aggregations']['type']['buckets']:

@@ -7,6 +7,7 @@ from django.http import QueryDict
 import urllib
 import unicodecsv as csv
 import cStringIO
+import datetime
 
 from pydat.forms import (domain_form, advdomain_form, pdns_form_dynamic,
                          rpdns_form_dynamic)
@@ -20,7 +21,7 @@ def __renderErrorResponse__(request, view, message, data=None):
 
     context = __createRequestContext__(d)
     return render(request, view, context=context)
-    
+
 
 def __renderErrorPage__(request, message, data=None):
     d = {'error': message}
@@ -40,9 +41,9 @@ def __createRequestContext__(data=None):
     ctx_var = { 'domain_form': search_f,
                 'advdomain_form': advdomain_f,
                 'pdns_form_dynamic': pdns_f_dyn,
-                'rpdns_form_dynamic': rpdns_f_dyn,   
+                'rpdns_form_dynamic': rpdns_f_dyn,
                 'latest_version': handler.lastVersion(),
-                'handler': settings.HANDLER, 
+                'handler': settings.HANDLER,
                 'pdns_sources':[mod_data.config for mod_data in passive.PDNS_HANDLER_MODS.values()]
             }
 
@@ -92,13 +93,16 @@ def stats(request):
     if lastten[0]['metadata'] == 0:
         lastten = lastten[1:]
 
-    context = __createRequestContext__(data = {
-                                                'domainStats': stats['domainStats'], 
-                                                'histogram': stats['histogram'],
-                                                'lastten': lastten,
-                                                'lastimport': lastimport
-                                            }
-                                    )
+    creation = datetime.datetime.utcfromtimestamp(stats['creation']).\
+        strftime('%Y-%m-%d %H:%M:%S GMT')
+
+    context = __createRequestContext__(
+        data={'domainStats': stats['domainStats'],
+              'histogram': stats['histogram'],
+              'creation': creation,
+              'lastten': lastten,
+              'lastimport': lastimport})
+
     return render(request, 'stats.html', context=context)
 
 def help(request):
@@ -115,7 +119,7 @@ def help(request):
 def about(request):
     context = __createRequestContext__()
     return render(request, 'about.html', context=context)
-    
+
 
 def advdomains(request):
     if request.method == "POST":
@@ -143,7 +147,7 @@ def advdomains(request):
     fmt = search_f.cleaned_data['fmt'] or 'none'
     search_string = search_f.cleaned_data['query']
     query_unique = str(search_f.cleaned_data['unique']).lower()
-    
+
     if fmt == 'none':
         context = __createRequestContext__(data = {'search_string': urllib.quote(search_string) or '',
                                                    'query_unique': query_unique,
@@ -245,7 +249,7 @@ def domains(request, key=None, value=None):
     else:
         low_version = None
         high_version = None
-    
+
     filt = None
     if fmt == 'list': #Only filter if a list was requested
         filt = filt_key
@@ -258,7 +262,7 @@ def domains(request, key=None, value=None):
             low_version_js = 'null'
         if high_version == None:
             high_version_js = 'null'
-        context = __createRequestContext__(data = { 
+        context = __createRequestContext__(data = {
                                                 'key': urllib.quote(key),
                                                 'value': urllib.quote(value),
                                                 'low_version': low_version_js,
@@ -280,7 +284,7 @@ def domains(request, key=None, value=None):
             return HttpResponse(data, content_type='text/plain')
         else:
             return __renderErrorPage__(request, 'Invalid Format.')
-        
+
 
 def pdns(request, search_value=None):
     if request.method == 'POST':
@@ -306,7 +310,7 @@ def pdns(request, search_value=None):
                                    'pdns.html',
                                    'Unable to verify form data',
                                     data = {"passive_form": pdns_f_dyn})
-    
+
     # Get clean values for all common passive form fields
     search_value = pdns_f_dyn.cleaned_data['search_value']
     result_format = pdns_f_dyn.cleaned_data['result_format']
@@ -368,7 +372,7 @@ def pdns_r(request, search_value = None):
     # Get clean values for all common reverse passive form fields
     search_value = rpdns_f_dyn.cleaned_data['search_value']
     result_format = rpdns_f_dyn.cleaned_data['result_format']
-  
+
     dynamic_fields = {}
     # Obtain cleaned data for every reverse passive-DNS field
     for passive_field in passive.PDNS_UI_FIELDS_BASE + passive.PDNS_UI_FIELDS_REVERSE:
