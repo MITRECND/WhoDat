@@ -18,8 +18,14 @@
 # Uncomment to change
 # ES_URI = 'localhost:9200'
 # ES_INDEX_PREFIX = 'pydat'
+
+# The following two settings are required if basic auth is enabled on your ES
+# cluster
 # ES_USER = None
 # ES_PASS = None
+
+# The path on disk to the CA cert for your ES cluster, required if
+# ssl/tls has been enabled on your cluster
 # ES_CACERT = None
 
 # Fill in with pdns sources within the custom_settings.py.
