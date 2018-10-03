@@ -713,7 +713,7 @@ precedence = (
     )
 
 import ply.yacc as yacc
-yacc.yacc()
+yacc.yacc(debug=False)
 
 
 def main():
