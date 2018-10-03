@@ -1,3 +1,9 @@
+<div id = "dnsdb-quota">
+    Remaining Queries: {{results.rate.remaining}}
+    {% if results.rate.limit != "unlimited" %}
+        (Resets [{{results.rate.limit}}]: {{results.rate.reset}})
+    {% endif %}
+</div>
 {% if results.data %}
     <div id = "dnsdb-tab">
         {% if fmt == "none" %}

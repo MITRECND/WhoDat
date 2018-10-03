@@ -5,6 +5,7 @@ pdns module for DNSDB
 '''
 import cgi
 import time
+import datetime
 import json
 import requests
 import socket
@@ -138,6 +139,64 @@ def _verify_type(value, type):
     return value
 
 
+def request_rate_limit():
+    url = "https://api.dnsdb.info/lookup/rate_limit"
+    results = {'success': False}
+
+    if not config.myConfig['apikey']:
+        results['error'] = 'No DNSDB key.'
+        return results
+
+    try:
+        headers = {'Accept': 'application/json',
+                   'X-API-Key': config.myConfig['apikey']}
+        r = requests.get(url,
+                         proxies=settings.PROXIES,
+                         headers=headers,
+                         verify=config.myConfig["ssl_verify"])
+    except Exception as e:
+        results['error'] = str(e)
+        return results
+
+    if r.status_code != 200:
+        results['error'] = "Unable to query quota."
+        return results
+
+    data = r.json()
+    if 'rate' not in data:
+        results['error'] = "expected field not found in response"
+        return results
+
+    rate = data['rate']
+
+    return rate
+
+
+def check_return_code(response):
+    results = {'success': False}
+    if response.status_code == 400:
+        results['error'] = 'Url possibly misconfigured'
+    elif response.status_code == 403:
+        results['error'] = "API key not valid"
+    elif response.status_code == 429:
+        try:
+            rate = request_rate_limit()
+            reset = time.strftime("%Y-%m-%d %H:%M:%S",
+                                  time.gmtime(rate['reset']))
+            results['error'] = ('Quota reached (limit: %d) Reset: %d'
+                                % (rate['limit'], reset))
+        except Exception as e:
+            results['error'] = "Quota reached, but unable to query limits"
+    elif response.status_code == 500:
+        results['error'] = "dnsdb server unable to process request"
+    elif response.status_code == 503:
+        results['error'] = "Request throttled, try again later"
+    else:
+        results['error'] = "Received unexpected response from server"
+
+    return results
+
+
 def pdns_request_handler(domain, result_format, **dynamic_data):
     results = {'success': False}
 
@@ -169,10 +228,13 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
                              headers=headers,
                              verify=config.myConfig["ssl_verify"])
         except Exception as e:
-                results['error'] = str(e)
-                return results
+            results['error'] = str(e)
+            return results
 
-        if r.status_code != 404:
+        if r.status_code not in [200, 404]:
+            return check_return_code(r)
+
+        if r.status_code == 200:
             # Each line of the response is an individual JSON blob.
             for line in r.text.split('\n'):
                 # Skip empty lines.
@@ -209,6 +271,13 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
                     results['data'][rrtype] = [tmp]
 
     results['success'] = True
+    rate = {'limit': r.headers['X-RateLimit-Limit'],
+            'remaining': r.headers['X-RateLimit-Remaining'],
+            'reset': r.headers['X-RateLimit-Reset']}
+    if rate['reset'] != 'n/a':
+        rate['reset'] = datetime.datetime.utcfromtimestamp(
+            float(rate['reset'])).strftime('%Y-%m-%d %H:%M:%S GMT')
+    results['rate'] = rate
 
     if result_format != 'none':
         results = _format_results(results, result_format, dynamic_data)
@@ -258,7 +327,10 @@ def pdns_reverse_request_handler(search_value,
             results['error'] = str(e)
             return results
 
-        if r.status_code != 404:
+        if r.status_code not in [200, 404]:
+            return check_return_code(r)
+
+        if r.status_code == 200:
             # Each line of the response is an individual JSON blob.
             for line in r.text.split('\n'):
                 # Skip empty lines.
@@ -298,6 +370,14 @@ def pdns_reverse_request_handler(search_value,
                     results['data'][rrtype] = [tmp]
 
     results['success'] = True
+    rate = {'limit': r.headers['X-RateLimit-Limit'],
+            'remaining': r.headers['X-RateLimit-Remaining'],
+            'reset': r.headers['X-RateLimit-Reset']}
+    if rate['reset'] != 'n/a':
+        rate['reset'] = datetime.datetime.utcfromtimestamp(
+            float(rate['reset'])).strftime('%Y-%m-%d %H:%M:%S GMT')
+    results['rate'] = rate
+
     if result_format != 'none':
         results = _format_results(results, result_format, dynamic_fields)
 
