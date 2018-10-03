@@ -47,6 +47,7 @@ fields.addBaseField("rrtypes", "MultipleChoiceField", ["any"],
                                 "initial": ["any"],
                                 "choices": [
                                     ('any', 'Any'),
+                                    ('any-dnssec', 'ANY-DNSSEC'),
                                     ('a', 'A'),
                                     ('aaaa', 'AAAA'),
                                     ('cname', 'CNAME'),

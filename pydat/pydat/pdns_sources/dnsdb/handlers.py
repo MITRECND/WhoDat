@@ -10,6 +10,7 @@ import json
 import requests
 import socket
 import urllib
+import urlparse
 import cStringIO
 import unicodecsv as csv
 from django.conf import settings
@@ -198,15 +199,22 @@ def check_return_code(response):
 
 
 def pdns_request_handler(domain, result_format, **dynamic_data):
-    results = {'success': False}
+    scheme = "https"
+    netloc = "api.dnsdb.info"
+    path = "lookup/rrset/name".split('/')
+    query = ["limit=%d" % (int(dynamic_data['limit']))]
 
+    results = {'success': False}
     if not config.myConfig['apikey']:
         results['error'] = 'No DNSDB key.'
         return results
 
     # If 'any' is in rrtypes and anything else too, just default to 'any'
     if 'any' in dynamic_data['rrtypes']:
-        dynamic_data['rrtypes'] = ['any']
+        if 'any-dnssec' in dynamic_data['rrtypes']:
+            dynamic_data['rrtypes'] = ['any', 'any-dnssec']
+        else:
+            dynamic_data['rrtypes'] = ['any']
 
     results['data'] = {}
     wildcard = "*."
@@ -214,12 +222,21 @@ def pdns_request_handler(domain, result_format, **dynamic_data):
     if dynamic_data['absolute']:
         wildcard = ""
 
+    owner_name = wildcard + urllib.quote(domain)
+    path.append(owner_name)
+
     for rrtype in dynamic_data['rrtypes']:
-        url = "https://api.dnsdb.info/lookup/rrset/name/" \
-                + wildcard \
-                + urllib.quote(domain) + "/" \
-                + rrtype \
-                + "/?limit=" + str(dynamic_data['limit'])
+        local_path = list(path) + [rrtype]
+        local_path = "/".join(local_path)
+
+        local_url = urlparse.ParseResult(scheme,
+                                         netloc,
+                                         local_path,
+                                         "",
+                                         "&".join(query),
+                                         "")
+
+        url = urlparse.urlunparse(local_url)
         try:
             headers = {'Accept': 'application/json',
                        'X-API-Key': config.myConfig['apikey']}
@@ -293,8 +310,12 @@ def pdns_reverse_request_handler(search_value,
 
     Note: the method name must be "pdns_reverse_request_handler"
     """
-    results = {'success': False}
+    scheme = "https"
+    netloc = "api.dnsdb.info"
+    path = "lookup/rdata".split('/')
+    query = ["limit=%d" % ((int(dynamic_fields['limit'])))]
 
+    results = {'success': False}
     if not config.myConfig['apikey']:
         results['error'] = 'No DNSDB key.'
         return results
@@ -305,17 +326,28 @@ def pdns_reverse_request_handler(search_value,
         results['error'] = 'Unable to verify input'
         return results
 
+    path.extend([dynamic_fields['type'], urllib.quote(value)])
+
     # If 'any' is in rrtypes and anything else too, just default to 'any'
     if 'any' in dynamic_fields['rrtypes']:
-        dynamic_fields['rrtypes'] = ['any']
+        if 'any-dnssec' in dynamic_fields['rrtypes']:
+            dynamic_fields['rrtypes'] = ['any', 'any-dnssec']
+        else:
+            dynamic_fields['rrtypes'] = ['any']
 
     results['data'] = {}
     for rrtype in dynamic_fields['rrtypes']:
-        url = "https://api.dnsdb.info/lookup/rdata/" \
-                + dynamic_fields['type'] + "/" \
-                + urllib.quote(value) + "/" \
-                + rrtype \
-                + "?limit=" + str(dynamic_fields['limit'])
+        local_path = list(path) + [rrtype]
+        local_path = "/".join(local_path)
+
+        local_url = urlparse.ParseResult(scheme,
+                                         netloc,
+                                         local_path,
+                                         "",
+                                         "&".join(query),
+                                         "")
+
+        url = urlparse.urlunparse(local_url)
         try:
             headers = {'Accept': 'application/json',
                        'X-API-Key': config.myConfig['apikey']}
