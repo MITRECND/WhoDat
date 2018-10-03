@@ -17,7 +17,10 @@ fields.addBaseField("limit", "ChoiceNumberField", 1000,
                                             (100, 100),
                                             (200, 200),
                                             (500, 500),
-                                            (1000, 1000)],
+                                            (1000, 1000),
+                                            (2500, 2500),
+                                            (5000, 5000),
+                                            (10000, 10000)],
                                 "initial": 1000})
 
 fields.addBaseField("absolute", "BooleanField", False,
