@@ -6,42 +6,26 @@
     <script type="text/javascript">
         var active = 'domain';
     </script>
-    
+
 {% endblock %}
 
 {% block js %}
 {%endblock %}
 
 {% block searchBar %}
-    {% if legacy_search %}
-        {% include 'domain_search_form.html' %}
-    {% else %}
-        {% include 'domain_advsearch_form.html' %}
-    {% endif %}
+    {% include 'domain_advsearch_form.html' %}
 {% endblock %}
 
 {% block errors %}
-    {% if legacy_search %}
-        {% for field in domain_form %}
-            {% if field.errors %}
-                {% for error in field.errors %}
-                <span class='error'>
-                    {{ error }}
-                </span>
-                {% endfor %}
-            {% endif %}
-        {% endfor %}
-    {% else %}
-        {% for field in advdomain_form %}
-            {% if field.errors %}
-                {% for error in field.errors %}
-                <span class='error'>
-                    {{ error }}
-                </span>
-                {% endfor %}
-            {% endif %}
-        {% endfor %}
-    {% endif %}
+    {% for field in advdomain_form %}
+        {% if field.errors %}
+            {% for error in field.errors %}
+            <span class='error'>
+                {{ error }}
+            </span>
+            {% endfor %}
+        {% endif %}
+    {% endfor %}
     {% if error %}
         <span class = 'error'>
             {{ error }}

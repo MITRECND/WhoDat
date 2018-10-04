@@ -238,6 +238,8 @@ def formatSort(colID, direction):
         sort_key = "details.registrant_telephone"
     elif(colID == 6):
         sort_key = "dataVersion"
+    elif(colID == 7):
+        sort_key = "_score"
 
     if direction == "desc":
         sort_dir = "desc"
@@ -385,16 +387,43 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
     return results
 
 
-def __createAdvancedQuery__(query, skip, size, unique):
+def __createAdvancedQuery__(query, skip, size, unique, sort=None):
     q = yacc.parse(query)
 
     if not unique:
-        q['sort'] = [{'_score': {'order': 'desc'}},
-                     {'domainName': {'order': 'asc'}},
-                     {'dataVersion': {'order': 'desc'}},
+        if sort is not None and len(sort) > 0:
+            sortParams = list()
+            fields = set()
+            for (field, direction) in sort:
+                fields.add(field)
+                sortParams.append({field: {'order': direction}})
+                if field == 'dataVersion':
+                    sortParams.append({'updateVersion':
+                                       {'order': 'desc',
+                                        'missing': 0,
+                                        'unmapped_type': 'long'}})
+
+            if '_score' not in fields:
+                sortParams.append({"_score": {'order': 'desc'}})
+
+            if 'domainName' not in fields:
+                sortParams.append({"domainName": {'order': 'asc'}})
+
+            if 'dataVersion' not in fields:
+                sortParams.extend(
+                    [{'dataVersion': {'order': 'desc'}},
                      {'updateVersion': {'order': 'desc',
                                         'missing': 0,
-                                        'unmapped_type': 'long'}}]
+                                        'unmapped_type': 'long'}}])
+        else:
+            sortParams = [
+                {'_score': {'order': 'desc'}},
+                {'domainName': {'order': 'asc'}},
+                {'dataVersion': {'order': 'desc'}},
+                {'updateVersion': {'order': 'desc',
+                                   'missing': 0,
+                                   'unmapped_type': 'long'}}]
+        q['sort'] = sortParams
         q['size'] = size
         q['from'] = skip
     else:
@@ -418,7 +447,7 @@ def __createAdvancedQuery__(query, skip, size, unique):
     return q
 
 
-def advDataTableSearch(query, skip, pagesize, unique=False):
+def advDataTableSearch(query, skip, pagesize, unique=False, sort=None):
     results = {'success': False}
     results['aaData'] = []
 
@@ -429,7 +458,7 @@ def advDataTableSearch(query, skip, pagesize, unique=False):
         return results
 
     try:
-        q = __createAdvancedQuery__(query, skip, pagesize, unique)
+        q = __createAdvancedQuery__(query, skip, pagesize, unique, sort)
     except Exception as e:
         results['message'] = str(e)
         return results

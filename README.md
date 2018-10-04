@@ -333,7 +333,7 @@ This endpoint takes 4 parameters via a GET request:
     query - The query to search ES with
     size - The number of elements to return (aka page size)
     page - The page to return, combining this with size you can get the results in chunks
-    unique - Only accepted if ES scripting is enabled (read above)
+    unique - Attempts to return the latest entry per domainName
 
 **Note on the unique parameter**: If you're using the unique parameter, note
 that paging of results is disabled, but the size parameter will still be used

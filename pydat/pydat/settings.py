@@ -12,7 +12,6 @@ DEBUG = False
 
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
-HANDLER = 'es'
 ES_URI = 'localhost:9200'
 ES_INDEX_PREFIX = 'pydat'
 ES_USER = None

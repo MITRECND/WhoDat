@@ -2,8 +2,10 @@ import sys
 import socket
 from django import forms
 from django.conf import settings
-from pydat.handlers import handler
-from pydat.handlers.passive import PDNS_UI_FIELDS_BASE, PDNS_UI_FIELDS_FORWARD, PDNS_UI_FIELDS_REVERSE
+from pydat.handlers import es as handler
+from pydat.handlers.passive import (PDNS_UI_FIELDS_BASE,
+                                    PDNS_UI_FIELDS_FORWARD,
+                                    PDNS_UI_FIELDS_REVERSE)
 import urllib
 
 class domain_form(forms.Form):
@@ -33,7 +35,7 @@ class domain_form(forms.Form):
         self.fields['filt'].choices = settings.SEARCH_KEYS
 
         for field in self.fields.values():
-            field.error_messages = {'required':'%s is required' % field.label, 
+            field.error_messages = {'required':'%s is required' % field.label,
                                     'invalid_choice': '%s is invalid' % field.label}
 
     def clean_latest(self):
@@ -87,7 +89,7 @@ class advdomain_form(forms.Form):
 
         for field in self.fields.values():
             field.error_messages = {
-                            'required':'%s is required' % field.label, 
+                            'required':'%s is required' % field.label,
                             'invalid_choice': '%s is invalid' % field.label}
 
     def clean_unique(self):
@@ -105,7 +107,7 @@ class advdomain_form(forms.Form):
             raise forms.ValidationError("Unable to unquote query")
         result = handler.test_query(query)
         if result is not None:
-            raise forms.ValidationError("Unable to parse query: %s" % result) 
+            raise forms.ValidationError("Unable to parse query: %s" % result)
         return query
 
 class ChoiceNumberField(forms.ChoiceField):
