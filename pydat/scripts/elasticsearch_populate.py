@@ -354,7 +354,7 @@ class FileReader(Thread):
                     return
                 if self.options.extension != '':
                     fn, ext = os.path.splitext(path)
-                    if ext and ext[1:] != self.options.extension:
+                    if ext == '' or not ext.endswith(self.options.extension):
                         continue
                 self.datafile_queue.put(fp)
             else:
@@ -1369,7 +1369,7 @@ def main():
     options.es_args = {
         'hosts': options.es_uri,
         'sniff_on_start': (not options.es_disable_sniffing),
-        'sniff_on_connection_fail': (options.es_disable_sniffing),
+        'sniff_on_connection_fail': (not options.es_disable_sniffing),
         'sniff_timeout': (None if options.es_disable_sniffing else 1000),
         'max_retries': 100,
         'retry_on_timeout': True,
