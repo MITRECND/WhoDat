@@ -35,7 +35,7 @@ $(document).ready(function() {
                           aoData.push( { "name": "unique", "value": query_unique} );
                     },
 					"oLanguage": {
-                                  'sProcessing' : 'Fetching Data', 
+                                  'sProcessing' : 'Fetching Data',
                                   'sZeroRecords': 'No Results Found',
                                  },
                     "sDom" : '<"H"lirp>t<"F"lip>',
@@ -43,7 +43,7 @@ $(document).ready(function() {
 						  {"sClass": "dtExpand", 'bSortable': false, 'aTargets': [0]},
 						  //{'bSortable': false, 'aTargets': [6]},
 						  {"sClass": "dnCell", 'aTargets': [1]},
-                          {'bSortable': false, 'aTargets': [0,1,2,3,4,5,6,7]},
+                          {'bSortable': false, 'aTargets': [0]},
                     ],
 /*
 					"aoColumns" : [
@@ -70,13 +70,13 @@ $(document).ready(function() {
                         $("td:eq(0)", nRow).html('<span class="ui-icon ui-icon-circle-plus"></span>');
 
                         var domainName = aData[1];
-                        $('td:eq(1)', nRow).html( '<a href="' + pdns_rest + encodeURIComponent(domainName) + '/">' 
+                        $('td:eq(1)', nRow).html( '<a href="' + pdns_rest + encodeURIComponent(domainName) + '/">'
                                                     + domainName + "</a>").attr('title', 'Click to Search Passive DNS').addClass(oldVersion);
                         var registrant = aData[2];
                         if (registrant != null)
                             var safe_registrant = encodeURIComponent(registrant.toLowerCase())
-                        $('td:eq(2)', nRow).html( '<a href=' + advdomains + '?query=registrant_name:"' 
-                                                    + safe_registrant + '">' 
+                        $('td:eq(2)', nRow).html( '<a href=' + advdomains + '?query=registrant_name:"'
+                                                    + safe_registrant + '">'
                                                     + registrant + '</a>').attr('title', 'Click to search by Registrant').addClass(oldVersion);
 
                         var reg_email = aData[3];
@@ -88,7 +88,7 @@ $(document).ready(function() {
                         $('td:eq(4)', nRow).addClass(oldVersion);
 
                         var telephone = aData[5];
-                        $('td:eq(5)', nRow).html( '<a href=' + advdomains + '?query=telephone:"' 
+                        $('td:eq(5)', nRow).html( '<a href=' + advdomains + '?query=telephone:"'
                                                     + encodeURIComponent(telephone) + '">'
                                                     + telephone + '</a>').attr('title', 'Click to search by Telephone').addClass(oldVersion);
 
@@ -97,12 +97,12 @@ $(document).ready(function() {
 
                     },
                     //Called after table is drawn
-					"fnDrawCallback": function(oSettings) { 
+					"fnDrawCallback": function(oSettings) {
                         //Add an onclick toggle for the expand cells
                         $('td.dtExpand span').on('click', function () {
                             var nTr = $(this).parents('tr')[0];
                             if (dTable.fnIsOpen(nTr)){ //Close the row
-                                $(this).removeClass('ui-icon-circle-minus').addClass('ui-icon-circle-plus'); 
+                                $(this).removeClass('ui-icon-circle-minus').addClass('ui-icon-circle-plus');
                                 dTable.fnClose(nTr);
                             }else { //Open the row
                                 $(this).removeClass('ui-icon-circle-plus').addClass('ui-icon-circle-minus');
@@ -134,7 +134,7 @@ $(document).ready(function() {
                         $('.dnsres').tooltip({ items: 'td[title]' });
                     }
 				});
-	
+
                 dTable.dataTable().fnSetFilteringDelay(1000);
 
 
@@ -256,7 +256,7 @@ function full(domain, entry_version) {
         //Sort the results in alphabetical order
         sort_arr = [];
         for (var key in result){
-            sort_arr.push([key, result[key]]); 
+            sort_arr.push([key, result[key]]);
         }
         sort_arr.sort(function(a, b) {
             return a[0].localeCompare(b[0]);
@@ -275,7 +275,7 @@ function full(domain, entry_version) {
             $(drow).append(kcell).append(vcell);
             dtabb.append(drow);
 		}
-        
+
 		$("#dtext").append(text);
 	  } else {
 		$("#dtext").append(response.error);
@@ -310,7 +310,7 @@ function diff(domain, v1, v2) {
         //Sort the results in alphabetical order
         sort_arr = [];
         for (var key in result){
-            sort_arr.push([key, result[key]]); 
+            sort_arr.push([key, result[key]]);
         }
         sort_arr.sort(function(a, b) {
             return a[0].localeCompare(b[0]);
@@ -340,7 +340,7 @@ function diff(domain, v1, v2) {
             $(drow).append(kcell).append(vcell).append(vcell2);
             dtabb.append(drow);
 		}
-        
+
 		$("#dtext").append(text);
 	  } else {
 		$("#dtext").append(response.error);
@@ -367,7 +367,7 @@ function get_historical(domain, entry_version, target){
 
 
         var htable = document.createElement('table');
-        $(htable).html("<thead><tr><th colspan=7>Historical Records</th></tr><tr><th>Version</th><th>Registrant</th><th>Email</th><th>Created</th><th>Telephone</th><th>Details</th><th>Diff</th></tr></thead>")  
+        $(htable).html("<thead><tr><th colspan=7>Historical Records</th></tr><tr><th>Version</th><th>Registrant</th><th>Email</th><th>Created</th><th>Telephone</th><th>Details</th><th>Diff</th></tr></thead>")
         var hbody = document.createElement('tbody');
         $(htable).append(hbody);
 
@@ -480,10 +480,10 @@ function get_domain(domain, entry_version, target) {
 	success: function(response) {
 	  if (response.success) {
 		var result = response.data[0];
-    
+
         $(target).empty();
 
-        var reg_div = document.createElement('div');   
+        var reg_div = document.createElement('div');
         $(reg_div).addClass('qdtable');
         $(reg_div).append(create_registrant_table(result));
 
@@ -595,7 +595,7 @@ function create_dates_table(raw_data){
             $(dtd).html(raw_data[index]);
             $(dbod).append(dtr);
         }
-    }); 
+    });
 
     return $(dtab);
 }
@@ -604,7 +604,7 @@ var statusDialogStack = 0;
 
 function showStatusDialog(){
 	$("#statusDialog").dialog("open");
-    statusDialogStack += 1; 
+    statusDialogStack += 1;
 }
 
 function hideStatusDialog(){
