@@ -51,10 +51,11 @@ fields.addBaseField("rrtypes", "MultipleChoiceField", ["any"],
                                     ('a', 'A'),
                                     ('aaaa', 'AAAA'),
                                     ('cname', 'CNAME'),
-                                    ('txt', 'TXT'),
                                     ('mx', 'MX'),
                                     ('ns', 'NS'),
-                                    ('ptr', 'PTR')
+                                    ('ptr', 'PTR'),
+                                    ('soa', 'SOA'),
+                                    ('txt', 'TXT'),
                                 ]})
 
 fields.addReverseField("type", "ChoiceField", "ip",

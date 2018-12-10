@@ -227,7 +227,8 @@ function process_query(query){
                     $("#results").append(res);
                 }
             }
-        }
+        },
+        timeout: 60000
     });
 }
 
