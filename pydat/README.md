@@ -324,11 +324,11 @@ part, this does not apply to searches for things that look like domain names
 
 As privacy concerns reduce the amount of visibile data, the abaility to
 pare down data has become considerably more important, to aid to this a new
-keyword/token has been added: `!!NULL!!`. The null token allows one to search
+keyword/token has been added: `!NULL!`. The null token allows one to search
 for fields that are not filled. For example:
 
 >
-    registrant_name: !!NULL!!
+    registrant_name: !NULL!
 
 The above query would return all records where the registrant_name was empty.
 Note that this should be used along with other queries and is less useful
