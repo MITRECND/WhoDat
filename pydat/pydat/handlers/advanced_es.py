@@ -151,7 +151,13 @@ no_parts = [
     'details.administrativeContact_fax',
     'details.administrativeContact_faxExt',
     'details.administrativeContact_telephone',
-    'details.administrativeContact_telephoneExt'
+    'details.administrativeContact_telephoneExt',
+    'tld'
+]
+
+toplevel_keywords = [
+    'domainName',
+    'tld'
 ]
 
 date_keywords = {
@@ -195,7 +201,8 @@ original_keywords = [
     'contactEmail',
     'nameServers',
     'registrarName',
-    'whoisServer'
+    'whoisServer',
+    'tld'
 ]
 
 special_keywords = {
@@ -352,7 +359,7 @@ def create_specific_word_subquery(key, value):
         if key in shortcut_keywords:
             fields1 = shortcut_keywords[key]
         elif key in original_keywords:
-            if key != 'domainName':
+            if key not in toplevel_keywords:
                 key = 'details.' + key
             fields1 = [key]
         else:
@@ -425,7 +432,7 @@ def p_specific_fuzzy_quoted(t):
         if key in shortcut_keywords:
             fields1 = shortcut_keywords[key]
         elif key in original_keywords:
-            if key != 'domainName':
+            if key not in toplevel_keywords:
                 key = 'details.' + key
             fields1 = [key]
         else:
@@ -467,7 +474,7 @@ def p_specific_quoted(t):
         if key in shortcut_keywords:
             fields1 = shortcut_keywords[key]
         elif key in original_keywords:
-            if key != 'domainName':
+            if key not in toplevel_keywords:
                 key = 'details.' + key
             fields1 = [key]
         else:
@@ -520,7 +527,7 @@ def p_field_missing(t):
         if key in shortcut_keywords:
             fields = shortcut_keywords[key]
         elif key in original_keywords:
-            if key != 'domainName':
+            if key not in toplevel_keywords:
                 key = 'details.' + key
             fields = [key]
         else:
@@ -545,7 +552,7 @@ def create_wildreg_query(key, value, qtype):
         if key in shortcut_keywords:
             fields1 = shortcut_keywords[key]
         elif key in original_keywords:
-            if key != 'domainName':
+            if key not in toplevel_keywords:
                 key = 'details.' + key
             fields1 = [key]
         else:
