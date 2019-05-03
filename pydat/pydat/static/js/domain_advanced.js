@@ -127,11 +127,11 @@ $(document).ready(function() {
                                     $(this).tooltip( "option", "disabled", true );
                                     $(this).off("click");
                                     resolve($(this).attr('domainName'), $(this));
-                                }).tooltip();
+                                }); // .tooltip();
                             }
                         });
 
-                        $('.dnsres').tooltip({ items: 'td[title]' });
+                        // $('.dnsres').tooltip({ items: 'td[title]' });
                     }
 				});
 

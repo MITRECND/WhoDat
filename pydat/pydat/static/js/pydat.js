@@ -2,9 +2,9 @@ $(document).ready(function() {
     //Associate toggle with click
 	$(".accordion" ).accordion({heightStyle: "content", collapsible: true});
 
-    $("#searchIcon").on("click", function() { search_toggle();}); 
+    $("#searchIcon").on("click", function() { search_toggle();});
 
-    $('.tooltip').tooltip();
+    // $('.tooltip').tooltip();
 
     $("#" + active + "_link").addClass("tab_active");
 
@@ -30,7 +30,7 @@ $(document).ready(function() {
         }else{
             $(this).parents('tbody').find('.form_filter').addClass("novis");
         }
-    }); 
+    });
 
     $(".search_form [name='fmt']").change();
 
@@ -83,7 +83,7 @@ function search_toggle(duration){
 
 
 function resolve(domain, target) {
-  var ep_url = resolve_url + domain + "/"; 
+  var ep_url = resolve_url + domain + "/";
   $.ajax({
 	type: 'GET',
 	url: ep_url,
@@ -101,7 +101,7 @@ function resolve(domain, target) {
             var arCell = document.createElement('td');
             var anch = document.createElement('a');
             $(anch).attr("href", data.ips[i].url);
-            $(anch).html(data.ips[i].ip); 
+            $(anch).html(data.ips[i].ip);
 
             $(arCell).append(anch);
             $(arRow).append(arCell);
@@ -121,11 +121,11 @@ function resolve(domain, target) {
 //Authors: Zygimantas Berziunas, Allan Jardine and vex
 jQuery.fn.dataTableExt.oApi.fnSetFilteringDelay = function ( oSettings, iDelay ) {
     var _that = this;
- 
+
     if ( iDelay === undefined ) {
         iDelay = 250;
     }
-      
+
     this.each( function ( i ) {
         $.fn.dataTableExt.iApiIndex = i;
         var
@@ -133,20 +133,20 @@ jQuery.fn.dataTableExt.oApi.fnSetFilteringDelay = function ( oSettings, iDelay )
             oTimerId = null,
             sPreviousSearch = null,
             anControl = $( 'input', _that.fnSettings().aanFeatures.f );
-          
+
             anControl.unbind( 'keyup' ).bind( 'keyup', function() {
             var $$this = $this;
-  
+
             if (sPreviousSearch === null || sPreviousSearch != anControl.val()) {
                 window.clearTimeout(oTimerId);
-                sPreviousSearch = anControl.val(); 
+                sPreviousSearch = anControl.val();
                 oTimerId = window.setTimeout(function() {
                     $.fn.dataTableExt.iApiIndex = i;
                     _that.fnFilter( anControl.val() );
                 }, iDelay);
             }
         });
-          
+
         return this;
     } );
     return this;

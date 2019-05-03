@@ -212,6 +212,7 @@ The following is a list of keys that are recognized for searching specific
 fields:
 
 - **domainName**
+- **tld**
 - **administrativeContact_email**
 - **administrativeContact_name**
 - **administrativeContact_organization**
