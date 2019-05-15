@@ -130,12 +130,15 @@ def cluster_stats():
 
 
 def cluster_health():
-    try:
-        es = es_connector()
-    except Exception as e:
-        raise
+    health = cache.get('cluster_health')
+    if health is None:
+        try:
+            es = es_connector()
+        except Exception as e:
+            raise
 
-    health = es.cluster.health()
+        health = es.cluster.health()
+        cache.set('cluster_health', health, CACHE_TIME)
 
     return health['status']
 

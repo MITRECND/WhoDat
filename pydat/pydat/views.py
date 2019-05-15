@@ -33,7 +33,7 @@ def __renderErrorPage__(request, message, data=None):
     return render(request, 'error.html', context=context)
 
 
-def __createRequestContext__(data=None):
+def __createRequestContext__(data=None, include_es=True):
     # Default to adding search forms to every context
     search_f = domain_form()
     pdns_f_dyn = pdns_form_dynamic()
@@ -44,14 +44,15 @@ def __createRequestContext__(data=None):
                'advdomain_form': advdomain_f,
                'pdns_form_dynamic': pdns_f_dyn,
                'rpdns_form_dynamic': rpdns_f_dyn,
-               'latest_version': handler.lastVersion(),
                'pdns_sources': [
                     mod_data.config
                     for mod_data in passive.PDNS_HANDLER_MODS.values()]}
 
-    ctx_var['health'] = handler.cluster_health().capitalize()
-    ctx_var['record_count'] = handler.record_count()
-    ctx_var['last_import'] = handler.lastUpdate()
+    if include_es:
+        ctx_var['latest_version'] = handler.lastVersion()
+        ctx_var['health'] = handler.cluster_health().capitalize()
+        ctx_var['record_count'] = handler.record_count()
+        ctx_var['last_import'] = handler.lastUpdate()
 
     if data is not None:
         ctx_var.update(data)
@@ -115,7 +116,8 @@ def help(request):
     except Exception as e:
         helptxt = "Unable to render help text."
 
-    context = __createRequestContext__(data={'help': helptxt})
+    context = __createRequestContext__(
+        data={'help': helptxt}, include_es=False)
     return render(request, 'help.html', context=context)
 
 
