@@ -1,0 +1,17 @@
+venv/
+
+*.pyc
+__pycache__
+.tox
+
+instance/
+
+.pytest_cache/
+.coverage
+htmlcov/
+
+build/
+*.egg-info
+static/
+
+.vscode
