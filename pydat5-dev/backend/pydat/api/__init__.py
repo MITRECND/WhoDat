@@ -2,6 +2,10 @@ import os
 
 from flask import Flask, send_from_directory
 
+from api.controller.exceptions import InvalidUsage, handle_invalid_usage
+
+from pydat.core import plugins
+
 
 def create_app(test_config=None):
     # Application Factory
@@ -20,17 +24,19 @@ def create_app(test_config=None):
     except OSError:
         pass
 
+    # Register Error Handler
+    app.register_error_handler(InvalidUsage, handle_invalid_usage)
+
     # Register Framework Blueprints
 
-
     # Register Plugin Blueprints
+    plugins.get_plugins()
 
- 
     # catch invalid backend calls
     @app.route("/api/v1/", defaults={"path": ""})
     @app.route("/api/v1/<path:path>")
     def invalid(path):
-        raise exceptions.InvalidUsage("Nonexistant view {}".format(path), 404)
+        raise InvalidUsage("Nonexistant view {}".format(path), 404)
 
     # for rule in app.url_map.iter_rules('static'):
         # app.url_map._rules.remove(rule)
