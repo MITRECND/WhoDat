@@ -31,6 +31,9 @@ def create_app(test_config=None):
 
     # Register Plugin Blueprints
     plugins.get_plugins()
+    for plugin in plugins.PLUGINS:
+        bp_pref = plugin.blueprint_preferences()
+        app.register_blueprint(bp_pref[0], url_prefix='/api/v1/' + bp_pref[1])
 
     # catch invalid backend calls
     @app.route("/api/v1/", defaults={"path": ""})
