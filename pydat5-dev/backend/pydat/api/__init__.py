@@ -28,19 +28,15 @@ def create_app(test_config=None):
     app.register_error_handler(InvalidUsage, handle_invalid_usage)
 
     # Register Framework Blueprints
-    '''
     from api.controller import session
     app.register_blueprint(session.bp, url_prefix="/api/v1/session")
-    '''
 
     # Register Plugin Blueprints
-    plugins.get_plugins()
-    print(plugins.MODULES)
     for plugin in plugins.PLUGINS:
-        bp_pref = plugin.blueprint_preferences()
-        app.register_blueprint(bp_pref[0], url_prefix='/api/v1/' + bp_pref[1])
+        bp = plugin.blueprint()
+        app.register_blueprint(bp, url_prefix='/api/v1/' + plugin.name)
 
-    # catch invalid backend calls
+    # Catch invalid backend calls
     @app.route("/api/v1/", defaults={"path": ""})
     @app.route("/api/v1/<path:path>")
     def invalid(path):

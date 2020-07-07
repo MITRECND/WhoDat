@@ -13,20 +13,21 @@ USER_PREF = {}
 
 class PluginBase:
     '''Plugin base class'''
-    '''
-    name - string
-    bp_pref
-    user_pref - dictionary
-    '''
+    # user preferences for plugin
     user_pref = {}
+    # plugin name - namespace of blueprint and session
+    name = ""
 
     def setup(self):
-        self.user_pref = self.user_preferences()
+        self.name = self.set_name()
+        self.user_pref = self.set_user_pref()
 
-    def blueprint_preferences(self):
+    # return blueprint
+    def blueprint(self):
         pass
 
-    def user_preferences(self):
+    # find and parse config file
+    def set_user_pref(self):
         pref = None
         try:
             with open("config.yaml") as file:
@@ -37,14 +38,16 @@ class PluginBase:
             pref = {}
         return pref
 
-    def name(self):
-        return __name__
+    def set_name(self):
+        return self.__module__.split('.')[-1]
 
 
+# helper method for get_plugins
 def iter_namespace(ns_pkg):
     return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
 
 
+# import plugins
 def get_plugins(namespace=pydat.plugins):
     plugins = iter_namespace(namespace)
     for finder, name, ispkg in plugins:
@@ -58,7 +61,7 @@ def register(f):
         if not isinstance(plugin, PluginBase):
             raise TypeError(
                 'Cannot register plugin: wrong type {}'.format(type(plugin)))
-        # name = plugin.name()
         PLUGINS.append(plugin)
+        USER_PREF[plugin.name] = plugin.user_pref
         return plugin
     return wrapped

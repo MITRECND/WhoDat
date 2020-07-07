@@ -4,7 +4,7 @@ from flask import (
     request,
     session,
 )
-from api.controller.exceptions import InvalidUsage
+from pydat.api.controller.exceptions import InvalidUsage
 from pydat.core.plugins import USER_PREF
 
 bp = Blueprint("session", __name__)
@@ -20,55 +20,82 @@ def is_valid(param, g_params):
     return f"Nonexistant parameter {param}"
 
 
+def put_pref(curr_pref, new_pref):
+    error = ""
+    if len(curr_pref) != len(new_pref):
+        error = f"Expected {len(curr_pref)} params, gave {len(new_pref)}"
+    else:
+        for param in new_pref.keys():
+            temp_error = is_valid(param, curr_pref.keys())
+            if temp_error:
+                error += temp_error + "\n"
+
+    if error == "":
+        return None
+    return error
+
+
+def patch_pref(curr_pref, new_pref):
+    error = ""
+    for param in new_pref.keys():
+        temp_error = is_valid(param, new_pref.keys())
+        if temp_error is None:
+            curr_pref[param] = new_pref[param]
+        else:
+            error += temp_error + "\n"
+    if error == "":
+        return None
+    return error
+
+
 # look for global settings
 @bp.route("/global", methods=("PUT", "PATCH", "GET",))
 def global_pref():
-    g_pref = None
-    try:
-        with open("global.yaml") as file:
-            g_pref = yaml.load(file, Loader=yaml.FullLoader)
-    except FileNotFoundError:
-        pass
+    if "global" not in session:
+        try:
+            with open("global.yaml") as file:
+                session["global"] = yaml.load(file, Loader=yaml.FullLoader)
+        except FileNotFoundError:
+            session["global"] = None
+        if session["global"] is None:
+            session["global"] = {}
 
-    if g_pref is None:
-        g_pref = {}
-
-    g_params = session["global"]
     if request.method == "GET":
-        return g_params
+        return session["global"]
 
-    error = ""
-    if request.method == "PATCH":
-        for param in request.form.keys():
-            temp_error = is_valid(param, g_pref.keys())
-            if temp_error is None:
-                g_params[param] = request.form[param]
-            else:
-                error += temp_error + "\n"
-        session["global"] = g_params
+    error = None
+    g_pref = session["global"]
 
-    elif request.method == "PUT":
-        if len(g_params) != len(request.form):
-            error = (
-                f"Expected {len(g_params)} params, gave {len(request.form)}"
-            )
-        else:
-            for param in request.form.keys():
-                temp_error = is_valid(param, g_pref.keys())
-                if temp_error:
-                    error += temp_error + "\n"
-
+    if request.method == "PUT":
+        error = put_pref(g_pref, request.form)
         if error is None:
             session["global"] = request.form
 
-    if error != "":
+    elif request.method == "PATCH":
+        error = patch_pref(g_pref, request.form)
+
+    if error is not None:
         raise InvalidUsage(error)
 
 
-@bp.route('/<path:path>')
+@bp.route("/<path:path>")
 def preference(path):
     if path not in USER_PREF.keys():
         raise InvalidUsage(f"Nonexistant preferences for {path}", 404)
+    if path not in session:
+        session[path] = USER_PREF[path]
 
+    if request.method == "GET":
+        return session[path]
+
+    error = None
     if request.method == "PUT":
-        pass
+        error = put_pref(session[path], request.form)
+        if error is None:
+            session[path] = request.form
+
+    elif request.method == "PATCH":
+        error = patch_pref(session[path], request.form)
+
+    if error is not None:
+        raise InvalidUsage(error)
