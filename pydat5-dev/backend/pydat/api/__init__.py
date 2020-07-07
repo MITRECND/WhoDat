@@ -2,7 +2,7 @@ import os
 
 from flask import Flask, send_from_directory
 
-from api.controller.exceptions import InvalidUsage, handle_invalid_usage
+from pydat.api.controller.exceptions import InvalidUsage, handle_invalid_usage
 
 from pydat.core import plugins
 
@@ -28,9 +28,14 @@ def create_app(test_config=None):
     app.register_error_handler(InvalidUsage, handle_invalid_usage)
 
     # Register Framework Blueprints
+    '''
+    from api.controller import session
+    app.register_blueprint(session.bp, url_prefix="/api/v1/session")
+    '''
 
     # Register Plugin Blueprints
     plugins.get_plugins()
+    print(plugins.MODULES)
     for plugin in plugins.PLUGINS:
         bp_pref = plugin.blueprint_preferences()
         app.register_blueprint(bp_pref[0], url_prefix='/api/v1/' + bp_pref[1])

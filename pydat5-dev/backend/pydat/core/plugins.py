@@ -58,10 +58,7 @@ def register(f):
         if not isinstance(plugin, PluginBase):
             raise TypeError(
                 'Cannot register plugin: wrong type {}'.format(type(plugin)))
-        name = plugin.name()
-        if name not in MODULES.keys():
-            raise LookupError(
-                'Plugin name not found: {}'.format(name))
+        # name = plugin.name()
         PLUGINS.append(plugin)
         return plugin
     return wrapped
