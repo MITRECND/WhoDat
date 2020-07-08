@@ -51,10 +51,11 @@ def patch_pref(curr_pref, new_pref):
 # look for global settings
 @bp.route("/global", methods=("PUT", "PATCH", "GET",))
 def global_pref():
+    # print(session)
     if "global" not in session:
         try:
-            with open("global.yaml") as file:
-                session["global"] = yaml.load(file, Loader=yaml.FullLoader)
+            with open("global.yaml") as stream:
+                session["global"] = yaml.safe_load(stream)
         except FileNotFoundError:
             session["global"] = None
         if session["global"] is None:
@@ -78,7 +79,7 @@ def global_pref():
         raise InvalidUsage(error)
 
 
-@bp.route("/<path:path>")
+@bp.route("/<path:path>", methods=("PUT", "PATCH", "GET",))
 def preference(path):
     if path not in USER_PREF.keys():
         raise InvalidUsage(f"Nonexistant preferences for {path}", 404)

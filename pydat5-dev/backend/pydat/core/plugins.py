@@ -31,8 +31,8 @@ class PluginBase:
     def set_user_pref(self):
         pref = None
         try:
-            with open("config.yaml") as file:
-                pref = yaml.load(file, Loader=yaml.FullLoader)
+            with open("config.yaml") as stream:
+                pref = yaml.safe_load(stream)
         except FileNotFoundError:
             pref = None
         if pref is None:

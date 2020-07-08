@@ -1,2 +1,2 @@
-graft pydat/api/controller/global.yaml
+include pydat/api/controller/global.yaml
 global-exclude *.pyc

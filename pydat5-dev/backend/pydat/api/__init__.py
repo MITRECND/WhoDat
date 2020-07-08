@@ -9,7 +9,8 @@ from pydat.core import plugins
 
 def create_app(test_config=None):
     # Application Factory
-    app = Flask(__name__, instance_relative_config=True, static_folder='build')
+    app = Flask(__name__, instance_relative_config=True)
+    # app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
     app.config.from_mapping(SECRET_KEY="dev",)
 
     # load testing, if debugging; else, load deployment config
@@ -33,6 +34,7 @@ def create_app(test_config=None):
 
     # Register Plugin Blueprints
     plugins.get_plugins()
+    # print(plugins.USER_PREF)
     for plugin in plugins.PLUGINS:
         bp = plugin.blueprint()
         app.register_blueprint(bp, url_prefix='/api/v1/' + plugin.name)
