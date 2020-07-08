@@ -2,6 +2,7 @@ import pkgutil
 import importlib
 import pydat.plugins
 import yaml
+import functools
 
 # dictionary of module name and location
 MODULES = {}
@@ -55,9 +56,10 @@ def get_plugins(namespace=pydat.plugins):
 
 
 # register decorator
-def register(f):
+def register(func):
+    @functools.wraps(func)
     def wrapped(*args, **kwargs):
-        plugin = f(*args, **kwargs)
+        plugin = func(*args, **kwargs)
         if not isinstance(plugin, PluginBase):
             raise TypeError(
                 'Cannot register plugin: wrong type {}'.format(type(plugin)))

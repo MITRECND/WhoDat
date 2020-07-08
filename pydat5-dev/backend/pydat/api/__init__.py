@@ -32,6 +32,7 @@ def create_app(test_config=None):
     app.register_blueprint(session.bp, url_prefix="/api/v1/session")
 
     # Register Plugin Blueprints
+    plugins.get_plugins()
     for plugin in plugins.PLUGINS:
         bp = plugin.blueprint()
         app.register_blueprint(bp, url_prefix='/api/v1/' + plugin.name)
