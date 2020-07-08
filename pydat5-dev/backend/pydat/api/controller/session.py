@@ -61,7 +61,7 @@ def preference(path):
     elif request.method == "PATCH":
         error, valid_param = get_valid_parameters(new_pref, curr_pref)
         for param in valid_param.keys():
-            session[param] = valid_param[param]
+            session[path][param] = valid_param[param]
 
     if error is not None:
         raise InvalidUsage(error)

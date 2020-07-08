@@ -6,7 +6,7 @@ setup(
     packages=find_namespace_packages(include=['pydat.*']),
     include_package_data=True,
     zip_safe=False,
-    install_requires=["flask", "pyyaml"],
+    install_requires=["flask"],
     classifiers=["Programming language :: Python :: 3", ],
     python_requires=">=3.6",
 )

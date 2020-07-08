@@ -1,1 +1,2 @@
+graft pydat/plugins
 global-exclude *.pyc
