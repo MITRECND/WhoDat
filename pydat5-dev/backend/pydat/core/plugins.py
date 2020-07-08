@@ -1,7 +1,6 @@
 import pkgutil
 import importlib
 import pydat.plugins
-import yaml
 import functools
 
 # dictionary of module name and location
@@ -15,9 +14,9 @@ USER_PREF = {}
 class PluginBase:
     '''Plugin base class'''
     # user preferences for plugin
-    user_pref = {}
+    user_pref = None
     # plugin name - namespace of blueprint and session
-    name = ""
+    name = None
 
     def setup(self):
         self.name = self.set_name()
@@ -29,15 +28,7 @@ class PluginBase:
 
     # find and parse config file
     def set_user_pref(self):
-        pref = None
-        try:
-            with open("config.yaml") as stream:
-                pref = yaml.safe_load(stream)
-        except FileNotFoundError:
-            pref = None
-        if pref is None:
-            pref = {}
-        return pref
+        return {}
 
     def set_name(self):
         return self.__module__.split('.')[-1]

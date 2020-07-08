@@ -10,7 +10,6 @@ from pydat.core import plugins
 def create_app(test_config=None):
     # Application Factory
     app = Flask(__name__, instance_relative_config=True)
-    # app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
     app.config.from_mapping(SECRET_KEY="dev",)
 
     # load testing, if debugging; else, load deployment config
@@ -30,18 +29,17 @@ def create_app(test_config=None):
 
     # Register Framework Blueprints
     from api.controller import session
-    app.register_blueprint(session.bp, url_prefix="/api/v1/session")
+    app.register_blueprint(session.bp, url_prefix="/api/v2/session")
 
     # Register Plugin Blueprints
     plugins.get_plugins()
-    # print(plugins.USER_PREF)
     for plugin in plugins.PLUGINS:
         bp = plugin.blueprint()
-        app.register_blueprint(bp, url_prefix='/api/v1/' + plugin.name)
+        app.register_blueprint(bp, url_prefix='/api/v2/' + plugin.name)
 
     # Catch invalid backend calls
-    @app.route("/api/v1/", defaults={"path": ""})
-    @app.route("/api/v1/<path:path>")
+    @app.route("/api/v2/", defaults={"path": ""})
+    @app.route("/api/v2/<path:path>")
     def invalid(path):
         raise InvalidUsage("Nonexistant view {}".format(path), 404)
 
