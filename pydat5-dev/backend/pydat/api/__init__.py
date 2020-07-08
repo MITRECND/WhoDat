@@ -28,7 +28,7 @@ def create_app(test_config=None):
     app.register_error_handler(InvalidUsage, handle_invalid_usage)
 
     # Register Framework Blueprints
-    from api.controller import session
+    from pydat.api.controller import session
     app.register_blueprint(session.bp, url_prefix="/api/v2/session")
 
     # Register Plugin Blueprints
