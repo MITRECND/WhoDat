@@ -24,16 +24,16 @@ def is_valid(param, new_pref, curr_pref):
 
 # new_pref = request.form curr_pref = USER_PREF[plugin]
 def get_valid_parameters(new_pref, curr_pref):
-    error = ""
+    error = []
     valid = {}
     for param in new_pref.keys():
         temp_error = is_valid(param, new_pref, curr_pref)
         if temp_error:
-            error += temp_error + "\n"
+            error.append(temp_error)
         else:
             valid[param] = new_pref[param]
 
-    if error == "":
+    if error == []:
         return None, valid
     return error, valid
 
@@ -64,8 +64,9 @@ def preference(path):
 
     elif request.method == "PATCH":
         error, valid_param = get_valid_parameters(new_pref, curr_pref)
-        for param in valid_param.keys():
-            session[path][param] = valid_param[param]
+        if error is None:
+            for param in valid_param.keys():
+                session[path][param] = valid_param[param]
 
     if error is not None:
         raise InvalidUsage(error)
