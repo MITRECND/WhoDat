@@ -10,6 +10,7 @@ def client():
     return app.test_client()
 
 
+# simple test plugin, returns created valid plugin
 @pytest.fixture
 def create_plugin():
     def _create_plugin(user_pref, name):

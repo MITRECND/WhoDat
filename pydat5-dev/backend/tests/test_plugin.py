@@ -5,6 +5,7 @@ from pydat.core.plugins import PluginBase, register
 import pytest
 
 
+# tests a valid plugin
 def test_plugin(create_plugin):
     test_pref = {"name": str, "test": True}
     plugin = create_plugin(
@@ -41,11 +42,14 @@ def test_plugin(create_plugin):
         assert test_pref.keys() == session["test_plugin"].keys()
 
 
+# test invalid plugins
 def test_register_plugin():
+    # is not child of PluginBase
     class FakePlugin():
         def setup(self):
             self.name = "fake"
 
+    # does not return a blueprint
     class WrongPlugin(PluginBase):
         pass
 

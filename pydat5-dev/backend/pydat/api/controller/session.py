@@ -12,6 +12,8 @@ bp = Blueprint("session", __name__)
 USER_PREF["global"] = {"pi": int, "name": str, "development": bool}
 
 
+# helper method for get_valid_parameters
+# checks if param and param value is valid
 def is_valid(param, new_pref, curr_pref):
     if param in curr_pref.keys():
         val_type = curr_pref[param]
@@ -22,7 +24,8 @@ def is_valid(param, new_pref, curr_pref):
     return f"Nonexistant parameter {param}"
 
 
-# new_pref = request.form curr_pref = USER_PREF[plugin]
+# returns list specifying invalid parameters/values or None
+# returns dictionary of valid param-value pairs
 def get_valid_parameters(new_pref, curr_pref):
     error = []
     valid = {}
@@ -40,8 +43,10 @@ def get_valid_parameters(new_pref, curr_pref):
 
 @bp.route("/<path:path>", methods=("PUT", "PATCH", "GET",))
 def preference(path):
+    # check if path has preferences
     if path not in USER_PREF.keys():
         raise InvalidUsage(f"Nonexistant preferences for {path}", 404)
+    # define session[path]
     if session.get(path) is None:
         session[path] = {}
         for param in USER_PREF[path]:
@@ -64,6 +69,7 @@ def preference(path):
 
     elif request.method == "PATCH":
         error, valid_param = get_valid_parameters(new_pref, curr_pref)
+        # only patch if all parameters are valid
         if error is None:
             for param in valid_param.keys():
                 session[path][param] = valid_param[param]

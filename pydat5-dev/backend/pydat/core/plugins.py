@@ -22,10 +22,11 @@ class PluginBase:
     def blueprint(self):
         return None
 
-    # find and parse config file
+    # define user preferences
     def set_user_pref(self):
-        return {}
+        return None
 
+    # name of plugin, used for endpoint
     def set_name(self):
         return self.__module__.split('.')[-1]
 
@@ -54,6 +55,8 @@ def register(func):
             raise NotImplementedError(
                 'Cannot register plugin: must have blueprint')
         PLUGINS.append(plugin)
-        USER_PREF[plugin.name] = plugin.user_pref
+        # check if there are preferences for the plugin
+        if plugin.user_pref is not None:
+            USER_PREF[plugin.name] = plugin.user_pref
         return plugin
     return wrapped

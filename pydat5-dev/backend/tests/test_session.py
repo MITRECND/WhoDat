@@ -9,6 +9,8 @@ def test_global(client):
     assert response.status_code == 200
 
 
+# helper method for _put_get, _patch
+# checks PUT/PATCH validation methods for parameter-values
 def check_invalid(json_data, param_pref, type_pref):
     for param in session["fake_endpoint"].keys():
         assert session["fake_endpoint"][param] is None
