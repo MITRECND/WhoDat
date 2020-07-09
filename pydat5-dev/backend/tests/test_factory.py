@@ -1,4 +1,3 @@
-# import pytest
 from pydat.api import create_app
 
 

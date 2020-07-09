@@ -42,7 +42,7 @@ def get_valid_parameters(new_pref, curr_pref):
 def preference(path):
     if path not in USER_PREF.keys():
         raise InvalidUsage(f"Nonexistant preferences for {path}", 404)
-    if path not in session:
+    if session.get(path) is None:
         session[path] = {}
         for param in USER_PREF[path]:
             session[path][param] = None
