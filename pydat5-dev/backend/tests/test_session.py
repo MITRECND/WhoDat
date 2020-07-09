@@ -26,6 +26,7 @@ def check_invalid(json_data, param_pref, type_pref):
         else:
             assert param not in error_mes
 
+
 @pytest.mark.parametrize("type_pref", (
     {}, {"name": str}, {"pi": float, "dev": bool},
     {"name": str, "pi": float, "id": int}
