@@ -13,10 +13,6 @@ USER_PREF = {}
 
 class PluginBase:
     '''Plugin base class'''
-    # user preferences for plugin
-    user_pref = None
-    # plugin name - namespace of blueprint and session
-    name = None
 
     def setup(self):
         self.name = self.set_name()
@@ -24,7 +20,7 @@ class PluginBase:
 
     # return blueprint
     def blueprint(self):
-        pass
+        return None
 
     # find and parse config file
     def set_user_pref(self):
@@ -54,6 +50,9 @@ def register(func):
         if not isinstance(plugin, PluginBase):
             raise TypeError(
                 'Cannot register plugin: wrong type {}'.format(type(plugin)))
+        if plugin.blueprint() is None:
+            raise NotImplementedError(
+                'Cannot register plugin: must have blueprint')
         PLUGINS.append(plugin)
         USER_PREF[plugin.name] = plugin.user_pref
         return plugin
