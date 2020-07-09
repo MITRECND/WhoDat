@@ -1,6 +1,8 @@
 from pydat.core.plugins import PLUGINS, USER_PREF
 from flask import Blueprint, session
 from pydat.api import create_app
+from pydat.core.plugins import PluginBase, register
+import pytest
 
 
 def test_plugin(create_plugin):
@@ -37,3 +39,24 @@ def test_plugin(create_plugin):
         assert test_pref.keys() == json_data.keys()
         assert "test_plugin" in session.keys()
         assert test_pref.keys() == session["test_plugin"].keys()
+
+
+def test_register_plugin():
+    class FakePlugin():
+        def setup(self):
+            self.name = "fake"
+
+    class WrongPlugin(PluginBase):
+        pass
+
+    @register
+    def start_plugin(cls):
+        test = cls()
+        test.setup()
+        return test
+
+    with pytest.raises(TypeError):
+        assert start_plugin(FakePlugin)
+
+    with pytest.raises(NotImplementedError):
+        assert start_plugin(WrongPlugin)
