@@ -13,10 +13,12 @@ USER_PREF = {}
 
 class PluginBase:
     '''Plugin base class'''
-
-    def setup(self):
+    def __init__(self):
         self.name = self.set_name()
         self.user_pref = self.set_user_pref()
+
+    def setup(self):
+        pass
 
     # return blueprint
     def blueprint(self):
