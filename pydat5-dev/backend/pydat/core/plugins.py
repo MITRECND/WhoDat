@@ -12,41 +12,75 @@ USER_PREF = {}
 
 
 class PluginBase:
-    '''Plugin base class'''
+    """Plugin base class that all plugins should extend.
+
+    Attributes:
+        name: A string that stores the plugin's identifying name.
+        user_pref: A dict mapping plugin parameter's to their value type.
+    """
+
     def __init__(self):
+        """Inits PluginBase with set_name() and set_user_pref()"""
         self.name = self.set_name()
         self.user_pref = self.set_user_pref()
 
     def setup(self):
         pass
 
-    # return blueprint
     def blueprint(self):
+        """Returns the plugin's Blueprint. Must be overriden."""
         return None
 
-    # define user preferences
     def set_user_pref(self):
+        """Returns a dict of plugin's user preferences or None"""
         return None
 
-    # name of plugin, used for endpoint
     def set_name(self):
+        """Returns the plugin's name. Used for preferences and endpoints"""
         return self.__module__.split('.')[-1]
 
 
-# helper method for get_plugins
 def iter_namespace(ns_pkg):
+    """Finds modules under a namespace package. Helper method for get_plugins.
+
+    Args:
+        ns_pkg (module): A package to search under for modules
+
+    Returns:
+        A generator that yields found modules.
+    """
     return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
 
 
-# import plugins
 def get_plugins(namespace=pydat.plugins):
+    """Imports all modules found under namespace. Stores them in global MODULES.
+
+    Args:
+        namespace (module, optional): Namespace package to search for plugins.
+            Defaults to pydat.plugins.
+    """
     plugins = iter_namespace(namespace)
     for finder, name, ispkg in plugins:
         MODULES[name] = importlib.import_module(name)
 
 
-# register decorator
 def register(func):
+    """Decorator for registering plugins.
+
+    If the plugin is a valid plugin, the plugin object will be added to
+    the global PLUGINS. If the plugin has preferences, they will be added
+    to the global USER_PREF with the plugin name as the key.
+
+    Args:
+        func: Expects a function that returns a PluginBase subclass object
+
+    Raises:
+        TypeError: The function did not return a PluginBase plugin
+        NotImplementedError: The subclass did not override blueprint()
+
+    Returns:
+        Wrapped function that registers valid plugins.
+    """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
         plugin = func(*args, **kwargs)

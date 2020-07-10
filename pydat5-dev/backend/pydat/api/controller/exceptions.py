@@ -2,6 +2,11 @@ from flask import jsonify
 
 
 class InvalidUsage(Exception):
+    """Exception class for signaling invalid API usage
+
+    Attributes:
+        status_code: Default error code.
+    """
     status_code = 400
 
     def __init__(self, message, status_code=None, payload=None):

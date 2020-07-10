@@ -12,9 +12,21 @@ bp = Blueprint("session", __name__)
 USER_PREF["global"] = {"pi": int, "name": str, "development": bool}
 
 
-# helper method for get_valid_parameters
-# checks if param and param value is valid
 def is_valid(param, new_pref, curr_pref):
+    """Helper method for get_valid_parameters.
+
+    Checks if param exists in curr_pref and the value associated with param is
+    the correct type.
+
+    Args:
+        param: String of preference paramater to test if valid.
+        new_pref: Dict of parameter keys and values of new preferences
+        curr_pref: Dict of valid parameter keys and values of preference type
+
+    Returns:
+        None if the parameter is valid. Error string detailing either a type
+        mismatch or param being a nonexistant parameter.
+    """
     if param in curr_pref.keys():
         val_type = curr_pref[param]
         new_val = new_pref[param]
@@ -24,9 +36,18 @@ def is_valid(param, new_pref, curr_pref):
     return f"Nonexistant parameter {param}"
 
 
-# returns list specifying invalid parameters/values or None
-# returns dictionary of valid param-value pairs
 def get_valid_parameters(new_pref, curr_pref):
+    """Determines valid parameter-value pairs.
+
+    Args:
+        new_pref: Dict mappping parameters to potential new preferences
+        curr_pref: Dict mapping valid parameters to preference type
+
+    Returns:
+        Returns a tuple of a list of errors and a dictionary of valid
+        parameter-preferences pairs. If there are no errors, will
+        return None instead of a list.
+    """
     error = []
     valid = {}
     for param in new_pref.keys():
