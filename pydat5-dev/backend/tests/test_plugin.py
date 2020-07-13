@@ -46,8 +46,8 @@ def test_plugin(create_plugin):
 def test_register_plugin():
     # is not child of PluginBase
     class FakePlugin():
-        def setup(self):
-            self.name = "fake"
+        def set_name(self):
+            return "fake"
 
     # does not return a blueprint
     class WrongPlugin(PluginBase):
@@ -56,7 +56,6 @@ def test_register_plugin():
     @register
     def start_plugin(cls):
         test = cls()
-        test.setup()
         return test
 
     with pytest.raises(TypeError):

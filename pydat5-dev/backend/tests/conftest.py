@@ -33,7 +33,6 @@ def create_plugin():
         @register
         def start_plugin():
             test = TestPlugin()
-            test.setup()
             return test
         test_plugin = start_plugin()
         return test_plugin

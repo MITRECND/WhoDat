@@ -1,10 +1,9 @@
 import os
-
 from flask import Flask, send_from_directory
-
-from pydat.api.controller.exceptions import InvalidUsage, handle_invalid_usage
-
+from pydat.api.controller.exceptions import ClientError, handle_invalid_usage
 from pydat.core import plugins
+
+from pydat.api.controller import session
 
 
 def create_app(test_config=None):
@@ -18,22 +17,15 @@ def create_app(test_config=None):
     else:
         app.config.from_mapping(test_config)
 
-    # create instance folder if it doesn't exist
-    try:
-        os.makedirs(app.instance_path)
-    except OSError:
-        pass
-
     # Register Error Handler
-    app.register_error_handler(InvalidUsage, handle_invalid_usage)
+    app.register_error_handler(ClientError, handle_invalid_usage)
 
     # Register Framework Blueprints
-    from pydat.api.controller import session
     app.register_blueprint(session.bp, url_prefix="/api/v2/session")
 
     # Register Plugin Blueprints
-    plugins.get_plugins()
-    for plugin in plugins.PLUGINS:
+    valid_plugins = plugins.get_plugins()
+    for plugin in valid_plugins:
         bp = plugin.blueprint()
         app.register_blueprint(bp, url_prefix='/api/v2/' + plugin.name)
 
@@ -41,7 +33,7 @@ def create_app(test_config=None):
     @app.route("/api/v2/", defaults={"path": ""})
     @app.route("/api/v2/<path:path>")
     def invalid(path):
-        raise InvalidUsage("Nonexistant view {}".format(path), 404)
+        raise ClientError("Nonexistant view {}".format(path), 404)
 
     # for rule in app.url_map.iter_rules('static'):
         # app.url_map._rules.remove(rule)

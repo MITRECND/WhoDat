@@ -2,9 +2,8 @@ import pkgutil
 import importlib
 import pydat.plugins
 import functools
+from flask import Blueprint
 
-# dictionary of module name and location
-MODULES = {}
 # list of valid Plugin objects
 PLUGINS = []
 # dictionary of plugin user preferences
@@ -24,12 +23,10 @@ class PluginBase:
         self.name = self.set_name()
         self.user_pref = self.set_user_pref()
 
-    def setup(self):
-        pass
-
     def blueprint(self):
         """Returns the plugin's Blueprint. Must be overriden."""
-        return None
+        raise NotImplementedError(
+                'Plugin must have blueprint')
 
     def set_user_pref(self):
         """Returns a dict of plugin's user preferences or None"""
@@ -40,28 +37,17 @@ class PluginBase:
         return self.__module__.split('.')[-1]
 
 
-def iter_namespace(ns_pkg):
-    """Finds modules under a namespace package. Helper method for get_plugins.
-
-    Args:
-        ns_pkg (module): A package to search under for modules
-
-    Returns:
-        A generator that yields found modules.
-    """
-    return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
-
-
-def get_plugins(namespace=pydat.plugins):
+def get_plugins(ns_pkg=pydat.plugins):
     """Imports all modules found under namespace. Stores them in global MODULES.
 
     Args:
         namespace (module, optional): Namespace package to search for plugins.
             Defaults to pydat.plugins.
     """
-    plugins = iter_namespace(namespace)
+    plugins = pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
     for finder, name, ispkg in plugins:
-        MODULES[name] = importlib.import_module(name)
+        importlib.import_module(name)
+    return PLUGINS
 
 
 def register(func):
@@ -87,9 +73,9 @@ def register(func):
         if not isinstance(plugin, PluginBase):
             raise TypeError(
                 'Cannot register plugin: wrong type {}'.format(type(plugin)))
-        if plugin.blueprint() is None:
-            raise NotImplementedError(
-                'Cannot register plugin: must have blueprint')
+        plugin_bp = plugin.blueprint()
+        if not isinstance(plugin_bp, Blueprint):
+            raise TypeError('Cannot register plugin, must return a blueprint')
         PLUGINS.append(plugin)
         # check if there are preferences for the plugin
         if plugin.user_pref is not None:

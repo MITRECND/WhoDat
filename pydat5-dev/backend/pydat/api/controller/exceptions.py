@@ -1,7 +1,7 @@
 from flask import jsonify
 
 
-class InvalidUsage(Exception):
+class ClientError(Exception):
     """Exception class for signaling invalid API usage
 
     Attributes:

@@ -5,11 +5,11 @@ from flask import (
     make_response,
     jsonify
 )
-from pydat.api.controller.exceptions import InvalidUsage
+from pydat.api.controller.exceptions import ClientError
 from pydat.core.plugins import USER_PREF
 
 bp = Blueprint("session", __name__)
-USER_PREF["global"] = {"pi": int, "name": str, "development": bool}
+# USER_PREF["global"] = {"pi": int, "name": str, "development": bool}
 
 
 def is_valid(param, new_pref, curr_pref):
@@ -66,7 +66,7 @@ def get_valid_parameters(new_pref, curr_pref):
 def preference(path):
     # check if path has preferences
     if path not in USER_PREF.keys():
-        raise InvalidUsage(f"Nonexistant preferences for {path}", 404)
+        raise ClientError(f"Nonexistant preferences for {path}", 404)
     # define session[path]
     if session.get(path) is None:
         session[path] = {}
@@ -96,7 +96,7 @@ def preference(path):
                 session[path][param] = valid_param[param]
 
     if error is not None:
-        raise InvalidUsage(error)
+        raise ClientError(error)
 
     res = make_response(
         jsonify({"message": f"{path} preferences updated"}), 200
