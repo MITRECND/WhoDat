@@ -6,10 +6,10 @@ from flask import (
     jsonify
 )
 from pydat.api.controller.exceptions import ClientError
-from pydat.core.plugins import USER_PREF
+from pydat.core.preferences import add_user_pref, get_user_pref
 
-bp = Blueprint("session", __name__)
-# USER_PREF["global"] = {"pi": int, "name": str, "development": bool}
+session_bp = Blueprint("session", __name__)
+# add_user_pref("global", {"pi": int, "name": str, "development": bool})
 
 
 def is_valid(param, new_pref, curr_pref):
@@ -62,22 +62,24 @@ def get_valid_parameters(new_pref, curr_pref):
     return error, valid
 
 
-@bp.route("/<path:path>", methods=("PUT", "PATCH", "GET",))
+@session_bp.route("/session/<path:path>", methods=("PUT", "PATCH", "GET",))
 def preference(path):
     # check if path has preferences
-    if path not in USER_PREF.keys():
+    curr_pref = None
+    try:
+        curr_pref = get_user_pref(path)
+        # define session[path]
+        if session.get(path) is None:
+            session[path] = {}
+            for param in curr_pref:
+                session[path][param] = None
+    except KeyError:
         raise ClientError(f"Nonexistant preferences for {path}", 404)
-    # define session[path]
-    if session.get(path) is None:
-        session[path] = {}
-        for param in USER_PREF[path]:
-            session[path][param] = None
 
     if request.method == "GET":
         return session[path]
 
     error = None
-    curr_pref = USER_PREF[path]
     new_pref = request.get_json()
 
     if request.method == "PUT":

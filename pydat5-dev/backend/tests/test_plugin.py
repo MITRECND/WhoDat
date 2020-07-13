@@ -1,8 +1,9 @@
-from pydat.core.plugins import PLUGINS, USER_PREF
+from pydat.core.plugins import PLUGINS
 from flask import Blueprint, session
 from pydat.api import create_app
 from pydat.core.plugins import PluginBase, register
 import pytest
+from pydat.core import preferences
 
 
 # tests a valid plugin
@@ -16,8 +17,7 @@ def test_plugin(create_plugin):
     assert plugin.name == "test_plugin"
     assert plugin.user_pref == test_pref
     assert isinstance(plugin.blueprint(), Blueprint)
-    assert "test_plugin" in USER_PREF.keys()
-    assert USER_PREF["test_plugin"] == test_pref
+    assert preferences.get_user_pref("test_plugin") == test_pref
     plugin_exists = False
     for obj in PLUGINS:
         if obj is plugin:

@@ -3,11 +3,10 @@ import importlib
 import pydat.plugins
 import functools
 from flask import Blueprint
+from pydat.core import preferences
 
 # list of valid Plugin objects
 PLUGINS = []
-# dictionary of plugin user preferences
-USER_PREF = {}
 
 
 class PluginBase:
@@ -79,6 +78,6 @@ def register(func):
         PLUGINS.append(plugin)
         # check if there are preferences for the plugin
         if plugin.user_pref is not None:
-            USER_PREF[plugin.name] = plugin.user_pref
+            preferences.add_user_pref(plugin.name, plugin.user_pref)
         return plugin
     return wrapped

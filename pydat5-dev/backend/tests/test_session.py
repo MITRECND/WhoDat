@@ -1,4 +1,4 @@
-from pydat.core.plugins import USER_PREF
+from pydat.core import preferences
 from flask import session
 import pytest
 
@@ -48,7 +48,7 @@ def test_put_get(client, type_pref, param_pref):
     assert 'fake_endpoint' in response.get_json()['error']
 
     # set preferences and check get, session[fake] is created
-    USER_PREF['fake_endpoint'] = type_pref
+    preferences.add_user_pref('fake_endpoint', type_pref)
     with client:
         response = client.get('/api/v2/session/fake_endpoint')
         assert response.status_code == 200
@@ -87,7 +87,7 @@ def test_put_get(client, type_pref, param_pref):
                 check_invalid(json_data, param_pref, type_pref)
 
     # cleanup
-    USER_PREF.pop("fake_endpoint")
+    preferences.USER_PREF.pop("fake_endpoint")
 
 
 @pytest.mark.parametrize("type_pref", (
@@ -99,7 +99,7 @@ def test_put_get(client, type_pref, param_pref):
     {"pi": 3.1415, "dev": True}
 ))
 def test_patch(client, type_pref, param_pref):
-    USER_PREF['fake_endpoint'] = type_pref
+    preferences.add_user_pref('fake_endpoint', type_pref)
     with client:
         response = client.patch(
             '/api/v2/session/fake_endpoint',
@@ -115,4 +115,4 @@ def test_patch(client, type_pref, param_pref):
             check_invalid(response.get_json(), param_pref, type_pref)
 
     # cleanup
-    USER_PREF.pop("fake_endpoint")
+    preferences.USER_PREF.pop("fake_endpoint")
