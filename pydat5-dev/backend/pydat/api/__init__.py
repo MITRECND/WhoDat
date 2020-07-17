@@ -1,5 +1,5 @@
 import os
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, render_template
 from pydat.api.controller import exceptions
 from pydat.core import plugins
 
@@ -25,9 +25,12 @@ def create_app(test_config=None):
 
     # Register Plugin Blueprints
     # add error handling
+    included_jsfiles = []
     for plugin in plugins.get_plugins():
         app.register_blueprint(
-            plugin.blueprint(), url_prefix='/api/v2/' + plugin.name)
+            plugin.blueprint, url_prefix='/api/v2/' + plugin.name)
+        for js in plugin.jsfiles:
+            included_jsfiles.append(js)
 
     # Catch invalid backend calls
     @app.route("/api/v2/", defaults={"path": ""})
@@ -35,16 +38,19 @@ def create_app(test_config=None):
     def invalid(path):
         raise exceptions.ClientError("Nonexistant view {}".format(path), 404)
 
-    # for rule in app.url_map.iter_rules('static'):
-        # app.url_map._rules.remove(rule)
+    for rule in app.url_map.iter_rules('static'):
+        app.url_map._rules.remove(rule)
 
-    # Serve React App
+    # Serve React Appls
+
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve(path):
+        print(path)
         if path != "" and os.path.exists(app.static_folder + '/' + path):
+            print(app.static_folder)
             return send_from_directory(app.static_folder, path)
         else:
-            return send_from_directory(app.static_folder, 'index.html')
+            return render_template('index.html', jsfiles=included_jsfiles)
 
     return app

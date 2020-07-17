@@ -21,13 +21,14 @@ def create_plugin():
             return "Success!"
 
         class TestPlugin(PluginBase):
+            @property
             def blueprint(self):
                 return bp
-
-            def set_user_pref(self):
+            @property
+            def user_pref(self):
                 return user_pref
-
-            def set_name(self):
+            @property
+            def name(self):
                 return name
 
         @register

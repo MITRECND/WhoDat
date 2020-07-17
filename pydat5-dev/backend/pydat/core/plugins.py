@@ -16,22 +16,24 @@ class PluginBase:
         name: A string that stores the plugin's identifying name.
         user_pref: A dict mapping plugin parameter's to their value type.
     """
-
-    def __init__(self):
-        """Inits PluginBase with set_name() and set_user_pref()"""
-        self.name = self.set_name()
-        self.user_pref = self.set_user_pref()
-
+    @property
     def blueprint(self):
         """Returns the plugin's Blueprint. Must be overriden."""
         raise NotImplementedError(
                 'Plugin must have blueprint')
 
-    def set_user_pref(self):
+    @property
+    def user_pref(self):
         """Returns a dict of plugin's user preferences or None"""
         return None
 
-    def set_name(self):
+    @property
+    def jsfiles(self):
+        """Returns a list of plugins' bundled ReactJS files"""
+        return []
+
+    @property
+    def name(self):
         """Returns the plugin's name. Used for preferences and endpoints"""
         return self.__module__.split('.')[-1]
 
@@ -72,7 +74,7 @@ def register(func):
         if not isinstance(plugin, PluginBase):
             raise TypeError(
                 'Cannot register plugin: wrong type {}'.format(type(plugin)))
-        plugin_bp = plugin.blueprint()
+        plugin_bp = plugin.blueprint
         if not isinstance(plugin_bp, Blueprint):
             raise TypeError('Cannot register plugin, must return a blueprint')
         PLUGINS.append(plugin)

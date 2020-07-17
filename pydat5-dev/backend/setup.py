@@ -9,4 +9,9 @@ setup(
     install_requires=["flask"],
     classifiers=["Programming language :: Python :: 3", ],
     python_requires=">=3.6",
+    entry_points = {
+        "console_scripts": [
+            "pydat-run = pydat.scripts.api:main"
+        ]
+    },
 )

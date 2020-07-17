@@ -16,7 +16,7 @@ def test_plugin(create_plugin):
     # check valid plugin and registration
     assert plugin.name == "test_plugin"
     assert plugin.user_pref == test_pref
-    assert isinstance(plugin.blueprint(), Blueprint)
+    assert isinstance(plugin.blueprint, Blueprint)
     assert preferences.get_user_pref("test_plugin") == test_pref
     plugin_exists = False
     for obj in PLUGINS:
