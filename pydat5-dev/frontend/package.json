@@ -12,7 +12,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "npm run build:isolated && mv build/index.html ../backend/pydat/api/templates && rm -r ../backend/pydat/api/static/static && mv build/static ../backend/pydat/api/static",
+    "build:isolated": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
