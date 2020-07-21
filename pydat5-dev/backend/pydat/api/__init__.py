@@ -23,14 +23,14 @@ def create_app(test_config=None):
     # Register Framework Blueprints
     app.register_blueprint(session_bp, url_prefix="/api/v2")
 
-    # Register Plugin Blueprints
+    # Register Plugin Blueprints and JSfiles
     # add error handling
     included_jsfiles = []
     for plugin in plugins.get_plugins():
         app.register_blueprint(
             plugin.blueprint, url_prefix='/api/v2/' + plugin.name)
-        for js in plugin.jsfiles:
-            included_jsfiles.append(js)
+        for jsfile in plugin.jsfiles:
+            included_jsfiles.append(jsfile)
 
     # Catch invalid backend calls
     @app.route("/api/v2/", defaults={"path": ""})
