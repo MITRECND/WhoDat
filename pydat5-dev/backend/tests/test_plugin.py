@@ -7,7 +7,7 @@ from pydat.core import preferences
 
 
 # tests a valid plugin
-def test_plugin(create_plugin):
+def test_registration(create_plugin):
     test_pref = {"name": str, "test": True}
     plugin = create_plugin(
         test_pref,
@@ -43,15 +43,21 @@ def test_plugin(create_plugin):
 
 
 # test invalid plugins
-def test_register_plugin():
+def test_invalid_plugin():
     # is not child of PluginBase
     class FakePlugin():
         def set_name(self):
             return "fake"
 
-    # does not return a blueprint
-    class WrongPlugin(PluginBase):
+    # does not implement blueprint
+    class MissingBPPlugin(PluginBase):
         pass
+
+    # does not return blueprint
+    class WrongPlugin(PluginBase):
+        @property
+        def blueprint(self):
+            return ["fake"]
 
     @register
     def start_plugin(cls):
@@ -62,4 +68,7 @@ def test_register_plugin():
         assert start_plugin(FakePlugin)
 
     with pytest.raises(NotImplementedError):
+        assert start_plugin(MissingBPPlugin)
+
+    with pytest.raises(TypeError):
         assert start_plugin(WrongPlugin)

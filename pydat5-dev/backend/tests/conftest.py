@@ -13,7 +13,7 @@ def client():
 # simple test plugin, returns created valid plugin
 @pytest.fixture
 def create_plugin():
-    def _create_plugin(user_pref, name):
+    def _create_plugin(user_pref=None, name="hello", jsfiles=[]):
         bp = Blueprint(name, __name__)
 
         @bp.route("/hello")
@@ -24,12 +24,18 @@ def create_plugin():
             @property
             def blueprint(self):
                 return bp
+
             @property
             def user_pref(self):
                 return user_pref
+
             @property
             def name(self):
                 return name
+
+            @property
+            def jsfiles(self):
+                return jsfiles
 
         @register
         def start_plugin():

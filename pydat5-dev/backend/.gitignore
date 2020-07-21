@@ -12,6 +12,5 @@ htmlcov/
 
 build/
 *.egg-info
-static/
 
 .vscode

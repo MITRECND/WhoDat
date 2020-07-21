@@ -38,17 +38,12 @@ def create_app(test_config=None):
     def invalid(path):
         raise exceptions.ClientError("Nonexistant view {}".format(path), 404)
 
-    for rule in app.url_map.iter_rules('static'):
-        app.url_map._rules.remove(rule)
-
-    # Serve React Appls
+    # Serve React App
 
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve(path):
-        print(path)
         if path != "" and os.path.exists(app.static_folder + '/' + path):
-            print(app.static_folder)
             return send_from_directory(app.static_folder, path)
         else:
             return render_template('index.html', jsfiles=included_jsfiles)
