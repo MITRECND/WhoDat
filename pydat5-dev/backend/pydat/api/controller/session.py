@@ -10,7 +10,7 @@ from pydat.core.preferences import add_user_pref, get_user_pref
 
 session_bp = Blueprint("session", __name__)
 # Add global preferences
-add_user_pref("global", {"pi": int, "name": str, "development": bool})
+# add_user_pref("global", {"pi": int, "name": str, "development": bool})
 
 
 def is_valid(param, new_pref, curr_pref):

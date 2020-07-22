@@ -11,7 +11,7 @@ setup(
     python_requires=">=3.6",
     entry_points = {
         "console_scripts": [
-            "dev-server = pydat.scripts.api:main"
+            "pydat-dev-server = pydat.scripts.api:main"
         ]
     },
 )
