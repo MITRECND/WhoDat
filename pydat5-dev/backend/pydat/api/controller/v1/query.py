@@ -6,10 +6,9 @@ from flask import (
     jsonify
 )
 from pydat.api.controller.exceptions import ClientError, ServerError
-from math import ceil
 from pydat.api.utils import es as elastic
 
-query_bp = Blueprint("metadata", __name__)
+query_bp = Blueprint("query", __name__)
 
 
 @query_bp.route('/query')
@@ -36,7 +35,7 @@ def query():
     skip = (page_num-1)*page_size
     try:
         results = elastic.advanced_search(query, skip, page_size, unique)
-    except ElasticsearchError:
+    except elastic.ElasticsearchError:
         raise ServerError("Search failed to connect")
     except IndexError:
         raise ClientError(f"Page number {page_num} is too high")

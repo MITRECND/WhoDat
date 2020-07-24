@@ -5,10 +5,10 @@ from pydat.core import plugins
 
 from pydat.api.controller.session import session_bp
 from pydat.api.controller.v1 import (
-    #domain_bp,
+    domain_bp,
     domains_bp,
-    #metadata_bp,
-    #query_bp
+    metadata_bp,
+    query_bp
 )
 
 
@@ -31,6 +31,9 @@ def create_app(test_config=None):
 
     ## version 1 backwards compatibility
     app.register_blueprint(domains_bp, url_prefix="/api/v1")
+    app.register_blueprint(domain_bp, url_prefix="/api/v1")
+    app.register_blueprint(metadata_bp, url_prefix="/api/v1")
+    app.register_blueprint(query_bp, url_prefix="/api/v1")
 
     # Register Plugin Blueprints and JSfiles
     # add error handling

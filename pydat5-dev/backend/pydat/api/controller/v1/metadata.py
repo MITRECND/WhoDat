@@ -16,7 +16,7 @@ metadata_bp = Blueprint("metadata", __name__)
 def metadata(version=None):
     try:
         results = elastic.metadata(version)
-    except ElasticsearchError:
+    except elastic.ElasticsearchError:
         raise ServerError("Search failed to connect")
 
     return results

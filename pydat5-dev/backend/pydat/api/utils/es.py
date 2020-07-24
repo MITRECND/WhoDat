@@ -12,7 +12,7 @@ def lastVersion():
 
 
 def metadata(version=None):
-    pass
+    return {'success': True, 'data': []}
 
 
 def createAdvancedQuery(query, skip, size, unique, sort=None):
@@ -24,4 +24,4 @@ def search(key, value, limit, filt=None, low=None, high=None, versionSort=False)
 
 
 def advanced_search(query, skip=0, size=20, unique=False):
-    pass
+    return {'success': True, 'total': 0, 'data': []}
