@@ -4,6 +4,12 @@ from pydat.api.controller import exceptions
 from pydat.core import plugins
 
 from pydat.api.controller.session import session_bp
+from pydat.api.controller.v1 import (
+    #domain_bp,
+    domains_bp,
+    #metadata_bp,
+    #query_bp
+)
 
 
 def create_app(test_config=None):
@@ -13,7 +19,7 @@ def create_app(test_config=None):
 
     # load testing, if debugging; else, load deployment config
     if test_config is None:
-        app.config.from_pyfile("config.py", silent=True)
+        app.config.from_envvar("PYDAT_CONFIG", silent=False)
     else:
         app.config.from_mapping(test_config)
 
@@ -22,6 +28,9 @@ def create_app(test_config=None):
 
     # Register Framework Blueprints
     app.register_blueprint(session_bp, url_prefix="/api/v2")
+
+    ## version 1 backwards compatibility
+    app.register_blueprint(domains_bp, url_prefix="/api/v1")
 
     # Register Plugin Blueprints and JSfiles
     # add error handling
@@ -33,8 +42,8 @@ def create_app(test_config=None):
             included_jsfiles.append(jsfile)
 
     # Catch invalid backend calls
-    @app.route("/api/v2/", defaults={"path": ""})
-    @app.route("/api/v2/<path:path>")
+    @app.route("/api", defaults={"path": ""})
+    @app.route("/api/<path:path>")
     def invalid(path):
         raise exceptions.ClientError("Nonexistant view {}".format(path), 404)
 
