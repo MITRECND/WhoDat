@@ -20,7 +20,7 @@ def createAdvancedQuery(query, skip, size, unique, sort=None):
 
 
 def search(key, value, limit, filt=None, low=None, high=None, versionSort=False):
-    return {'success': True, 'aaData': [], 'iTotalRecords': 0, 'iTotalDisplayRecords': 0}
+    return {'success': True, 'data': [], 'total': 0, 'avail': 0}
 
 
 def advanced_search(query, skip=0, size=20, unique=False):
