@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, current_app
 from pydat.api.controller.v1.domains import domains, domains_latest
 from pydat.api.utils import es as elastic
 from pydat.api.controller.exceptions import ClientError, ServerError
@@ -26,12 +26,19 @@ def domain_diff(domainName, v1, v2):
         raise ClientError("Input paramaters are of the wrong type")
 
     try:
+<<<<<<< HEAD
         v1_result = elastic.search('domainName', domainName, filt=None, low=v1)
         v2_result = elastic.search('domainName', domainName, filt=None, low=v2)
     except elastic.ConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.NotFoundError:
         raise ClientError(f'Cannot find domain name {domainName}', 404)
+=======
+        v1_result = elastic.search('domainName', domainName, limit=current_app.config["LIMIT"], filt=None, low=v1)
+        v2_result = elastic.search('domainName', domainName, limit=current_app.config["LIMIT"], filt=None, low=v2)
+    except elastic.ElasticsearchError:
+        raise ServerError("Search failed to connect")
+>>>>>>> 6395ab95517dd329f23bd4b17bf0256c45d1a2f4
 
     if not v1_result['data'] or not v2_result['data']:
         raise ClientError('Version has no results', 404)
