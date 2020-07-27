@@ -19,7 +19,7 @@ def create_app(test_config=None):
 
     # load testing, if debugging; else, load deployment config
     if test_config is None:
-        app.config.from_envvar("PYDAT_CONFIG", silent=False)
+        app.config.from_envvar("PYDAT_CONFIG", silent=True)
     else:
         app.config.from_mapping(test_config)
 
@@ -29,7 +29,7 @@ def create_app(test_config=None):
     # Register Framework Blueprints
     app.register_blueprint(session_bp, url_prefix="/api/v2")
 
-    ## version 1 backwards compatibility
+    # version 1 backwards compatibility
     app.register_blueprint(domains_bp, url_prefix="/api/v1")
     app.register_blueprint(domain_bp, url_prefix="/api/v1")
     app.register_blueprint(metadata_bp, url_prefix="/api/v1")

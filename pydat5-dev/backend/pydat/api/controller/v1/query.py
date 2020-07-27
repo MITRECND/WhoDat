@@ -1,12 +1,10 @@
 from flask import (
     Blueprint,
     request,
-    session,
-    make_response,
-    jsonify
 )
 from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api.utils import es as elastic
+from math import ceil
 
 query_bp = Blueprint("query", __name__)
 
@@ -15,9 +13,13 @@ query_bp = Blueprint("query", __name__)
 def query():
     try:
         query = request.args.get("query", default=None, type=str)
-        page_size = request.args.get("size", default=20, type=int)
-        page_num = request.args.get("page", default=1, type=int)
-        unique = request.args.get("unique", default=False, type=bool)
+        page_size = int(request.args.get("size", default=20))
+        page_num = int(request.args.get("page", default=1))
+        unique = request.args.get("unique", default=False)
+        if str(unique).lower() == 'true':
+            unique = True
+        else:
+            unique = False
     except ValueError:
         raise ClientError("Input paramaters are of the wrong type")
 
@@ -35,9 +37,10 @@ def query():
     skip = (page_num-1)*page_size
     try:
         results = elastic.advanced_search(query, skip, page_size, unique)
-    except elastic.ElasticsearchError:
+    except elastic.ConnectionError:
         raise ServerError("Search failed to connect")
-    except IndexError:
+
+    if page_num > ceil(results['total']/page_size):
         raise ClientError(f"Page number {page_num} is too high")
 
     return results
