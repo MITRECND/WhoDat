@@ -1,9 +1,6 @@
 from flask import (
     Blueprint,
     request,
-    session,
-    make_response,
-    jsonify
 )
 from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api.utils import es as elastic
@@ -15,9 +12,13 @@ query_bp = Blueprint("query", __name__)
 def query():
     try:
         query = request.args.get("query", default=None, type=str)
-        page_size = request.args.get("size", default=20, type=int)
-        page_num = request.args.get("page", default=1, type=int)
-        unique = request.args.get("unique", default=False, type=bool)
+        page_size = int(request.args.get("size", default=20))
+        page_num = int(request.args.get("page", default=1))
+        unique = request.args.get("unique", default=False)
+        if unique.lower() == 'true':
+            unique = True
+        else:
+            unique = False
     except ValueError:
         raise ClientError("Input paramaters are of the wrong type")
 
