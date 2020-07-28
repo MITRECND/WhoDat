@@ -45,6 +45,8 @@ def domains(key, value, low=None, high=None):
         raise ServerError("Search failed to connect")
     except elastic.NotFoundError:
         raise ClientError(f'Cannot find specified value {value}', 404)
+    except elastic.ElasticsearchError:
+        raise ServerError("Unexpected exception")
 
     return results
 
@@ -86,9 +88,13 @@ def domain_diff(domainName, v1, v2):
         raise ServerError("Search failed to connect")
     except elastic.NotFoundError:
         raise ClientError(f'Cannot find domain name {domainName}', 404)
+    except elastic.ElasticsearchError:
+        raise ServerError('Unexpected exception')
 
     if not v1_result['data'] or not v2_result['data']:
-        raise ClientError('Version has no results', 404)
+        raise ClientError('Provided version has no data', 404)
+    v1_result = v1_result['data'][0]
+    v2_result = v2_result['data'][0]
 
     blacklist = {'Version', 'UpdateVersion', 'domainName', 'dataFirstSeen'}
     v1_key = set(v1_result.keys())-blacklist
@@ -127,8 +133,10 @@ def metadata(version=None):
         results = elastic.metadata(version)
     except elastic.NotFoundError:
         raise ClientError(f'Version {version} does not exist', 404)
-    except elastic.ElasticsearchError:
+    except elastic.ConnectionError:
         raise ServerError("Search failed to connect")
+    except elastic.ElasticsearchError:
+        raise ServerError('Unexpected exception')
 
     return results
 
@@ -164,6 +172,8 @@ def query():
         results = elastic.advanced_search(query, skip, page_size, unique)
     except elastic.ConnectionError:
         raise ServerError("Search failed to connect")
+    except elastic.ElasticsearchError:
+        raise ServerError('Unexpected exception')
 
     if page_num > ceil(results['total']/page_size):
         raise ClientError(f"Page number {page_num} is too high")
