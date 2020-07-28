@@ -2,14 +2,8 @@ import os
 from flask import Flask, send_from_directory, render_template
 from pydat.api.controller import exceptions
 from pydat.core import plugins
-
 from pydat.api.controller.session import session_bp
-from pydat.api.controller.v1 import (
-    domain_bp,
-    domains_bp,
-    metadata_bp,
-    query_bp
-)
+from pydat.api.controller.v1 import whoisv1_bp
 
 
 def create_app(test_config=None):
@@ -30,10 +24,7 @@ def create_app(test_config=None):
     app.register_blueprint(session_bp, url_prefix="/api/v2")
 
     # version 1 backwards compatibility
-    app.register_blueprint(domains_bp, url_prefix="/api/v1")
-    app.register_blueprint(domain_bp, url_prefix="/api/v1")
-    app.register_blueprint(metadata_bp, url_prefix="/api/v1")
-    app.register_blueprint(query_bp, url_prefix="/api/v1")
+    app.register_blueprint(whoisv1_bp, url_prefix="/api/v1")
 
     # Register Plugin Blueprints and JSfiles
     # add error handling
