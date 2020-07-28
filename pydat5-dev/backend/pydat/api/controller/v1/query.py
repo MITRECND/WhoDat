@@ -16,11 +16,7 @@ def query():
         page_size = int(request.args.get("size", default=20))
         page_num = int(request.args.get("page", default=1))
         unique = request.args.get("unique", default=False)
-<<<<<<< HEAD
         if str(unique).lower() == 'true':
-=======
-        if unique.lower() == 'true':
->>>>>>> 6395ab95517dd329f23bd4b17bf0256c45d1a2f4
             unique = True
         else:
             unique = False
