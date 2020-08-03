@@ -4,6 +4,7 @@ from pydat.api.utils import es as elastic
 from urllib import parse
 import socket
 from pydat.api.shared import whois
+import sys
 
 whoisv2_bp = Blueprint("whoisv2", __name__)
 
@@ -71,7 +72,7 @@ def domains_diff():
 
 
 @whoisv2_bp.route("/domains/<search_key>", methods=("POST"))
-def domains(search_key, version=None, chunk_size=50, offset=0):
+def domains(search_key):
     if search_key not in current_app.config["SEARCH_KEYS"]:
         raise ClientError(f"Invalid key {search_key}")
     if not request.is_json:
@@ -83,15 +84,14 @@ def domains(search_key, version=None, chunk_size=50, offset=0):
     except KeyError:
         raise ClientError("Value is required")
 
-    if "version" in json_data.keys():
-        try:
+    version = json_data.get("version", None)
+    try:
+        if version:
             version = float(json_data["version"])
-        except ValueError:
-            raise ClientError(f"Version {version} is not an integer")
-    if "chunk_size" in json_data.keys():
-        chunk_size = json_data["chunk_size"]
-    if "offset" in json_data.keys():
-        offset = json_data["offset"]
+    except ValueError:
+        raise ClientError(f"Version {version} is not an integer")
+    chunk_size = json_data.get("chunk_size", sys.maxsize)
+    offset = json_data.get("offset", 0)
     chunk_size, offset = valid_size_offset(chunk_size, offset)
 
     search_key = parse.unquote(search_key)
@@ -129,4 +129,48 @@ def domains(search_key, version=None, chunk_size=50, offset=0):
         "chunk_size": chunk_size,
         "offset": offset,
         "results": search_results["data"][start:end],
+    }
+
+
+@whoisv2_bp.route("/query", methods=("POST",))
+def query():
+    if not request.is_json:
+        raise ClientError("Wrong format, JSON required")
+
+    json_data = request.get_json()
+    try:
+        query = json_data["query"]
+    except KeyError:
+        raise ClientError("Query is required")
+
+    chunk_size = json_data.get("chunk_size", 50)
+    offset = json_data.get("offset", 0)
+    chunk_size, offset = valid_size_offset(chunk_size, offset)
+    unique = json_data.get("unique", False)
+    sort_key = json_data.get("sort_key", None)
+    sort_reverse = json_data.get("sort_reverse", False)
+
+    skip = offset * chunk_size
+    if sort_key:
+        sort = [sort_key, "asc"]
+        if sort_reverse:
+            sort = [sort_key, "desc"]
+
+    try:
+        search_results = elastic.advanced_search(
+            query, skip, chunk_size, unique, sort=sort
+        )
+    except elastic.ConnectionError:
+        raise ServerError("Search failed to connect")
+    except elastic.ElasticsearchError:
+        raise ServerError("Unexpected exception")
+
+    if chunk_size * offset > search_results["total"]:
+        raise ClientError(f"Offset {offset} is too high")
+
+    return {
+        "total": search_results["total"],
+        "results": search_results["data"],
+        "chunk_size": chunk_size,
+        "offset": offset,
     }
