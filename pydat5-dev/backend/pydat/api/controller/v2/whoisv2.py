@@ -160,6 +160,8 @@ def query():
         search_results = elastic.advanced_search(
             query, skip, chunk_size, unique, sort=sort
         )
+    except elastic.SearchError:
+        raise ClientError("Invalid Search parameter")
     except elastic.ConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ElasticsearchError:

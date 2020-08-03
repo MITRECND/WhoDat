@@ -46,18 +46,20 @@ def diff(domainName, v1, v2):
     v2_result = v2_result['data'][0]
 
     blacklist = {'Version', 'UpdateVersion', 'domainName', 'dataFirstSeen'}
-    v1_key = set(v1_result.keys())-blacklist
-    v2_key = set(v2_result.keys())-blacklist
+    v1_keys = set(v1_result.keys())
+    v2_keys = set(v2_result.keys())
+    keys = (v1_keys | v2_keys) - blacklist
     results = {}
 
-    for key in v1_key-v2_key:
-        results[key] = [v1_result[key], '']
-    for key in v2_key-v1_key:
-        results[key] = ['', v2_result[key]]
-    for key in v1_key & v2_key:
-        if v1_result[key] == v2_result[key]:
-            results[key] = v1_result[key]
+    for key in keys:
+        if key in v1_keys and key in v2_keys:
+            if v1_result[key] == v2_result[key]:
+                results[key] = v1_result[key]
+            else:
+                results[key] = [v1_result[key], v2_result[key]]
+        elif key in v1_keys:
+            results[key] = [v1_result[key], '']
         else:
-            results[key] = [v1_result[key], v2_result[key]]
+            results[key] = ['', v2_result[key]]
 
     return results

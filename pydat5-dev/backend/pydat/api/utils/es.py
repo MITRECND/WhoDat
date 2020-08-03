@@ -1,15 +1,23 @@
 from flask import current_app
 
 
+# general ES error
 class ElasticsearchError(Exception):
     pass
 
 
+# failed to connect to ES
 class ConnectionError(ElasticsearchError):
     pass
 
 
+# ES couldn't find results
 class NotFoundError(ElasticsearchError):
+    pass
+
+
+# invalid search keys/values
+class SearchError(ElasticsearchError):
     pass
 
 
@@ -30,7 +38,7 @@ def search(key, value, filt=None, low=None, high=None, versionSort=False):
     return {"success": True, "data": [], "total": 100, "avail": 0}
 
 
-def advanced_search(query, skip=0, size=20, unique=False):
+def advanced_search(query, skip=0, size=50, unique=False, sort=None):
     return {
         "success": True,
         "total": 100,
