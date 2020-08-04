@@ -4,6 +4,7 @@ from pydat.api.controller import exceptions
 from pydat.core import plugins
 from pydat.api.controller.session import session_bp
 from pydat.api.controller.v1 import whoisv1_bp
+from pydat.api.controller.v2 import whoisv2_bp
 
 
 def create_app(test_config=None):
@@ -22,6 +23,7 @@ def create_app(test_config=None):
 
     # Register Framework Blueprints
     app.register_blueprint(session_bp, url_prefix="/api/v2")
+    app.register_blueprint(whoisv2_bp, url_prefix="/api/v2")
 
     # version 1 backwards compatibility
     app.register_blueprint(whoisv1_bp, url_prefix="/api/v1")

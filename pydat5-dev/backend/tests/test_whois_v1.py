@@ -1,20 +1,6 @@
-from pydat.api import create_app
 import pytest
 from unittest.mock import MagicMock
 from pydat.api.utils import es as elastic
-
-NAMESPACE = 'pydat.api.controller.v1.whoisv1.elastic'
-
-
-@pytest.fixture
-def config_app():
-    app = create_app(
-        {
-            "TESTING": True,
-            "SEARCH_KEYS": ['domainName', 'registrant_name',
-                            'contactEmail', 'registrant_telephone'],
-            'LIMIT': 100, })
-    return app
 
 
 @pytest.mark.parametrize("low", ("low", -1, 3, 100, 1.2, -.1))

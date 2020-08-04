@@ -44,8 +44,10 @@ def resolve(domain):
 
     try:
         hostname, aliaslist, iplist = socket.gethostbyname_ex(domain)
-    except socket.error:
+    except (socket.herror, socket.gaierror):
         raise ClientError(f"Domain name {domain} couldn't be resolved")
+    except OSError as e:
+        raise ServerError(str(e), 504)
 
     hostnames = [hostname]
     for alias in aliaslist:
@@ -55,7 +57,7 @@ def resolve(domain):
 
 
 # Domains
-@whoisv2_bp.route("/domains/diff", methods=("POST"))
+@whoisv2_bp.route("/domains/diff", methods=["POST"])
 def domains_diff():
     if not request.is_json:
         raise ClientError("Wrong format, JSON required")
@@ -71,7 +73,7 @@ def domains_diff():
     return whois.diff(domain, version1, version2)
 
 
-@whoisv2_bp.route("/domains/<search_key>", methods=("POST"))
+@whoisv2_bp.route("/domains/<search_key>", methods=["POST"])
 def domains(search_key):
     if search_key not in current_app.config["SEARCH_KEYS"]:
         raise ClientError(f"Invalid key {search_key}")
@@ -132,7 +134,7 @@ def domains(search_key):
     }
 
 
-@whoisv2_bp.route("/query", methods=("POST",))
+@whoisv2_bp.route("/query", methods=["POST"])
 def query():
     if not request.is_json:
         raise ClientError("Wrong format, JSON required")
@@ -151,6 +153,7 @@ def query():
     sort_reverse = json_data.get("sort_reverse", False)
 
     skip = offset * chunk_size
+    sort = None
     if sort_key:
         sort = [sort_key, "asc"]
         if sort_reverse:
