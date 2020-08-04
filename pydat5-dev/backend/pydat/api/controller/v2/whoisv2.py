@@ -68,7 +68,7 @@ def domains_diff():
         version1 = json_data["version1"]
         version2 = json_data["version2"]
     except KeyError:
-        ClientError("All required parameters must be provided")
+        raise ClientError("All required parameters must be provided")
 
     return whois.diff(domain, version1, version2)
 
@@ -89,12 +89,14 @@ def domains(search_key):
     version = json_data.get("version", None)
     try:
         if version:
-            version = float(json_data["version"])
+            version = float(version)
     except ValueError:
         raise ClientError(f"Version {version} is not an integer")
     chunk_size = json_data.get("chunk_size", sys.maxsize)
     offset = json_data.get("offset", 0)
     chunk_size, offset = valid_size_offset(chunk_size, offset)
+    if chunk_size == sys.maxsize:
+        offset = 0
 
     search_key = parse.unquote(search_key)
     value = parse.unquote(value)
@@ -112,14 +114,14 @@ def domains(search_key):
         )
     except elastic.ConnectionError:
         raise ServerError("Search failed to connect")
-    except elastic.NotFoundError:
-        raise ClientError(f"Cannot find specified value {value}", 404)
     except elastic.ElasticsearchError:
         raise ServerError("Unexpected exception")
 
     # Return results based on chunk size and offset
+    if chunk_size == sys.maxsize:
+        chunk_size = search_results['total']
     start = offset * chunk_size
-    if start >= search_results["total"]:
+    if start > 0 and start >= search_results["total"]:
         raise ClientError(
             f"Offset {offset} is too high for {search_results['total']} hits"
         )
@@ -170,7 +172,7 @@ def query():
     except elastic.ElasticsearchError:
         raise ServerError("Unexpected exception")
 
-    if chunk_size * offset > search_results["total"]:
+    if skip > 0 and skip > search_results["total"]:
         raise ClientError(f"Offset {offset} is too high")
 
     return {
