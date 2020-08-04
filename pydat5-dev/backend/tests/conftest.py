@@ -5,6 +5,17 @@ from flask import Blueprint
 
 
 @pytest.fixture
+def config_app():
+    app = create_app(
+        {
+            "TESTING": True,
+            "SEARCH_KEYS": ['domainName', 'registrant_name',
+                            'contactEmail', 'registrant_telephone'],
+            'LIMIT': 100, })
+    return app
+
+
+@pytest.fixture
 def client():
     app = create_app({"TESTING": True, })
     return app.test_client()
