@@ -4,6 +4,7 @@ from pydat.api.utils import es as elastic
 import socket
 
 
+# identical code to testing metadata v1 (shared)
 @pytest.mark.parametrize("version", ("version", -1, 1))
 def test_metadata(monkeypatch, client, version):
     # metadata is always valid
@@ -125,9 +126,7 @@ def test_domains_diff(monkeypatch, config_app):
     # required parameters
     response = client.post("/api/v2/domains/diff", json={})
     assert response.status_code == 400
-    response = client.post(
-        "/api/v2/domains/diff", json={"domain": "value"}
-    )
+    response = client.post("/api/v2/domains/diff", json={"domain": "value"})
     assert response.status_code == 400
     response = client.post(
         "/api/v2/domains/diff", json={"domain": "value", "version1": 0}
@@ -152,12 +151,30 @@ def test_query(monkeypatch, config_app):
     assert response.status_code == 400
     response = client.post("/api/v2/query", json={"query": "query"})
     assert response.status_code == 200
+    # valid sort key
+    response = client.post(
+        "/api/v2/query", json={"query": "query", "sort_key": "domainName"}
+    )
+    assert response.status_code == 200
+    response = client.post(
+        "/api/v2/query", json={"query": "query", "sort_key": "fake_key"}
+    )
+    assert response.status_code == 400
     response = client.post(
         "/api/v2/query",
         json={
             "query": "query",
             "chunk_size": mock_adv.return_value["total"] / 5,
             "offset": 6,
+        },
+    )
+    assert response.status_code == 400
+    response = client.post(
+        "/api/v2/query",
+        json={
+            "query": "query",
+            "chunk_size": mock_adv.return_value["total"] / 5.0,
+            "offset": 4,
         },
     )
     assert response.status_code == 400
@@ -178,6 +195,11 @@ def test_connection_error(monkeypatch, config_app):
     # Domains
     response = client.post(
         "/api/v2/domains/domainName", json={"value": "value"}
+    )
+    assert response.status_code == 500
+    response = client.post(
+        "/api/v2/domains/diff",
+        json={"domain": "value", "version1": 0, "version2": 1},
     )
     assert response.status_code == 500
 

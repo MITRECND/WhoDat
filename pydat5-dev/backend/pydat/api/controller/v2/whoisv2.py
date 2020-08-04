@@ -10,10 +10,7 @@ whoisv2_bp = Blueprint("whoisv2", __name__)
 
 
 def valid_size_offset(chunk_size, offset):
-    try:
-        chunk_size = int(chunk_size)
-        offset = int(offset)
-    except ValueError:
+    if not (isinstance(chunk_size, int) and isinstance(offset, int)):
         raise ClientError(
             f"Offset {offset} and/or chunk size {chunk_size} are not integers"
         )
@@ -64,7 +61,7 @@ def domains_diff():
 
     json_data = request.get_json()
     try:
-        domain = json_data["domain"]
+        domain = str(json_data["domain"])
         version1 = json_data["version1"]
         version2 = json_data["version2"]
     except KeyError:
@@ -82,7 +79,7 @@ def domains(search_key):
 
     json_data = request.get_json()
     try:
-        value = json_data["value"]
+        value = str(json_data["value"])
     except KeyError:
         raise ClientError("Value is required")
 
@@ -143,7 +140,7 @@ def query():
 
     json_data = request.get_json()
     try:
-        query = json_data["query"]
+        query = str(json_data["query"])
     except KeyError:
         raise ClientError("Query is required")
 
@@ -155,8 +152,11 @@ def query():
     sort_reverse = json_data.get("sort_reverse", False)
 
     skip = offset * chunk_size
+    # handle sort_key
     sort = None
     if sort_key:
+        if sort_key not in current_app.config["SORT_KEYS"]:
+            raise ClientError(f"Invalid sort key {sort_key} provided")
         sort = [sort_key, "asc"]
         if sort_reverse:
             sort = [sort_key, "desc"]

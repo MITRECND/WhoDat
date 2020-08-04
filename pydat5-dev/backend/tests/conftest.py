@@ -9,9 +9,24 @@ def config_app():
     app = create_app(
         {
             "TESTING": True,
-            "SEARCH_KEYS": ['domainName', 'registrant_name',
-                            'contactEmail', 'registrant_telephone'],
-            'LIMIT': 100, })
+            "SEARCH_KEYS": [
+                "domainName",
+                "registrant_name",
+                "contactEmail",
+                "registrant_telephone",
+            ],
+            "SORT_KEYS": [
+                "domainName",
+                "details.registrant_name",
+                "details.contactEmail",
+                "details.standardRegCreatedDate",
+                "details.registrant_telephone",
+                "dataVersion",
+                "_score",
+            ],
+            "LIMIT": 100,
+        }
+    )
     return app
 
 
@@ -52,6 +67,7 @@ def create_plugin():
         def start_plugin():
             test = TestPlugin()
             return test
+
         test_plugin = start_plugin()
         return test_plugin
 
