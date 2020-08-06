@@ -270,7 +270,7 @@ def _create_advanced_query(query, skip, size, unique, sort=None):
         query (str): search query
         skip (int): 
         size (int): number of result hits to retrieve
-        unique (bool):
+        unique (bool): restrict results to unique set of records
         sort (list): tuples of the form (sort_key, sort_direction)
 
     Returns: (dict) ElasticSearch query object
