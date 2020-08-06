@@ -6,13 +6,21 @@
     - 'settings', need replacement
     - no more 'cache', need replacement
 - change to f-strings
-- Create custom exceptions:
-    - ESConnectionError
-    - ESQueryError
-    - ESProcessingError
-    - Should there be a generic ESAPIError for any value/argument exceptions?
 Q: What is version in this context?
 - Q: testing?
+
+
+## Exceptions
+
+New proposed custom exceptions:
+- ESConnectionError
+- ESQueryError
+- ESProcessingError
+- (?)Should there be a generic ESAPIError for any value/argument exceptions?
+
+## API
+
+Note: section titles are the old API method names
 
 **_es_connector()_**
 
