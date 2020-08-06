@@ -18,6 +18,8 @@ New proposed custom exceptions:
 - ESProcessingError
 - (?)Should there be a generic ESAPIError for any value/argument exceptions?
 
+- H: We catch some ES query errors and gracefully handle them, others we dont and thus excpetion is passed to caller directly from ES. Prefer to catch ES query exceptions and then raise abstract custom error ESQueryError.
+
 ## API
 
 Note: section titles are the old API method names
@@ -58,6 +60,7 @@ def record_count():
     
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 
@@ -81,6 +84,7 @@ def cluster_stats():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 ```
@@ -92,6 +96,7 @@ Q:
 R:
 - remove use of django cache
 - raise ESConnectionError
+
 ```python
 def cluster_health():
     """Retrieve cluster health status.
@@ -100,9 +105,9 @@ def cluster_health():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
-
 ```
 
 **_lastVersion()_**
@@ -123,6 +128,7 @@ def last_version():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
         ESProcessingError - when ElasticSearch result cant be processed. Not raised, silently logged.
     """
     pass
@@ -146,6 +152,7 @@ def last_update():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
         ESProcessingError - when ElasticSearch result cant be processed. Not raised, silently logged.
     """
     pass
@@ -170,6 +177,7 @@ def metadata(version=None):
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 ```
@@ -250,6 +258,7 @@ def data_table_search(key, value, skip, pagesize, sortset, sfilter, low, high):
 
     Raises:
         ValueError - if 'low' and 'high' args are not integers
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 ```
@@ -283,6 +292,8 @@ def _create_advanced_query(query, skip, size, unique, sort=None):
 Q:
 - assuming dont need to tweak at all?
 - An error from the ES query fails gracefully and erro message is passed to caller. Do we want to maintain this of actual raise a custom Exception.
+
+- H: Not used in V2
 R:
 - fix naming convention
 - replace use of django settings
@@ -303,10 +314,11 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
     Returns: (dict) results blob
 
     Raises:
+        ESQueryError - when error occurs at ElasticSearch from sent query/request. (NOTE: Still unsure about this
+        as this method actually catches any ES errors and handles gracefully, unlike other methods)
         
     """
     pass
-
 ```
 
 **_search()_**
@@ -338,9 +350,9 @@ def search(key, value, filt=None, limit=settings.LIMIT, low=None, high=None, ver
     Returns: (dict) results blob
 
     Raises:
-        ESProcessingError - when  error occurs formatting version filter of ES query 
+        ESProcessingError - when  error occurs formatting version filter of ES query
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
         ValueError - when 'low' and 'high' args are not integers
-
     """
     pass
 ```
@@ -360,11 +372,13 @@ R:
 Q:
 - Why do we catch and handle an ES search call exception here but not in other query calls?
 - Why is skip=0 default here, on other methods its None
+
 R:
 - extract sub-method for processing of ES results
+- H: doesnt give the option to sort results based colID, i.e. using format_sort. Would like to have that in v2.
 
 ```python
-def advanced_search(query, skip=0, size, unique):
+def advanced_search(query, skip=0, size, unique, sort=None):
     """Search whois index with advanced search, via supplied regex.
 
     Args:
@@ -372,12 +386,17 @@ def advanced_search(query, skip=0, size, unique):
         skip (int): 
         size: number of result hits to retrieve
         unique (bool): restrict results to unique set of records
+        sort (list): tuples of the form (sort_key, sort_direction)
 
-    Returns: (dict) ElasticSearch query object
+
+    Returns: (dict) results blob
+
+    Raises:
+        ESQueryError - when error occurs at ElasticSearch from sent query/request. (NOTE: Still unsure about this
+          as this method actually catches any ES errors and handles gracefully, unlike other methods)
 
     """
     pass
-
 ```
 
 

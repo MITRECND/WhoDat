@@ -14,7 +14,6 @@ Note: section titles are the old API method names
 
 **_es_connector()_**
 
-
 ```python
 def es_connector():
     """Return python ElasticSearch client.
@@ -29,7 +28,6 @@ def es_connector():
 
 **_record_count_**
 
-
 ```python
 def record_count():
     """Return record count of ES record index.
@@ -38,13 +36,13 @@ def record_count():
     
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 
 ```
 
 **_cluster_stats()_**
-
 
 ```python
 def cluster_stats():
@@ -54,6 +52,7 @@ def cluster_stats():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 ```
@@ -68,9 +67,9 @@ def cluster_health():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
-
 ```
 
 **_lastVersion()_**
@@ -83,6 +82,7 @@ def last_version():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
         ESProcessingError - when ElasticSearch result cant be processed. Not raised, silently logged.
     """
     pass
@@ -98,6 +98,7 @@ def last_update():
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
         ESProcessingError - when ElasticSearch result cant be processed. Not raised, silently logged.
     """
     pass
@@ -116,6 +117,7 @@ def metadata(version=None):
 
     Raises:
         ESConnectionError - when ElasticSearch connection cannot be established.
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 ```
@@ -177,6 +179,7 @@ def data_table_search(key, value, skip, pagesize, sortset, sfilter, low, high):
 
     Raises:
         ValueError - if 'low' and 'high' args are not integers
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     pass
 ```
@@ -215,10 +218,11 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
     Returns: (dict) results blob
 
     Raises:
+        ESQueryError - when error occurs at ElasticSearch from sent query/request. (NOTE: Still unsure about this
+        as this method actually catches any ES errors and handles gracefully, unlike other methods)
         
     """
     pass
-
 ```
 
 **_search()_**
@@ -239,9 +243,9 @@ def search(key, value, filt=None, limit=settings.LIMIT, low=None, high=None, ver
     Returns: (dict) results blob
 
     Raises:
-        ESProcessingError - when  error occurs formatting version filter of ES query 
+        ESProcessingError - when  error occurs formatting version filter of ES query
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
         ValueError - when 'low' and 'high' args are not integers
-
     """
     pass
 ```
@@ -255,7 +259,7 @@ def search(key, value, filt=None, limit=settings.LIMIT, low=None, high=None, ver
 **_advanced_search()_**
 
 ```python
-def advanced_search(query, skip=0, size, unique):
+def advanced_search(query, skip=0, size, unique, sort=None):
     """Search whois index with advanced search, via supplied regex.
 
     Args:
@@ -263,12 +267,17 @@ def advanced_search(query, skip=0, size, unique):
         skip (int): 
         size: number of result hits to retrieve
         unique (bool): restrict results to unique set of records
+        sort (list): tuples of the form (sort_key, sort_direction)
 
-    Returns: (dict) ElasticSearch query object
+
+    Returns: (dict) results blob
+
+    Raises:
+        ESQueryError - when error occurs at ElasticSearch from sent query/request. (NOTE: Still unsure about this
+          as this method actually catches any ES errors and handles gracefully, unlike other methods)
 
     """
     pass
-
 ```
 
 
