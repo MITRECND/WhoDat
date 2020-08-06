@@ -1,17 +1,27 @@
-import sys
-import json
-from elasticsearch import Elasticsearch
-from django.conf import settings
-from django.core.cache import cache
-from handlers.advanced_es import yacc
-from datetime import date
-import time
 import collections
+from datetime import date
+import json
+import sys
+import time
+
+from elasticsearch import Elasticsearch
+from flask_caching import Cache
+from flask import current_app
+from handlers.advanced_es import yacc
+
+#TODO: RE usage of settings- with  Flask now, the settings.py module can be loaded as well into the app
+#object, and thus accessed here via "current_app.config". But make sure settings.py module is loaded into
+# Flask app. Currently dont know where in code/bootup that is being done since using blueprints etc..
+
+# setup cache
+CACHE_TIMEOUT = 300  # 5 minutes
+current_app.config["CACHE_TYPE"] = "simple"
+current_app.config["CACHE_DEFAULT_TIMEOUT"] = CACHE_TIMEOUT
+CACHE = Cache(current_app)
 
 
-CACHE_TIME = 300  # 5 minutes
-SEARCH_INDEX = "%s-search" % (settings.ES_INDEX_PREFIX)
-META_INDEX = ".%s-meta" % (settings.ES_INDEX_PREFIX)
+SEARCH_INDEX = "%s-search" % (current_app.config["ES_INDEX_PREFIX"])
+META_INDEX = ".%s-meta" % (current_app.config["ES_INDEX_PREFIX"])
 DOC_TYPE = "doc"
 
 
@@ -22,15 +32,15 @@ class ElasticsearchError(Exception):
 def es_connector():
     security_args = dict()
 
-    if settings.ES_USER is not None and settings.ES_PASS is not None:
-        security_args['http_auth'] = (settings.ES_USER,
-                                      settings.ES_PASS)
-    if settings.ES_CACERT is not None:
+    if current_app.config["ES_USER"] is not None and current_app.config["ES_PASS"] is not None:
+        security_args['http_auth'] = (current_app.config["ES_USER"],
+                                      current_app.config["ES_PASS"])
+    if current_app.config["ES_CACERT"] is not None:
         security_args['use_ssl'] = True
-        security_args['ca_certs'] = settings.ES_CACERT
+        security_args['ca_certs'] = current_app.config["ES_CACERT"]
 
     try:
-        es = Elasticsearch(settings.ES_URI,
+        es = Elasticsearch(current_app.config["ES_URI"],
                            max_retries=100,
                            retry_on_timeout=True,
                            **security_args)
@@ -40,7 +50,7 @@ def es_connector():
 
 
 def record_count():
-    records = cache.get('record_count')
+    records = CACHE.get('record_count')
     if records is None:
         try:
             es = es_connector()
@@ -48,7 +58,7 @@ def record_count():
             raise
 
         records = es.cat.count(index=SEARCH_INDEX, h="count")
-        cache.set('record_count', records, CACHE_TIME)
+        CACHE.set('record_count', records)
 
     return int(records)
 
@@ -90,13 +100,13 @@ def cluster_stats():
                                         "format": "yyyy-MM"}}}}},
              "size": 0}
 
-    results = cache.get('cluster_stats')
+    results = CACHE.get('cluster_stats')
     if results is None:
         results = es.search(index=SEARCH_INDEX, body=query)
         # Cache for an hour since this is a relatively expensive query
         # whose results shouldn't change often
         results['cache_time'] = time.time()
-        cache.set('cluster_stats', results, 3600)
+        CACHE.set('cluster_stats', results, 3600)
 
     stats = {'domainStats': {},
              'histogram': {},
@@ -124,13 +134,13 @@ def cluster_stats():
         stats['histogram'] = \
             collections.OrderedDict(sorted(stats['histogram'].items()))
     except Exception as e:
-        cache.delete('cluster_stats')
+        CACHE.delete('cluster_stats')
 
     return stats
 
 
 def cluster_health():
-    health = cache.get('cluster_health')
+    health = CACHE.get('cluster_health')
     if health is None:
         try:
             es = es_connector()
@@ -138,20 +148,20 @@ def cluster_health():
             raise
 
         health = es.cluster.health()
-        cache.set('cluster_health', health, CACHE_TIME)
+        CACHE.set('cluster_health', health)
 
     return health['status']
 
 
 def lastVersion():
     try:
-        lastVersion = cache.get('lastVersion')
+        lastVersion = CACHE.get('lastVersion')
         if lastVersion is None:
             es = es_connector()
             result = es.get(index=META_INDEX, doc_type=DOC_TYPE, id=0)
             if result['found']:
-                cache.set('lastVersion',
-                          result['_source']['lastVersion'], CACHE_TIME)
+                CACHE.set('lastVersion',
+                          result['_source']['lastVersion'])
                 return result['_source']['lastVersion']
             else:
                 raise
@@ -163,7 +173,7 @@ def lastVersion():
 
 def lastUpdate():
     try:
-        update = cache.get('lastUpdate')
+        update = CACHE.get('lastUpdate')
         if update is None:
             es = es_connector()
 
@@ -178,7 +188,7 @@ def lastUpdate():
                                     data.get('updateVersion', 0))
             else:
                 update = "0.0"
-            cache.set('update', update, CACHE_TIME)
+            CACHE.set('update', update)
     except ElasticsearchError as e:
         update = "0.0"
 
@@ -194,13 +204,13 @@ def metadata(version=None):
         return results
 
     if version is None:
-        res = cache.get('all_metadata')
+        res = CACHE.get('all_metadata')
         if res is None:
             res = es.search(index=META_INDEX,
                             body={"query": {"match_all": {}},
                                   "sort": "metadata",
                                   "size": 999})
-            cache.set('all_metadata', res, CACHE_TIME)
+            CACHE.set('all_metadata', res)
 
         if res['hits']['total'] > 0:
             newres = []
@@ -261,7 +271,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
         results['message'] = str(e)
         return results
 
-    if key != settings.SEARCH_KEYS[0][0]:
+    if key != current_app.config["SEARCH_KEYS"][0][0]:
         key = 'details.' + key
 
     # All data in ES is lowercased (during ingestion/analysis) and we're using
@@ -324,10 +334,10 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
             return results
         else:
             shoulds = []
-            for skey in [keys[0] for keys in settings.SEARCH_KEYS]:
+            for skey in [keys[0] for keys in current_app.config["SEARCH_KEYS"]]:
                 if skey == key:  # Don't bother filtering on the key field
                     continue
-                if skey != settings.SEARCH_KEYS[0][0]:
+                if skey != current_app.config["SEARCH_KEYS"][0][0]:
                     snkey = 'details.' + skey
                 else:
                     snkey = skey
@@ -353,7 +363,7 @@ def dataTableSearch(key, value, skip, pagesize, sortset, sfilter, low, high):
 
         query["sort"] = sorter
 
-    if settings.DEBUG:
+    if current_app.config["DEBUG"]:
         try:
             sys.stdout.write("%s\n" % json.dumps(query))
             sys.stdout.flush()
@@ -466,7 +476,7 @@ def advDataTableSearch(query, skip, pagesize, unique=False, sort=None):
         results['message'] = str(e)
         return results
 
-    if settings.DEBUG:
+    if current_app.config["DEBUG"]:
         try:
             sys.stdout.write(json.dumps(q) + "\n")
             sys.stdout.flush()
@@ -536,17 +546,16 @@ def advDataTableSearch(query, skip, pagesize, unique=False, sort=None):
     return results
 
 
-def search(key, value, filt=None, limit=settings.LIMIT,
-           low=None, high=None, versionSort=False):
+def search(key, value, filt=None, limit=current_app.config["LIMIT"], low=None, high=None, versionSort=False):
     results = {'success': False}
     try:
         es = es_connector()
-        index = '%s-*' % settings.ES_INDEX_PREFIX
+        index = '%s-*' % current_app.config["ES_INDEX_PREFIX"]
     except ElasticsearchError as e:
         results['message'] = str(e)
         return results
 
-    if key != settings.SEARCH_KEYS[0][0]:
+    if key != current_app.config["SEARCH_KEYS"][0][0]:
         key = 'details.' + key
     value = value.lower()
 
@@ -626,7 +635,7 @@ def search(key, value, filt=None, limit=settings.LIMIT,
         pdomain = domain['_source']
         # Take each key in details (if any) and stuff it in top level dict.
         if 'details' in pdomain:
-            for k, v in pdomain['details'].iteritems():
+            for k, v in pdomain['details'].items():
                 pdomain[k] = v
             del pdomain['details']
         if 'dataVersion' in pdomain:
@@ -655,8 +664,7 @@ def test_query(search_string):
     return None
 
 
-def advanced_search(search_string, skip=0,
-                    size=20, unique=False):  # TODO XXX versions, dates, etc
+def advanced_search(search_string, skip=0, size=20, unique=False, sort=None):  # TODO XXX versions, dates, etc
     results = {'success': False}
     try:
         es = es_connector()
@@ -665,7 +673,7 @@ def advanced_search(search_string, skip=0,
         return results
 
     try:
-        query = __createAdvancedQuery__(search_string, skip, size, unique)
+        query = __createAdvancedQuery__(search_string, skip, size, unique, sort)
     except Exception as e:
         results['message'] = str(e)
         return results
@@ -685,7 +693,7 @@ def advanced_search(search_string, skip=0,
             pdomain = domain['_source']
             # Take each key in details (if any) and stuff it in top level dict.
             if 'details' in pdomain:
-                for k, v in pdomain['details'].iteritems():
+                for k, v in pdomain['details'].items():
                     pdomain[k] = v
                 del pdomain['details']
             if 'dataVersion' in pdomain:
@@ -710,7 +718,7 @@ def advanced_search(search_string, skip=0,
             pdomain = domain['_source']
             # Take each key in details (if any) and stuff it in top level dict.
             if 'details' in pdomain:
-                for k, v in pdomain['details'].iteritems():
+                for k, v in pdomain['details'].items():
                     pdomain[k] = v
                 del pdomain['details']
             if 'dataVersion' in pdomain:
