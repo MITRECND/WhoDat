@@ -6,7 +6,6 @@
     - 'settings', need replacement
     - no more 'cache', need replacement
 - change to f-strings
-Q: What is version in this context?
 - Q: testing?
 
 
@@ -398,5 +397,3 @@ def advanced_search(query, skip=0, size, unique, sort=None):
     """
     pass
 ```
-
-
