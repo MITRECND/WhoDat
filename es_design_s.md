@@ -1,5 +1,15 @@
 # Design/Refactor of es.py
 
+## Exceptions
+
+New proposed custom exceptions:
+- ESConnectionError
+- ESQueryError
+- ESProcessingError
+- (?)Should there be a generic ESAPIError for any value/argument exceptions?
+
+## API
+
 Note: section titles are the old API method names
 
 **_es_connector()_**
