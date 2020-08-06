@@ -1,6 +1,6 @@
 # Design/Refactor of es.py
 
-
+Note: section titles are the old API method names
 
 **_es_connector()_**
 
