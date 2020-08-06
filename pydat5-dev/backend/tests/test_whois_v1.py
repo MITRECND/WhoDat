@@ -47,8 +47,8 @@ def test_latest(monkeypatch, config_app):
         response = client.get("/api/v1/domain/fake/latest")
         assert response.status_code == 200
 
-    # errpr: unable to find last version
-    mock_last.side_effect = elastic.ElasticsearchError
+    # error: unable to find last version
+    mock_last.side_effect = elastic.ESQueryError
     response = client.get("/api/v1/domain/fake/latest")
     assert response.status_code == 500
     response = client.get(f"/api/v1/domains/{key}/fake/latest")
@@ -68,7 +68,7 @@ def test_domain_diff(monkeypatch, client):
     assert 'version' in response.get_json()['error']
 
     # error: domainName doesn't exist
-    mock_diff.side_effect = elastic.NotFoundError
+    mock_diff.side_effect = elastic.ESQueryError
     response = client.get('/api/v1/domain/test/diff/3/4')
     assert response.status_code == 404
     assert 'test' in response.get_json()['error']
@@ -110,9 +110,9 @@ def test_metadata(monkeypatch, client, version):
     else:
         assert response.status_code == 400
 
-    # error: versioin doesn't exist
-    mock_meta.side_effect = elastic.NotFoundError
-    with pytest.raises(elastic.NotFoundError):
+    # error: version doesn't exist
+    mock_meta.side_effect = elastic.ESQueryError
+    with pytest.raises(elastic.ESQueryError):
         assert elastic.metadata()
     assert client.get('/api/v1/metadata/1').status_code == 404
 
@@ -149,12 +149,12 @@ def test_query(monkeypatch, client):
 
 
 def test_connection_error(monkeypatch, config_app):
-    mock_connection = MagicMock(side_effect=elastic.ConnectionError)
+    mock_connection = MagicMock(side_effect=elastic.ESConnectionError)
     client = config_app.test_client()
 
     # search connection error
     monkeypatch.setattr(elastic, 'search', mock_connection)
-    with pytest.raises(elastic.ConnectionError):
+    with pytest.raises(elastic.ESConnectionError):
         assert elastic.search()
     # Domains
     response = client.get('/api/v1/domains/domainName/value')
@@ -170,7 +170,7 @@ def test_connection_error(monkeypatch, config_app):
     assert response.status_code == 500
 
     monkeypatch.setattr(elastic, 'metadata', mock_connection)
-    with pytest.raises(elastic.ConnectionError):
+    with pytest.raises(elastic.ESConnectionError):
         assert elastic.metadata()
     # Metadata
     response = client.get('/api/v1/metadata')
@@ -179,7 +179,7 @@ def test_connection_error(monkeypatch, config_app):
     assert response.status_code == 500
 
     monkeypatch.setattr(elastic, 'advanced_search', mock_connection)
-    with pytest.raises(elastic.ConnectionError):
+    with pytest.raises(elastic.ESConnectionError):
         assert elastic.advanced_search()
     # Query
     response = client.get('/api/v1/query', query_string={"query": "query"})

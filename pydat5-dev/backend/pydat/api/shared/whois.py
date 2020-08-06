@@ -13,13 +13,12 @@ def metadata(version=None):
 
     try:
         results = elastic.metadata(version)
-    except elastic.NotFoundError:
+    except elastic.ESQueryError:
         raise ClientError(f'Version {version} does not exist', 404)
-    except elastic.ConnectionError:
+    except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
-    except elastic.ElasticsearchError:
-        raise ServerError('Unexpected exception')
-
+    except Exception as e:
+        raise ServerError(f'Unexpected exception {str(e)}')
     return results
 
 
@@ -33,12 +32,12 @@ def diff(domainName, v1, v2):
     try:
         v1_result = elastic.search('domainName', domainName, filt=None, low=v1)
         v2_result = elastic.search('domainName', domainName, filt=None, low=v2)
-    except elastic.ConnectionError:
+    except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
-    except elastic.NotFoundError:
-        raise ClientError(f'Cannot find domain name {domainName}', 404)
-    except elastic.ElasticsearchError:
-        raise ServerError('Unexpected exception')
+    except elastic.ESQueryError:
+        raise ClientError(f'Invalid search parameter {domainName}', 404)
+    except Exception as e:
+        raise ServerError(f'Unexpected exception {str(e)}')
 
     if not v1_result['data'] or not v2_result['data']:
         raise ClientError('Provided version has no data', 404)

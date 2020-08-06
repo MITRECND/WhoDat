@@ -42,12 +42,12 @@ def domains(key, value, low=None, high=None):
         results = elastic.search(
             key, value, filt=None, low=low,
             high=high, versionSort=versionSort)
-    except elastic.ConnectionError:
+    except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
-    except elastic.NotFoundError:
-        raise ClientError(f'Cannot find specified value {value}', 404)
-    except elastic.ElasticsearchError:
-        raise ServerError("Unexpected exception")
+    except elastic.ESQueryError:
+        raise ClientError(f'Invalid search of {key}:{value}')
+    except Exception as e:
+        raise ServerError(f'Unexpected exception {str(e)}')
 
     return results
 
@@ -56,8 +56,12 @@ def domains(key, value, low=None, high=None):
 def domains_latest(key, value):
     try:
         low = elastic.lastVersion()
-    except elastic.ElasticsearchError:
+    except elastic.ESConnectionError:
+        raise ServerError("Search failed to connect")
+    except elastic.ESQueryError:
         raise ServerError("Failed to retrieve latest version")
+    except Exception as e:
+        raise ServerError(f'Unexpected exception {str(e)}')
     return domains(key, value, low)
 
 
@@ -117,10 +121,12 @@ def query():
     skip = (page_num-1)*page_size
     try:
         results = elastic.advanced_search(query, skip, page_size, unique)
-    except elastic.ConnectionError:
+    except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
-    except elastic.ElasticsearchError:
-        raise ServerError('Unexpected exception')
+    except elastic.ESQueryError:
+        raise ClientError(f"Invalid search query {query}")
+    except Exception as e:
+        raise ServerError(f'Unexpected exception {str(e)}')
 
     if page_num > ceil(results['total']/page_size):
         raise ClientError(f"Page number {page_num} is too high")

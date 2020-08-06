@@ -1,23 +1,23 @@
 from flask import current_app
 
 
-# general ES error
-class ElasticsearchError(Exception):
+# General ES error (500)
+class ESError(Exception):
     pass
 
 
-# failed to connect to ES
-class ConnectionError(ElasticsearchError):
+# Failed to connect to ES (500)
+class ESConnectionError(ESError):
     pass
 
 
-# ES couldn't find results
-class NotFoundError(ElasticsearchError):
+# ES query failed (400)
+class ESQueryError(ESError):
     pass
 
 
-# invalid search keys/values
-class SearchError(ElasticsearchError):
+# Expected ES results/fields not present (500)
+class ESProcessingError(ESError):
     pass
 
 

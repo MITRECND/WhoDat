@@ -109,10 +109,12 @@ def domains(search_key):
         search_results = elastic.search(
             search_key, value, filt=None, low=version, versionSort=versionSort
         )
-    except elastic.ConnectionError:
+    except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
-    except elastic.ElasticsearchError:
-        raise ServerError("Unexpected exception")
+    except elastic.ESQueryError:
+        raise ClientError(f'Invalid search of {search_key}:{value}')
+    except Exception as e:
+        raise ServerError(f'Unexpected exception {str(e)}')
 
     # Return results based on chunk size and offset
     if chunk_size == sys.maxsize:
@@ -165,12 +167,12 @@ def query():
         search_results = elastic.advanced_search(
             query, skip, chunk_size, unique, sort=sort
         )
-    except elastic.SearchError:
-        raise ClientError("Invalid Search parameter")
-    except elastic.ConnectionError:
+    except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
-    except elastic.ElasticsearchError:
-        raise ServerError("Unexpected exception")
+    except elastic.ESQueryError:
+        raise ClientError(f"Invalid search query {query}")
+    except Exception as e:
+        raise ServerError(f'Unexpected exception {str(e)}')
 
     if skip > 0 and skip > search_results["total"]:
         raise ClientError(f"Offset {offset} is too high")
