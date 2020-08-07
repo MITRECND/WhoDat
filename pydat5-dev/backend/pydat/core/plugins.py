@@ -16,14 +16,10 @@ class PluginBase:
         name: A string that stores the plugin's identifying name.
         user_pref: A dict mapping plugin parameter's to their value type.
     """
-    def __init__(self, name, blueprint):
+    def __init__(self, name, blueprint, config=None):
         self.name = name
-
-    @property
-    def blueprint(self):
-        """Returns the plugin's Blueprint. Must be overriden."""
-        raise NotImplementedError(
-                'Plugin must have blueprint')
+        self.config = config
+        self.blueprint = blueprint
 
     @property
     def user_pref(self):
@@ -35,31 +31,39 @@ class PluginBase:
         """Returns a list of plugins' bundled ReactJS files"""
         return []
 
+    def setConfig(self, plugin_config):
+        raise NotImplementedError('Plugin must set configuration')
+
 
 class PassivePluginBase(PluginBase):
+    def __init__(self, name, blueprint):
+        super().__init__(name, blueprint)
+
     @property
     def blueprint(self):
         return self._blueprint
 
     @blueprint.setter
     def blueprint(self, passive_bp):
-        @passive_bp.route("/passive_dns", methods=["POST"])
+        @passive_bp.route("/forward_pdns", methods=["GET", "POST"])
         def handle_passive():
-            self.passive_dns()
+            return self.forward_pdns()
 
-        @passive_bp.route("/reverse_dns", methods=["POST"])
+        @passive_bp.route("/reverse_pdns", methods=["GET", "POST"])
         def handle_reverse():
-            self.reverse_dns()
+            return self.reverse_pdns()
+        self._blueprint = passive_bp
 
-    def passive_dns(self):
+    def forward_pdns(self):
         pass
 
-    def reverse_dns(self):
+    def reverse_pdns(self):
         pass
 
-    @property
-    def config(self):
-        return None
+    def setConfig(self, passive_config):
+        if not passive_config.get("API_KEY"):
+            raise ValueError
+        self.config = passive_config
 
 
 def get_plugins(ns_pkg=pydat.plugins):
@@ -109,7 +113,6 @@ def register_plugin(func):
     return wrapped
 
 
-@register_plugin
 def register_passive_plugin(func):
 
     @functools.wraps(func)
@@ -121,10 +124,17 @@ def register_passive_plugin(func):
         # check config
         try:
             plugin_config = current_app.config["PASSIVE"][plugin.name]
-            api_key = plugin_config["API_KEY"]
-            plugin.config = plugin_config
-        except KeyError:
-            raise ValueError("Passive plugin needs correct config values")
-
+            plugin.setConfig(plugin_config)
+        except (KeyError, ValueError):
+            raise ValueError("Passive plugin missing correct config values")
+        ### PHASE OUT: register_plugin
+        plugin_bp = plugin.blueprint
+        if not isinstance(plugin_bp, Blueprint):
+            raise TypeError('Cannot register plugin, must return a blueprint')
+        PLUGINS.append(plugin)
+        # check if there are preferences for the plugin
+        if plugin.user_pref is not None:
+            preferences.add_user_pref(plugin.name, plugin.user_pref)
+        ###
         return plugin
     return wrapped

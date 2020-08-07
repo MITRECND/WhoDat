@@ -31,14 +31,15 @@ def create_app(test_config=None):
     # Register Plugin Blueprints and JSfiles
     # add error handling
     included_jsfiles = []
-    for plugin in plugins.get_plugins():
-        prefix = '/api/v2/'
-        if isinstance(plugin, plugins.PassivePluginBase):
-            prefix = prefix+'passive/'
-        app.register_blueprint(
-            plugin.blueprint, url_prefix=prefix + plugin.name)
-        for jsfile in plugin.jsfiles:
-            included_jsfiles.append(jsfile)
+    with app.app_context():
+        for plugin in plugins.get_plugins():
+            prefix = '/api/v2/'
+            if isinstance(plugin, plugins.PassivePluginBase):
+                prefix = prefix+'passive/'
+            app.register_blueprint(
+                plugin.blueprint, url_prefix=prefix + plugin.name)
+            for jsfile in plugin.jsfiles:
+                included_jsfiles.append(jsfile)
 
     # Catch invalid backend calls
     @app.route("/api", defaults={"path": ""})
