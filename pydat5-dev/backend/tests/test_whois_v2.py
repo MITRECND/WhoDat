@@ -8,7 +8,7 @@ import socket
 @pytest.mark.parametrize("version", ("version", -1, 1))
 def test_metadata(monkeypatch, client, version):
     # metadata is always valid
-    mock_meta = MagicMock(return_value="success")
+    mock_meta = MagicMock(return_value={"data": "success"})
     monkeypatch.setattr(elastic, "metadata", mock_meta)
 
     # type checking
@@ -19,9 +19,7 @@ def test_metadata(monkeypatch, client, version):
         assert response.status_code == 400
 
     # error: version doesn't exist
-    mock_meta.side_effect = elastic.ESQueryError
-    with pytest.raises(elastic.ESQueryError):
-        assert elastic.metadata()
+    mock_meta.return_value = {"data": []}
     assert client.get("/api/v2/metadata/1").status_code == 404
 
 
@@ -153,13 +151,20 @@ def test_query(monkeypatch, config_app):
     assert response.status_code == 200
     # valid sort key
     response = client.post(
-        "/api/v2/query", json={"query": "query", "sort_key": "domainName"}
-    )
-    assert response.status_code == 200
-    response = client.post(
-        "/api/v2/query", json={"query": "query", "sort_key": "fake_key"}
+        "/api/v2/query",
+        json={"query": "query", "sort_keys": {"domainName": "swirl"}},
     )
     assert response.status_code == 400
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query", "sort_keys": {"fake_key": "desc"}},
+    )
+    assert response.status_code == 400
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query", "sort_keys": {"domainName": "asc"}},
+    )
+    assert response.status_code == 200
     response = client.post(
         "/api/v2/query",
         json={

@@ -60,18 +60,12 @@ def test_domain_diff(monkeypatch, client):
     assert client.get('/api/v1/domain/test/diff/false/true').status_code == 400
     assert client.get('/api/v1/domain/test/diff/1/true').status_code == 400
 
-    # error: no data for version
+    # error: no data for domainName/version
     mock_diff = MagicMock(return_value={'data': []})
     monkeypatch.setattr(elastic, 'search', mock_diff)
     response = client.get('/api/v1/domain/greetings/diff/3/4')
     assert response.status_code == 404
     assert 'version' in response.get_json()['error']
-
-    # error: domainName doesn't exist
-    mock_diff.side_effect = elastic.ESQueryError
-    response = client.get('/api/v1/domain/test/diff/3/4')
-    assert response.status_code == 404
-    assert 'test' in response.get_json()['error']
 
     # test diff functunality
     v1_res = {"data": [{"hey": True, "hi": 1, "bye": -1.1, "Version": 1}]}
@@ -79,7 +73,7 @@ def test_domain_diff(monkeypatch, client):
     mock_diff.side_effect = [v1_res, v2_res, v2_res, v1_res]
     response = client.get('/api/v1/domain/greetings/diff/1/2')
     # ensure call search(low=1) and search(low=2)
-    assert mock_diff.call_count == 5
+    assert mock_diff.call_count == 4
     assert response.status_code == 200
     v1_data = response.get_json()['data']
 
@@ -100,7 +94,7 @@ def test_domain_diff(monkeypatch, client):
 @pytest.mark.parametrize("version", ("version", -1, 1))
 def test_metadata(monkeypatch, client, version):
     # metadata is always valid
-    mock_meta = MagicMock(return_value="success")
+    mock_meta = MagicMock(return_value={"data": "success"})
     monkeypatch.setattr(elastic, 'metadata', mock_meta)
 
     # type checking
@@ -111,9 +105,7 @@ def test_metadata(monkeypatch, client, version):
         assert response.status_code == 400
 
     # error: version doesn't exist
-    mock_meta.side_effect = elastic.ESQueryError
-    with pytest.raises(elastic.ESQueryError):
-        assert elastic.metadata()
+    mock_meta.return_value = {"data": []}
     assert client.get('/api/v1/metadata/1').status_code == 404
 
 

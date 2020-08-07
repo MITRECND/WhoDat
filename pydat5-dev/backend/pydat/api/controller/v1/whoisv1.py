@@ -1,15 +1,10 @@
-from flask import (
-    Blueprint,
-    current_app,
-    request
-)
+from flask import Blueprint, current_app, request
 from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api.utils import es as elastic
-from math import ceil
 from urllib import parse
 from pydat.api.shared import whois
 
-whoisv1_bp = Blueprint('whoisv1', __name__)
+whoisv1_bp = Blueprint("whoisv1", __name__)
 
 
 # Domains
@@ -35,19 +30,19 @@ def domains(key, value, low=None, high=None):
     value = parse.unquote(value)
 
     versionSort = False
-    if key == 'domainName':
+    if key == "domainName":
         versionSort = True
 
     try:
         results = elastic.search(
-            key, value, filt=None, low=low,
-            high=high, versionSort=versionSort)
+            key, value, filt=None, low=low, high=high, versionSort=versionSort
+        )
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError(f'Invalid search of {key}:{value}')
+        raise ClientError(f"Invalid search of {key}:{value}")
     except Exception as e:
-        raise ServerError(f'Unexpected exception {str(e)}')
+        raise ServerError(f"Unexpected exception {str(e)}")
 
     return results
 
@@ -61,7 +56,7 @@ def domains_latest(key, value):
     except elastic.ESQueryError:
         raise ServerError("Failed to retrieve latest version")
     except Exception as e:
-        raise ServerError(f'Unexpected exception {str(e)}')
+        raise ServerError(f"Unexpected exception {str(e)}")
     return domains(key, value, low)
 
 
@@ -81,7 +76,7 @@ def domain_latest(domainName):
 @whoisv1_bp.route("/domain/<domainName>/diff/<v1>/<v2>")
 def domain_diff(domainName, v1, v2):
     data = whois.diff(domainName, v1, v2)
-    return {'success': True, 'data': data}
+    return {"success": True, "data": data}
 
 
 # Metadata
@@ -89,18 +84,18 @@ def domain_diff(domainName, v1, v2):
 @whoisv1_bp.route("/metadata/<version>")
 def metadata(version=None):
     results = whois.metadata(version)
-    return results
+    return {"success": True, "data": results}
 
 
 # Query Advanced Search
-@whoisv1_bp.route('/query')
+@whoisv1_bp.route("/query")
 def query():
     try:
         query = request.args.get("query", default=None, type=str)
         page_size = int(request.args.get("size", default=20))
         page_num = int(request.args.get("page", default=1))
         unique = request.args.get("unique", default=False)
-        if str(unique).lower() == 'true':
+        if str(unique).lower() == "true":
             unique = True
         else:
             unique = False
@@ -118,7 +113,7 @@ def query():
     if error is not None:
         raise ClientError(error)
 
-    skip = (page_num-1)*page_size
+    skip = (page_num - 1) * page_size
     try:
         results = elastic.advanced_search(query, skip, page_size, unique)
     except elastic.ESConnectionError:
@@ -126,9 +121,9 @@ def query():
     except elastic.ESQueryError:
         raise ClientError(f"Invalid search query {query}")
     except Exception as e:
-        raise ServerError(f'Unexpected exception {str(e)}')
+        raise ServerError(f"Unexpected exception {str(e)}")
 
-    if page_num > ceil(results['total']/page_size):
+    if skip > 0 and skip > results["total"]:
         raise ClientError(f"Page number {page_num} is too high")
 
     return results

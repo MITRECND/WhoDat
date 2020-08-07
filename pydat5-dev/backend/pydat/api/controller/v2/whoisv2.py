@@ -112,13 +112,13 @@ def domains(search_key):
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError(f'Invalid search of {search_key}:{value}')
+        raise ClientError(f"Invalid search of {search_key}:{value}")
     except Exception as e:
-        raise ServerError(f'Unexpected exception {str(e)}')
+        raise ServerError(f"Unexpected exception {str(e)}")
 
     # Return results based on chunk size and offset
     if chunk_size == sys.maxsize:
-        chunk_size = search_results['total']
+        chunk_size = search_results["total"]
     start = offset * chunk_size
     if start > 0 and start >= search_results["total"]:
         raise ClientError(
@@ -150,18 +150,19 @@ def query():
     offset = json_data.get("offset", 0)
     chunk_size, offset = valid_size_offset(chunk_size, offset)
     unique = json_data.get("unique", False)
-    sort_key = json_data.get("sort_key", None)
-    sort_reverse = json_data.get("sort_reverse", False)
+    sort_keys = json_data.get("sort_keys", {})
 
     skip = offset * chunk_size
     # handle sort_key
-    sort = None
-    if sort_key:
+    sort = []
+    for sort_key in sort_keys:
         if sort_key not in current_app.config["SORT_KEYS"]:
             raise ClientError(f"Invalid sort key {sort_key} provided")
-        sort = [sort_key, "asc"]
-        if sort_reverse:
-            sort = [sort_key, "desc"]
+        if not (sort_keys[sort_key] == "asc" or sort_keys[sort_key] == "desc"):
+            raise ClientError(f"Invalid sort direction {sort_keys[sort_key]}")
+        sort.append((sort_key, sort_keys[sort_key]))
+    if not sort:
+        sort = None
 
     try:
         search_results = elastic.advanced_search(
@@ -170,9 +171,9 @@ def query():
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError(f"Invalid search query {query}")
+        raise ClientError(f"Invalid query {query} received")
     except Exception as e:
-        raise ServerError(f'Unexpected exception {str(e)}')
+        raise ServerError(f"Unexpected exception {str(e)}")
 
     if skip > 0 and skip > search_results["total"]:
         raise ClientError(f"Offset {offset} is too high")
