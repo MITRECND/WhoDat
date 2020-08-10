@@ -157,6 +157,7 @@ def register_passive_plugin(func):
     """
 
     @functools.wraps(func)
+    @register_plugin
     def wrapped(*args, **kwargs):
         plugin = func(*args, **kwargs)
         if not isinstance(plugin, PassivePluginBase):
@@ -169,16 +170,6 @@ def register_passive_plugin(func):
             plugin.setConfig(plugin_config)
         except (KeyError, ValueError):
             raise ValueError("Passive plugin missing correct config values")
-
-        # PHASE OUT: register_plugin
-        plugin_bp = plugin.blueprint
-        if not isinstance(plugin_bp, Blueprint):
-            raise TypeError("Cannot register plugin, must return a blueprint")
-        PLUGINS.append(plugin)
-        # check if there are preferences for the plugin
-        if plugin.user_pref is not None:
-            preferences.add_user_pref(plugin.name, plugin.user_pref)
-        #
 
         return plugin
 
