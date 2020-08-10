@@ -3,6 +3,21 @@ from pydat.api.utils import es as elastic
 
 
 def metadata(version=None):
+    """Shared metadata functionality between v1 and v2
+
+    Args:
+        version (int, optional): Specific metadata version. Defaults to None.
+
+    Raises:
+        ClientError: Version is not a valid integer
+        ClientError: Call caused an invalid query
+        ServerError: Search failed to connect
+        ServerError: Unexpected failure
+        ClientError: Specific version or metadata does not exist
+
+    Returns:
+        dict: Found metadata for all or specific version
+    """
     try:
         if version:
             version = int(version)
@@ -26,6 +41,24 @@ def metadata(version=None):
 
 
 def diff(domainName, v1, v2):
+    """Shared diff functionality between whoisv1 and whoisv2
+
+    Args:
+        domainName (str): Name of the domain to diff versions between
+        v1 (float): First version of the domainName
+        v2 (float): Second version to compare the first to
+
+    Raises:
+        ClientError: Versions are not floats
+        ServerError: Search failed to connect
+        ClientError: Parameters created an invalid query
+        ServerError: Unexpected exception
+        ClientError: v1 and/or v2 does not exist
+
+    Returns:
+        dict: Contains data fields of v1 and v2 with the value specifying if
+              the data is the same, different, or nonexistant between versions
+    """
     try:
         v1 = float(v1)
         v2 = float(v2)

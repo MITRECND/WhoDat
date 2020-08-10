@@ -10,6 +10,16 @@ whoisv2_bp = Blueprint("whoisv2", __name__)
 
 
 def valid_size_offset(chunk_size, offset):
+    """Validates chunk size and offset
+
+    Args:
+        chunk_size (int): Size of data chunk to split total data into
+        offset (int): Number of chunks to offset start by
+
+    Raises:
+        ClientError: chunk_size and/or offset are not integers
+        ClientError: chunk_size and/or offset are not valid integers
+    """
     if not (isinstance(chunk_size, int) and isinstance(offset, int)):
         raise ClientError(
             f"Offset {offset} and/or chunk size {chunk_size} are not integers"
@@ -22,8 +32,6 @@ def valid_size_offset(chunk_size, offset):
         error = f"Invalid offset {offset}"
     if error is not None:
         raise ClientError(error)
-
-    return chunk_size, offset
 
 
 # Metadata
@@ -91,7 +99,7 @@ def domains(search_key):
         raise ClientError(f"Version {version} is not an integer")
     chunk_size = json_data.get("chunk_size", sys.maxsize)
     offset = json_data.get("offset", 0)
-    chunk_size, offset = valid_size_offset(chunk_size, offset)
+    valid_size_offset(chunk_size, offset)
     if chunk_size == sys.maxsize:
         offset = 0
 
