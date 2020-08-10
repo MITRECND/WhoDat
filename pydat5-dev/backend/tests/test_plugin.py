@@ -1,7 +1,7 @@
 from pydat.core.plugins import PLUGINS
 from flask import Blueprint, session
 from pydat.api import create_app
-from pydat.core.plugins import PluginBase, register
+from pydat.core.plugins import PluginBase, register_plugin
 import pytest
 from pydat.core import preferences
 
@@ -49,26 +49,19 @@ def test_invalid_plugin():
         def set_name(self):
             return "fake"
 
-    # does not implement blueprint
-    class MissingBPPlugin(PluginBase):
-        pass
-
     # does not return blueprint
     class WrongPlugin(PluginBase):
         @property
         def blueprint(self):
             return ["fake"]
 
-    @register
+    @register_plugin
     def start_plugin(cls):
         test = cls()
         return test
 
     with pytest.raises(TypeError):
         assert start_plugin(FakePlugin)
-
-    with pytest.raises(NotImplementedError):
-        assert start_plugin(MissingBPPlugin)
 
     with pytest.raises(TypeError):
         assert start_plugin(WrongPlugin)

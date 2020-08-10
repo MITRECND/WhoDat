@@ -6,7 +6,7 @@ import pytest
 # global is required to be in USER_PREF
 def test_global(client):
     response = client.get("/api/v2/session/global")
-    assert response.status_code == 200
+    assert response.status_code == 404
 
 
 # helper method for _put_get, _patch

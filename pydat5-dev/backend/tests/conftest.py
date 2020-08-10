@@ -1,6 +1,10 @@
 import pytest
 from pydat.api import create_app
-from pydat.core.plugins import PluginBase, register
+from pydat.core.plugins import (
+    PluginBase,
+    register_plugin,
+    PassivePluginBase,
+)
 from flask import Blueprint
 
 
@@ -25,6 +29,11 @@ def config_app():
                 "_score",
             ],
             "LIMIT": 100,
+            "PASSIVE": {
+                "TestPassive": {
+                    "API_KEY": "success"
+                }
+            }
         }
     )
     return app
@@ -48,27 +57,49 @@ def create_plugin():
 
         class TestPlugin(PluginBase):
             @property
-            def blueprint(self):
-                return bp
-
-            @property
             def user_pref(self):
                 return user_pref
-
-            @property
-            def name(self):
-                return name
 
             @property
             def jsfiles(self):
                 return jsfiles
 
-        @register
+        @register_plugin
         def start_plugin():
-            test = TestPlugin()
+            test = TestPlugin(name, bp)
             return test
 
         test_plugin = start_plugin()
         return test_plugin
 
     return _create_plugin
+
+
+# simple test passive plugin, returns created valid plugin
+@pytest.fixture
+def create_passive_plugin():
+    def _create_passive_plugin(user_pref=None, name="TestPassive", jsfiles=[]):
+        bp = Blueprint(name, __name__)
+
+        @bp.route("/hello")
+        def hello():
+            return "Success!"
+
+        class TestPassivePlugin(PassivePluginBase):
+            @property
+            def user_pref(self):
+                return user_pref
+
+            @property
+            def jsfiles(self):
+                return jsfiles
+
+            def forward_pdns(self):
+                return "Forward success!"
+
+            def reverse_pdns(self):
+                return "Reverse success!"
+
+        return TestPassivePlugin(name, bp)
+
+    return _create_passive_plugin
