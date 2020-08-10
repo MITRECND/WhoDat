@@ -14,12 +14,13 @@ class PluginBase:
 
     Attributes:
         name: A string that stores the plugin's identifying name.
-        user_pref: A dict mapping plugin parameter's to their value type.
+        blueprint: A Blueprint that defines the plugin.
+        config: A dictionary of specific plugin config details.
     """
     def __init__(self, name, blueprint, config=None):
         self.name = name
-        self.config = config
         self.blueprint = blueprint
+        self.config = config
 
     @property
     def user_pref(self):
@@ -32,21 +33,29 @@ class PluginBase:
         return []
 
     def setConfig(self, plugin_config):
-        raise NotImplementedError('Plugin must set configuration')
+        """Sets available configuration settings for plugin"""
+        self.config = plugin_config
 
 
 class PassivePluginBase(PluginBase):
+    """Plugin base class that all passive plugins should extend.
+
+    Attributes:
+        name: A string that stores the plugin's identifying name.
+        blueprint: A Blueprint that defines the plugin.
+    """
     def __init__(self, name, blueprint):
         super().__init__(name, blueprint)
 
     @property
     def blueprint(self):
+        """Returns blueprint with added forward and reverse endpoints"""
         return self._blueprint
 
     @blueprint.setter
     def blueprint(self, passive_bp):
         @passive_bp.route("/forward_pdns", methods=["GET", "POST"])
-        def handle_passive():
+        def handle_forward():
             return self.forward_pdns()
 
         @passive_bp.route("/reverse_pdns", methods=["GET", "POST"])
@@ -55,15 +64,27 @@ class PassivePluginBase(PluginBase):
         self._blueprint = passive_bp
 
     def forward_pdns(self):
-        pass
+        """Required forward pdns functionality for passive plugin
+
+        Raises:
+            NotImplementedError: subclasses must implement"""
+        raise NotImplementedError("Passive Plugin must have forward pdns")
 
     def reverse_pdns(self):
-        pass
+        """Required reverse pdns functionality for passive plugin
+
+        Raises:
+            NotImplementedError: subclasses must implement"""
+        raise NotImplementedError("Passive Plugin must have reverse pdns")
 
     def setConfig(self, passive_config):
+        """Validates and sets passive configuration settings
+
+        Raises:
+            ValueError: Configuration does not contain proper information"""
         if not passive_config.get("API_KEY"):
             raise ValueError
-        self.config = passive_config
+        super.setConfig(passive_config)
 
 
 def get_plugins(ns_pkg=pydat.plugins):
@@ -90,11 +111,10 @@ def register_plugin(func):
         func: Expects a function that returns a PluginBase subclass object
 
     Raises:
-        TypeError: The function did not return a PluginBase plugin
-        NotImplementedError: The subclass did not override blueprint()
+        TypeError: The function did not return a proper PluginBase plugin
 
     Returns:
-        Wrapped function that registers valid plugins.
+        Wrapped function that registers and returns valid plugins.
     """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
@@ -114,7 +134,21 @@ def register_plugin(func):
 
 
 def register_passive_plugin(func):
+    """Decorator for registering passive plugins.
 
+    If the plugin is a valid passive plugin, the plugin object will be added to
+    the global PLUGINS. If the plugin has preferences, they will be added
+    to the global USER_PREF with the plugin name as the key.
+
+    Args:
+        func: Expects a function that returns a PassivePluginBase subclass object
+
+    Raises:
+        TypeError: The function did not return a proper PassivePluginBase plugin
+        ValueError: The proper configuration values were not provided
+    Returns:
+        Wrapped function that registers and returns valid passive plugins.
+    """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
         plugin = func(*args, **kwargs)
