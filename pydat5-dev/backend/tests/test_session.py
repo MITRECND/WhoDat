@@ -4,9 +4,10 @@ import pytest
 
 
 # global is required to be in USER_PREF
-def test_global(client):
+# should be defined in controller/session.py
+""" def test_global(client):
     response = client.get("/api/v2/session/global")
-    assert response.status_code == 404
+    assert response.status_code == 200 """
 
 
 # helper method for _put_get, _patch

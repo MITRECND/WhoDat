@@ -156,7 +156,7 @@ def query():
 
     chunk_size = json_data.get("chunk_size", 50)
     offset = json_data.get("offset", 0)
-    chunk_size, offset = valid_size_offset(chunk_size, offset)
+    valid_size_offset(chunk_size, offset)
     unique = json_data.get("unique", False)
     sort_keys = json_data.get("sort_keys", {})
 
