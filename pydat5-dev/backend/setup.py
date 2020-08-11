@@ -6,10 +6,13 @@ setup(
     packages=find_namespace_packages(include=['pydat.*']),
     include_package_data=True,
     zip_safe=False,
-    install_requires=["flask"],
+    install_requires=[
+        "flask",
+        "cerberus"
+        ],
     classifiers=["Programming language :: Python :: 3", ],
     python_requires=">=3.6",
-    entry_points = {
+    entry_points={
         "console_scripts": [
             "pydat-dev-server = pydat.scripts.api:main"
         ]
