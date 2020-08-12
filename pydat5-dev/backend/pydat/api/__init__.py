@@ -2,21 +2,24 @@ import os
 from flask import Flask, send_from_directory, render_template
 from pydat.api.controller import exceptions
 from pydat.core import plugins
+from pydat.core.config_parser import configParser, DEFAULT_CONFIG
 from pydat.api.controller.session import session_bp
 from pydat.api.controller.v1 import whoisv1_bp
 from pydat.api.controller.v2 import whoisv2_bp
 
 
-def create_app(test_config=None):
+def create_app(config=None):
     # Application Factory
     app = Flask(__name__)
     app.config.from_mapping(SECRET_KEY=os.urandom(16),)
 
-    # load testing, if debugging; else, load deployment config
-    if test_config is None:
-        app.config.from_envvar("PYDAT_CONFIG", silent=True)
-    else:
-        app.config.from_mapping(test_config)
+    app.config.from_object(DEFAULT_CONFIG)
+
+    if config is not None:
+        app.config.from_mapping(config)
+
+    config_parser = configParser(app)
+    config_parser.parse()
 
     # Register Error Handler
     exceptions.register_errors(app)
