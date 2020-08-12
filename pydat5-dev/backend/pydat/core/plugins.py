@@ -161,7 +161,7 @@ def register_passive_plugin(func):
         plugin = func(*args, **kwargs)
         if not isinstance(plugin, PassivePluginBase):
             raise TypeError(
-                "Cannot register plugin: wrong type {}".format(type(plugin))
+                f"Cannot register plugin: wrong type {type(plugin)}"
             )
         # check config
         try:
