@@ -125,7 +125,7 @@ def register_plugin(func):
         plugin = func(*args, **kwargs)
         if not isinstance(plugin, PluginBase):
             raise TypeError(
-                "Cannot register plugin: wrong type {}".format(type(plugin))
+                f"Cannot register plugin: wrong type {type(plugin)}"
             )
         plugin_bp = plugin.blueprint
         if not isinstance(plugin_bp, Blueprint):
