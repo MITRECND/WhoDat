@@ -355,7 +355,7 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
     Returns: (dict) results blob
 
     Raises:
-        RuntimeError - when enexpected exception in processing ES results
+        RuntimeError - when enexpected exception in creating the query or processing ES results
     """
     results = {"success": False}
     results["aaData"] = []
@@ -525,7 +525,6 @@ def _es_connector():
         return es
     except Exception as e:
         raise ESConnectionError(f"The following exception occured while trying to establish a connection to ElasticSearch: {repr(e)}")
-
 
 
 def _create_search_query(key, value, limit, low, high, versionSort):
@@ -851,66 +850,72 @@ def _process_data_table_search_results(domains):
         results["iTotalDisplayRecords"] = domains["hits"]["total"]
         results["success"] = True
     except Exception as e:
-        raise RuntimeError("Unexpected error processing domain results from ElasticSearch")
+        raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(r)}")
     return results
 
 
 def _process_adv_data_table_search(domains):
-    """ """
+    """
+    Raises:
+        RuntimError
+    """
     results = {}
-    if "error" in domains:
-        results["message"] = "Error"
-        return results
+    try:
+        if "error" in domains:
+            results["message"] = "Error"
+            return results
 
-    if not unique:
-        results["iTotalDisplayRecords"] = domains["hits"]["total"]
-        results["iTotalRecords"] = record_count()
+        if not unique:
+            results["iTotalDisplayRecords"] = domains["hits"]["total"]
+            results["iTotalRecords"] = record_count()
 
-        if domains["hits"]["total"] > 0:
-            for domain in domains["hits"]["hits"]:
+            if domains["hits"]["total"] > 0:
+                for domain in domains["hits"]["hits"]:
+                    pdomain = domain["_source"]
+                    details = pdomain["details"]
+                    updateVersion = pdomain.get("updateVersion", 0)
+                    entryVersion = "%d.%d" % (pdomain["dataVersion"],
+                                            updateVersion)
+                    # Take each key in details (if any) and stuff
+                    # it in top level dict.
+                    dom_arr = ["&nbsp;",
+                            pdomain["domainName"],
+                            details["registrant_name"],
+                            details["contactEmail"],
+                            details["standardRegCreatedDate"],
+                            details["registrant_telephone"],
+                            entryVersion,
+                            "%.2f" % round(domain["_score"], 2)]
+                    results["aaData"].append(dom_arr)
+
+            results["success"] = True
+        else:
+            buckets = domains["aggregations"]["domains"]["buckets"]
+            results["iTotalDisplayRecords"] = len(buckets)
+            results["iTotalRecords"] = len(buckets)
+
+            for bucket in buckets:
+                domain = bucket["top_domains"]["hits"]["hits"][0]
                 pdomain = domain["_source"]
                 details = pdomain["details"]
                 updateVersion = pdomain.get("updateVersion", 0)
-                entryVersion = "%d.%d" % (pdomain["dataVersion"],
-                                          updateVersion)
-                # Take each key in details (if any) and stuff
-                # it in top level dict.
+                entryVersion = "%d.%d" % (pdomain["dataVersion"], updateVersion)
+                # For some reason the _score goes away in the
+                # aggregations if you sort by it
                 dom_arr = ["&nbsp;",
-                           pdomain["domainName"],
-                           details["registrant_name"],
-                           details["contactEmail"],
-                           details["standardRegCreatedDate"],
-                           details["registrant_telephone"],
-                           entryVersion,
-                           "%.2f" % round(domain["_score"], 2)]
+                        pdomain["domainName"],
+                        details["registrant_name"],
+                        details["contactEmail"],
+                        details["standardRegCreatedDate"],
+                        details["registrant_telephone"],
+                        entryVersion,
+                        "%.2f" % round(domain["sort"][0], 2)]
+
                 results["aaData"].append(dom_arr)
 
-        results["success"] = True
-    else:
-        buckets = domains["aggregations"]["domains"]["buckets"]
-        results["iTotalDisplayRecords"] = len(buckets)
-        results["iTotalRecords"] = len(buckets)
-
-        for bucket in buckets:
-            domain = bucket["top_domains"]["hits"]["hits"][0]
-            pdomain = domain["_source"]
-            details = pdomain["details"]
-            updateVersion = pdomain.get("updateVersion", 0)
-            entryVersion = "%d.%d" % (pdomain["dataVersion"], updateVersion)
-            # For some reason the _score goes away in the
-            # aggregations if you sort by it
-            dom_arr = ["&nbsp;",
-                       pdomain["domainName"],
-                       details["registrant_name"],
-                       details["contactEmail"],
-                       details["standardRegCreatedDate"],
-                       details["registrant_telephone"],
-                       entryVersion,
-                       "%.2f" % round(domain["sort"][0], 2)]
-
-            results["aaData"].append(dom_arr)
-
-        results["success"] = True
+            results["success"] = True
+    except Exception as e:
+        raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(r)}")
     return results
 
 
