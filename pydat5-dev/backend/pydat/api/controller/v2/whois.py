@@ -1,6 +1,6 @@
 from flask import Blueprint, request, current_app
 from pydat.api.controller.exceptions import ClientError, ServerError
-from pydat.api.utils import es as elastic
+from pydat.core import es as elastic
 from urllib import parse
 import socket
 from pydat.api.shared import whois
@@ -37,6 +37,15 @@ def valid_size_offset(chunk_size, offset):
 @whoisv2_bp.route("/metadata")
 @whoisv2_bp.route("/metadata/<version>")
 def metadata(version=None):
+    """Retrieves metadata for all or a specific versions
+
+    Args:
+        version (float, optional): Specific version to find metadata for.
+                                    Defaults to None.
+
+    Returns:
+        dict: Details for application metadata
+    """
     results = whois.metadata(version)
     return results
 
@@ -44,6 +53,18 @@ def metadata(version=None):
 # Resolve
 @whoisv2_bp.route("/resolve/<domain>")
 def resolve(domain):
+    """Attempts to resolve provided domain name
+
+    Args:
+        domain (str): Specific domain name to resolve
+
+    Raises:
+        ClientError: Domain name could not be resolved
+        ServerError: Failed to communicate with socket
+
+    Returns:
+        dict: Hostnames and IPs for domain
+    """
     domain = parse.unquote(domain)
 
     try:
@@ -63,6 +84,21 @@ def resolve(domain):
 # Domains
 @whoisv2_bp.route("/domains/diff", methods=["POST"])
 def domains_diff():
+    """Compares the keys and values between the two versions
+
+    Args:
+        domainName (str): Specific domain name to search
+        v1 (float): A valid version of domainName
+        v2 (float): Another valid version to compare v1 to
+
+    Raises:
+        ClientError: Input body must be JSON
+        ClientError: Domain name must be provided
+        ClientError: Two versions must be provided
+
+    Returns:
+        dict: Diff results from comparing keys and values of v1 and v2
+    """
     if not request.is_json:
         raise ClientError("Wrong format, JSON required")
 
@@ -82,6 +118,25 @@ def domains_diff():
 
 @whoisv2_bp.route("/domains/<search_key>", methods=["POST"])
 def domains(search_key):
+    """Specific search on a valid search field. Requires a value
+
+    Args:
+        search_key (str): Valid search field
+
+    Raises:
+        ClientError: Search key is not a valid key
+        ClientError: Input provided in not in JSOn format
+        ClientError: Value must be provided
+        ClientError: Version is not a float
+        ClientError: Invalid search was provided
+        ServerError: Unable to connect to search engine
+        ServerError: Unexpected issue when requesting results
+        ServerError: Failed to process results
+        ClientError: Offset exceeded total results
+
+    Returns:
+        dict: Domain hits that match search following the offset and size
+    """
     valid_key = False
     for search_config in current_app.config["SEARCHKEYS"]:
         if search_config[0] == search_key:
@@ -149,6 +204,23 @@ def domains(search_key):
 
 @whoisv2_bp.route("/query", methods=["POST"])
 def query():
+    """Advanced search allowing for flexible domain searches.
+        Allows sorting of data
+
+    Raises:
+        ClientError: Wrong format, JSON required
+        ClientError: Query is required
+        ClientError: Invalid sort key provided
+        ClientError: Invalid sort direction provided
+        ClientError: Invalid search query
+        ServerError: Unable to connect to search engine
+        ServerError: Unexpected issue when requesting results
+        ServerError: Failed to process results
+        ClientError: Offset exceeded total results
+
+    Returns:
+        [type]: [description]
+    """
     if not request.is_json:
         raise ClientError("Wrong format, JSON required")
 

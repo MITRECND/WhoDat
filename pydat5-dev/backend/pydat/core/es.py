@@ -1,3 +1,4 @@
+# Placeholder
 # Failed to connect to ES (500)
 class ESConnectionError(Exception):
     pass

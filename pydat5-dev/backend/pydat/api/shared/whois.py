@@ -1,5 +1,5 @@
 from pydat.api.controller.exceptions import ClientError, ServerError
-from pydat.api.utils import es as elastic
+from pydat.core import es as elastic
 
 
 def metadata(version=None):

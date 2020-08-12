@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from pydat.api.utils import es as elastic
+from pydat.core import es as elastic
 
 
 @pytest.mark.parametrize("low", ("low", -1, 3, 100, 1.2, -.1))

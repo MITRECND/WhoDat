@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, request
 from pydat.api.controller.exceptions import ClientError, ServerError
-from pydat.api.utils import es as elastic
+from pydat.core import es as elastic
 from urllib import parse
 from pydat.api.shared import whois
 
@@ -12,6 +12,27 @@ whoisv1_bp = Blueprint("whoisv1", __name__)
 @whoisv1_bp.route("/domains/<key>/<value>/<low>")
 @whoisv1_bp.route("/domains/<key>/<value>/<low>/<high>")
 def domains(key, value, low=None, high=None):
+    """Handle v1 domains specific searches
+
+    Args:
+        key (str): Search field to filter domain information on
+        value (str): Search field value
+        low (float, optional): Version of domain. Lower end of the range to
+                               search on or specific version. Defaults to None.
+        high (float, optional): Higher end of version range to search on.
+                                Defaults to None.
+
+    Raises:
+        ClientError: Provided search key is not recognized
+        ClientError: Low and high are invalid values
+        ClientError: Parameters formed an invalid search
+        ServerError: Unable to connect to search engine
+        ServerError: Unexpected issue when requesting search
+        ServerError: Failed to process results
+
+    Returns:
+        dict: All domain hits that matched search with their details
+    """
     valid_key = False
     for search_config in current_app.config["SEARCHKEYS"]:
         if search_config[0] == key:
@@ -55,6 +76,20 @@ def domains(key, value, low=None, high=None):
 
 @whoisv1_bp.route("/domains/<key>/<value>/latest")
 def domains_latest(key, value):
+    """Search for domains of only the latest version
+
+    Args:
+        key (str): Search field to filter domain information on
+        value (str): Search field value
+
+    Raises:
+        ServerError: Unable to connect to search engine
+        ServerError: Unexpected issue when requesting latest version
+        ServerError: Failed to process results
+
+    Returns:
+        dict: All domain hits that matched search with their details
+    """
     try:
         low = elastic.lastVersion()
     except elastic.ESConnectionError:
@@ -71,16 +106,47 @@ def domains_latest(key, value):
 @whoisv1_bp.route("/domain/<domainName>/<low>")
 @whoisv1_bp.route("/domain/<domainName>/<low>/<high>")
 def domain(domainName, low=None, high=None):
+    """Search based on a specific domain name
+
+    Args:
+        domainName (str): Specific domain name to search
+        low (float, optional): Version of domain. Lower end of the range to
+                               search on or specific version. Defaults to None.
+        high (float, optional): Higher end of version range to search on.
+                                Defaults to None.
+
+    Returns:
+        dict: Details for all domains that match the specific domain name
+    """
     return domains("domainName", domainName, low, high)
 
 
 @whoisv1_bp.route("/domain/<domainName>/latest")
 def domain_latest(domainName):
+    """Search for the latest version of a specific domain.
+        Equivalent to domains_latest when searching on the domainName field
+
+    Args:
+        domainName (str): Specific domain name to search on
+
+    Returns:
+        dict: Details for the latest version of the domain
+    """
     return domains_latest("domainName", domainName)
 
 
 @whoisv1_bp.route("/domain/<domainName>/diff/<v1>/<v2>")
 def domain_diff(domainName, v1, v2):
+    """Compares the keys and values between the two versions
+
+    Args:
+        domainName (str): Specific domain name to search
+        v1 (float): A valid version of domainName
+        v2 (float): Another valid version to compare v1 to
+
+    Returns:
+        dict: Diff results from comparing keys and values of v1 and v2
+    """
     data = whois.diff(domainName, v1, v2)
     return {"success": True, "data": data}
 
@@ -89,6 +155,15 @@ def domain_diff(domainName, v1, v2):
 @whoisv1_bp.route("/metadata")
 @whoisv1_bp.route("/metadata/<version>")
 def metadata(version=None):
+    """Retrieves metadata for all or a specific versions
+
+    Args:
+        version (float, optional): Specific version to find metadata for.
+                                    Defaults to None.
+
+    Returns:
+        dict: Details for application metadata
+    """
     results = whois.metadata(version)
     return {"success": True, "data": results}
 
@@ -96,20 +171,39 @@ def metadata(version=None):
 # Query Advanced Search
 @whoisv1_bp.route("/query")
 def query():
-    try:
-        query = request.args.get("query", default=None, type=str)
-        page_size = int(request.args.get("size", default=20))
-        page_num = int(request.args.get("page", default=1))
-        unique = request.args.get("unique", default=False)
-        if str(unique).lower() == "true":
-            unique = True
-        else:
-            unique = False
-    except ValueError:
-        raise ClientError("Input paramaters are of the wrong type")
+    """Advanced search allowing for flexible domain searches
 
+    Raises:
+        ClientError: Query required
+        ClientError: Input parameter size is not an integer
+        ClientError: Input parameter page is not an integer
+        ClientError: Out of range page or size
+        ClientError: Invalid search query
+        ServerError: Unable to connect to search engine
+        ServerError: Unexpected issue when requesting results
+        ServerError: Failed to process results
+        ClientError: Provided page is too high
+
+    Returns:
+        dict: All details for every domain hit that matches query
+    """
+
+    query = request.args.get("query", default=None, type=str)
     if query is None:
         raise ClientError("Query required")
+    try:
+        page_size = int(request.args.get("size", default=20))
+    except ValueError:
+        raise ClientError("Input parameter size is not an integer")
+    try:
+        page_num = int(request.args.get("page", default=1))
+    except ValueError:
+        raise ClientError("Input parameter page is not an integer")
+    unique = request.args.get("unique", default=False)
+    if str(unique).lower() == "true":
+        unique = True
+    else:
+        unique = False
 
     error = None
     if page_size < 1:
