@@ -12,17 +12,21 @@ whoisv1_bp = Blueprint("whoisv1", __name__)
 @whoisv1_bp.route("/domains/<key>/<value>/<low>")
 @whoisv1_bp.route("/domains/<key>/<value>/<low>/<high>")
 def domains(key, value, low=None, high=None):
-    if key not in current_app.config["SEARCH_KEYS"]:
+    valid_key = False
+    for search_config in current_app.config["SEARCHKEYS"]:
+        if search_config[0] == key:
+            valid_key = True
+    if not valid_key:
         raise ClientError(f"Invalid key {key}")
     try:
         if low:
             low = float(low)
             if low < 0:
-                raise ValueError
+                raise ValueError("Low must be positive")
         if high:
             high = float(high)
             if low > high:
-                raise ValueError
+                raise ValueError("Low must be less than high")
     except ValueError:
         raise ClientError("Low/high must be integers and form a valid range")
 
@@ -40,9 +44,9 @@ def domains(key, value, low=None, high=None):
     except ValueError:
         raise ClientError(f"Invalid search of {key}:{value}")
     except elastic.ESConnectionError:
-        raise ServerError("Search failed to connect")
+        raise ServerError("Unable to connect to search engine")
     except elastic.ESQueryError:
-        raise ServerError("Search failed")
+        raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")
 
@@ -54,9 +58,9 @@ def domains_latest(key, value):
     try:
         low = elastic.lastVersion()
     except elastic.ESConnectionError:
-        raise ServerError("Search failed to connect")
+        raise ServerError("Unable to connect to search engine")
     except elastic.ESQueryError:
-        raise ServerError("Failed to retrieve latest version")
+        raise ServerError("Unexpected issue when requesting latest version")
     except RuntimeError:
         raise ServerError("Failed to process results")
     return domains(key, value, low)
@@ -121,13 +125,13 @@ def query():
     except ValueError:
         raise ClientError(f"Invalid search query {query}")
     except elastic.ESConnectionError:
-        raise ServerError("Search failed to connect")
+        raise ServerError("Unable to connect to search engine")
     except elastic.ESQueryError:
-        raise ServerError("Search failed")
+        raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")
 
-    if skip > 0 and skip > results["total"]:
+    if skip > 0 and skip >= results["total"]:
         raise ClientError(f"Page number {page_num} is too high")
 
     return results

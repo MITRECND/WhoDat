@@ -1,23 +1,10 @@
-from flask import current_app
-
-
-# General ES error (500)
-class ESError(Exception):
-    pass
-
-
 # Failed to connect to ES (500)
-class ESConnectionError(ESError):
+class ESConnectionError(Exception):
     pass
 
 
-# ES query failed (400)
-class ESQueryError(ESError):
-    pass
-
-
-# Expected ES results/fields not present (500)
-class ESProcessingError(ESError):
+# ES query failed (500)
+class ESQueryError(Exception):
     pass
 
 
@@ -34,7 +21,6 @@ def createAdvancedQuery(query, skip, size, unique, sort=None):
 
 
 def search(key, value, filt=None, low=None, high=None, versionSort=False):
-    limit = current_app.config["LIMIT"]
     return {"success": True, "data": [], "total": 100, "avail": 0}
 
 

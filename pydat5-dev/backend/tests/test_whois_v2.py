@@ -13,7 +13,9 @@ def test_metadata(monkeypatch, client, version):
 
     # type checking
     response = client.get(f"/api/v2/metadata/{version}")
-    if (isinstance(version, int) or isinstance(version, float)) and version > 0:
+    if (
+        isinstance(version, int) or isinstance(version, float)
+    ) and version > 0:
         assert response.status_code == 200
     else:
         assert response.status_code == 400
@@ -54,9 +56,9 @@ def test_domains(monkeypatch, config_app, version):
     monkeypatch.setattr(elastic, "search", mock_search)
 
     # test checking valid search keys
-    for key in config_app.config["SEARCH_KEYS"]:
+    for key in config_app.config["SEARCHKEYS"]:
         response = client.post(
-            f"/api/v2/domains/{key}", json={"value": "value"}
+            f"/api/v2/domains/{key[0]}", json={"value": "value"}
         )
         assert response.status_code == 200
     # required value not provided

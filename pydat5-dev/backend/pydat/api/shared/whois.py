@@ -29,9 +29,9 @@ def metadata(version=None):
     try:
         results = elastic.metadata(version)
     except elastic.ESConnectionError:
-        raise ServerError("Search failed to connect")
+        raise ServerError("Unable to connect to search engine")
     except elastic.ESQueryError:
-        raise ServerError("Search failed")
+        raise ServerError("Unexpected issue when requesting search")
 
     if not results["data"]:
         raise ClientError(f"Version {version} does not exist", 404)
@@ -69,9 +69,9 @@ def diff(domainName, v1, v2):
     except ValueError:
         raise ClientError(f"Invalid search of {domainName} and {v1} or {v2}")
     except elastic.ESConnectionError:
-        raise ServerError("Search failed to connect")
+        raise ServerError("Unable to connect to search engine")
     except elastic.ESQueryError:
-        raise ServerError("Search failed")
+        raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")
 

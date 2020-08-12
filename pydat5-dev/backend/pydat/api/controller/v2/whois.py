@@ -19,10 +19,10 @@ def valid_size_offset(chunk_size, offset):
         ClientError: chunk_size and/or offset are not integers
         ClientError: chunk_size and/or offset are not valid integers
     """
-    if not (isinstance(chunk_size, int) and isinstance(offset, int)):
-        raise ClientError(
-            f"Offset {offset} and/or chunk size {chunk_size} are not integers"
-        )
+    if not isinstance(chunk_size, int):
+        raise ClientError(f"Chunk size {chunk_size} is not an integer")
+    if not isinstance(offset, int):
+        raise ClientError(f"Offset {offset} is not an integer")
 
     error = None
     if chunk_size < 1:
@@ -68,25 +68,32 @@ def domains_diff():
 
     json_data = request.get_json()
     try:
-        domain = str(json_data["domain"])
+        domain = json_data["domain"]
+    except KeyError:
+        raise ClientError("A domain name must be provided")
+    try:
         version1 = json_data["version1"]
         version2 = json_data["version2"]
     except KeyError:
-        raise ClientError("All required parameters must be provided")
+        raise ClientError("Two versions must be provided")
 
     return whois.diff(domain, version1, version2)
 
 
 @whoisv2_bp.route("/domains/<search_key>", methods=["POST"])
 def domains(search_key):
-    if search_key not in current_app.config["SEARCH_KEYS"]:
+    valid_key = False
+    for search_config in current_app.config["SEARCHKEYS"]:
+        if search_config[0] == search_key:
+            valid_key = True
+    if not valid_key:
         raise ClientError(f"Invalid key {search_key}")
     if not request.is_json:
         raise ClientError("Wrong format, JSON required")
 
     json_data = request.get_json()
     try:
-        value = str(json_data["value"])
+        value = json_data["value"]
     except KeyError:
         raise ClientError("Value is required")
 
@@ -117,9 +124,9 @@ def domains(search_key):
     except ValueError:
         raise ClientError(f"Invalid search of {search_key}:{value}")
     except elastic.ESConnectionError:
-        raise ServerError("Search failed to connect")
+        raise ServerError("Unable to connect to search engine")
     except elastic.ESQueryError:
-        raise ServerError("Search failed")
+        raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")
 
@@ -147,7 +154,7 @@ def query():
 
     json_data = request.get_json()
     try:
-        query = str(json_data["query"])
+        query = json_data["query"]
     except KeyError:
         raise ClientError("Query is required")
 
@@ -161,7 +168,15 @@ def query():
     # handle sort_key
     sort = []
     for sort_key in sort_keys:
-        if sort_key not in current_app.config["SORT_KEYS"]:
+        if sort_key not in [
+                "domainName",
+                "details.registrant_name",
+                "details.contactEmail",
+                "details.standardRegCreatedDate",
+                "details.registrant_telephone",
+                "dataVersion",
+                "_score",
+        ]:
             raise ClientError(f"Invalid sort key {sort_key} provided")
         if not (sort_keys[sort_key] == "asc" or sort_keys[sort_key] == "desc"):
             raise ClientError(f"Invalid sort direction {sort_keys[sort_key]}")
@@ -176,9 +191,9 @@ def query():
     except ValueError:
         raise ClientError(f"Invalid search query {query}")
     except elastic.ESConnectionError:
-        raise ServerError("Search failed to connect")
+        raise ServerError("Unable to connect to search engine")
     except elastic.ESQueryError:
-        raise ServerError("Search failed")
+        raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")
 

@@ -12,8 +12,8 @@ def test_domains(monkeypatch, config_app, low, high):
     monkeypatch.setattr(elastic, 'search', mock_search)
 
     # test checking valid search keys
-    for key in config_app.config['SEARCH_KEYS']:
-        response = client.get(f"/api/v1/domains/{key}/fake")
+    for key in config_app.config['SEARCHKEYS']:
+        response = client.get(f"/api/v1/domains/{key[0]}/fake")
         assert response.status_code == 200
     assert client.get("/api/v1/domains/fake_key/fake").status_code == 400
     assert client.get("/api/v1/domains/fake_key").status_code == 404
@@ -41,8 +41,8 @@ def test_latest(monkeypatch, config_app):
     monkeypatch.setattr(elastic, 'lastVersion', mock_last)
 
     client = config_app.test_client()
-    for key in config_app.config['SEARCH_KEYS']:
-        response = client.get(f"/api/v1/domains/{key}/fake/latest")
+    for key in config_app.config['SEARCHKEYS']:
+        response = client.get(f"/api/v1/domains/{key[0]}/fake/latest")
         assert response.status_code == 200
         response = client.get("/api/v1/domain/fake/latest")
         assert response.status_code == 200
@@ -51,7 +51,7 @@ def test_latest(monkeypatch, config_app):
     mock_last.side_effect = elastic.ESQueryError
     response = client.get("/api/v1/domain/fake/latest")
     assert response.status_code == 500
-    response = client.get(f"/api/v1/domains/{key}/fake/latest")
+    response = client.get(f"/api/v1/domains/{key[0]}/fake/latest")
     assert response.status_code == 500
 
 
@@ -99,7 +99,9 @@ def test_metadata(monkeypatch, client, version):
 
     # type checking
     response = client.get(f'/api/v1/metadata/{version}')
-    if (isinstance(version, int) or isinstance(version, float)) and version > 0:
+    if (
+        isinstance(version, int) or isinstance(version, float)
+    ) and version > 0:
         assert response.status_code == 200
     else:
         assert response.status_code == 400

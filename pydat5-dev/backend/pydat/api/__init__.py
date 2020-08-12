@@ -4,8 +4,8 @@ from pydat.api.controller import exceptions
 from pydat.core import plugins
 from pydat.core.config_parser import configParser, DEFAULT_CONFIG
 from pydat.api.controller.session import session_bp
-from pydat.api.controller.v1 import whoisv1_bp
-from pydat.api.controller.v2 import whoisv2_bp
+from pydat.api.controller.v1.whois import whoisv1_bp
+from pydat.api.controller.v2.whois import whoisv2_bp
 
 
 def create_app(config=None):
