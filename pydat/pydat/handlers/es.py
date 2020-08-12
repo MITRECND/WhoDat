@@ -212,11 +212,7 @@ def metadata(version=None):
         ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     results = {"success": False}
-    try:
-        es = _es_connector()
-    except ESConnectionError as e:
-        results["message"] = str(e)
-        return results
+    es = _es_connector()
 
     if version is None:
         res = CACHE.get("all_metadata")
@@ -304,19 +300,16 @@ def data_table_search(key, value, skip, pagesize, sortset, sfilter, low, high):
     Returns: (dict) results blob
 
     Raises:
-        ValueError - if 'low' and 'high' args are not integers
+        ESConnectionError - when ElasticSearch connection cannot be established.
+        ValueError - if 'low' and 'high' args are not integers.
         ESQueryError - when error occurs at ElasticSearch from sent query/request.
         RuntimeError - when unexpected error processing ElasticSearch results
     """
     results = {"success": False}
-    try:
-        es = _es_connector()
-    except ESConnectionError as e:
-        results["message"] = str(e)
-        return results
+    es = _es_connector()
 
     if key != current_app.config["SEARCHKEYS"][0][0]:
-        key = "details." + key
+        key = f"details.{key}"
 
     # All data in ES is lowercased (during ingestion/analysis) and we're using
     # a term filter to take advantage of filter caching, we could probably
@@ -327,7 +320,7 @@ def data_table_search(key, value, skip, pagesize, sortset, sfilter, low, high):
 
     if current_app.config["DEBUG"]:
         try:
-            sys.stdout.write("%s\n" % json.dumps(query))
+            sys.stdout.write(f"{json.dumps(query)}\n")
             sys.stdout.flush()
         except Exception as e:
             pass
@@ -355,26 +348,18 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
     Returns: (dict) results blob
 
     Raises:
+        ESConnectionError - when ElasticSearch connection cannot be established.
         RuntimeError - when enexpected exception in creating the query or processing ES results
+        ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
     results = {"success": False}
     results["aaData"] = []
-
-    try:
-        es = _es_connector()
-    except ESConnectionError as e:
-        results["message"] = str(e)
-        return results
-
-    try:
-        q = _create_advanced_query(query, skip, pagesize, unique, sort)
-    except RuntimeError as e:
-        results["message"] = str(e)
-        return results
+    es = _es_connector()
+    q = _create_advanced_query(query, skip, pagesize, unique, sort)
 
     if current_app.config["DEBUG"]:
         try:
-            sys.stdout.write(json.dumps(q) + "\n")
+            sys.stdout.write(f"{json.dumps(q)}\n")
             sys.stdout.flush()
         except Exception as e:
             pass
@@ -382,9 +367,7 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
         domains = es.search(index=SEARCH_INDEX, body=q,
                             search_type="dfs_query_then_fetch")
     except Exception as e:
-        # TODO: change to raising ESQueryError?
-        results["message"] = str(e)
-        return results
+        raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
 
     results.update(_process_adv_data_table_search(domains))
 
@@ -411,13 +394,8 @@ def search(key, value, filt=None, limit=10000, low=None, high=None, versionSort=
         ValueError - when 'low' and 'high' args are not integers
     """
     results = {"success": False}
-    try:
-        es = _es_connector()
-        index = f"{current_app.config['ELASTICSEARCH']['indexPrefix']}-*"
-    except ESConnectionError as e:
-        # TODO: why is this gracefully handled here, instead of raising like others
-        results["message"] = str(e)
-        return results
+    es = _es_connector()
+    index = f"{current_app.config['ELASTICSEARCH']['indexPrefix']}-*"
 
     if key != current_app.config["SEARCHKEYS"][0][0]:
         key = f"details.{key}"
@@ -427,14 +405,14 @@ def search(key, value, filt=None, limit=10000, low=None, high=None, versionSort=
 
     # XXX DEBUG CODE
     try:
-        sys.stdout.write("%s\n" % json.dumps(query))
+        sys.stdout.write(f"{json.dumps(query)}\n")
         sys.stdout.flush()
     except Exception as e:
         pass
     try:
         domains = es.search(index=SEARCH_INDEX, body=query)
     except Exception as e:
-        raise ESQuerryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
+        raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
 
     results.update(_process_search_query_results(domains))
     return results
@@ -462,29 +440,17 @@ def advanced_search(search_string, skip=0, size=20, unique=False, sort=None):  #
     Returns: (dict) results blob
 
     Raises:
-        RuntimeError - when unexpected error occurs processing results from Elasticsearch
+        ESConnectionError - when cannot create and initialize python client
+        RuntimeError - when unexpected error occurs when creating advanced query or processing results from Elasticsearch
     """
     results = {"success": False}
-    try:
-        es = _es_connector()
-    except ESConnectionError as e:
-        # TODO: why is this gracefully handled here, instead of raising like others
-        results["message"] = str(e)
-        return results
-
-    try:
-        query = _create_advanced_query(search_string, skip, size, unique, sort)
-    except RuntimeError as e:
-        results["message"] = str(e)
-        return results
-
+    es = _es_connector()
+    query = _create_advanced_query(search_string, skip, size, unique, sort)
     try:
         domains = es.search(index=SEARCH_INDEX, body=query,
                             search_type="dfs_query_then_fetch")
     except Exception as e:
-        # TODO: why is this handled gracefully while others raise ESQueryError
-        results["message"] = str(e)
-        return results
+        raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
 
     results.update(_process_advanced_search_results(domains, skip, size, unique))
 
