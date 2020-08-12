@@ -13,27 +13,12 @@ def config_app():
     app = create_app(
         {
             "TESTING": True,
-            "SEARCH_KEYS": [
-                "domainName",
-                "registrant_name",
-                "contactEmail",
-                "registrant_telephone",
-            ],
-            "SORT_KEYS": [
-                "domainName",
-                "details.registrant_name",
-                "details.contactEmail",
-                "details.standardRegCreatedDate",
-                "details.registrant_telephone",
-                "dataVersion",
-                "_score",
-            ],
-            "LIMIT": 100,
-            "PASSIVE": {
-                "TestPassive": {
-                    "API_KEY": "success"
-                }
-            }
+            "SEARCHKEYS": [
+                        ('domainName', 'Domain'),
+                        ('registrant_name', 'Registrant Name'),
+                        ('contactEmail', 'Contact Email'),
+                        ('registrant_telephone', 'Telephone')
+                        ],
         }
     )
     return app
