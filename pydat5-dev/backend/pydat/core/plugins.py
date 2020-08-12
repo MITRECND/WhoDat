@@ -84,10 +84,9 @@ class PassivePluginBase(PluginBase):
         """Validates and sets passive configuration settings
 
         Raises:
-            ValueError: Configuration does not contain proper information"""
-        if not passive_config.get("API_KEY"):
-            raise ValueError
-        super().setConfig(passive_config)
+            NotImplementedError: Must check for proper configuration.
+                            Raise ValueError if needed config isn't there"""
+        raise NotImplementedError("Passive Plugin must take in configuration")
 
 
 def get_plugins(ns_pkg=pydat.plugins):
@@ -166,10 +165,10 @@ def register_passive_plugin(func):
             )
         # check config
         try:
-            plugin_config = current_app.config["PASSIVE"][plugin.name]
+            plugin_config = current_app.config["PDNSSOURCES"][plugin.name]
             plugin.setConfig(plugin_config)
         except (KeyError, ValueError):
-            raise ValueError("Passive plugin missing correct config values")
+            raise ValueError("Passive plugin missing proper configuration")
 
         return plugin
 

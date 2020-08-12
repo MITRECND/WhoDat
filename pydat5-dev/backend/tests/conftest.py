@@ -19,6 +19,11 @@ def config_app():
                         ('contactEmail', 'Contact Email'),
                         ('registrant_telephone', 'Telephone')
                         ],
+            "PDNSSOURCES": {
+                "TestPassive": {
+
+                }
+            }
         }
     )
     return app
@@ -63,7 +68,7 @@ def create_plugin():
 # simple test passive plugin, returns created valid plugin
 @pytest.fixture
 def create_passive_plugin():
-    def _create_passive_plugin(user_pref=None, name="TestPassive", jsfiles=[]):
+    def _create_passive_plugin(name="TestPassive", user_pref=None, jsfiles=[]):
         bp = Blueprint(name, __name__)
 
         @bp.route("/hello")
@@ -84,6 +89,9 @@ def create_passive_plugin():
 
             def reverse_pdns(self):
                 return "Reverse success!"
+
+            def setConfig(self, test_config):
+                self.config = test_config
 
         return TestPassivePlugin(name, bp)
 
