@@ -20,20 +20,18 @@ def metadata(version=None):
     """
     try:
         if version:
-            version = int(version)
+            version = float(version)
             if version < 0:
                 raise ValueError
     except ValueError:
-        raise ClientError(f"Version {version} must be a valid integer")
+        raise ClientError(f"Version {version} must be a valid float")
 
     try:
         results = elastic.metadata(version)
-    except elastic.ESQueryError:
-        raise ClientError("Invalid query received")
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
-    except Exception as e:
-        raise ServerError(f"Unexpected exception {str(e)}")
+    except elastic.ESQueryError:
+        raise ServerError("Search failed")
 
     if not results["data"]:
         raise ClientError(f"Version {version} does not exist", 404)
@@ -68,12 +66,14 @@ def diff(domainName, v1, v2):
     try:
         v1_result = elastic.search("domainName", domainName, filt=None, low=v1)
         v2_result = elastic.search("domainName", domainName, filt=None, low=v2)
+    except ValueError:
+        raise ClientError(f"Invalid search of {domainName} and {v1} or {v2}")
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError("Invalid query received")
-    except Exception as e:
-        raise ServerError(f"Unexpected exception {str(e)}")
+        raise ServerError("Search failed")
+    except RuntimeError:
+        raise ServerError("Failed to process results")
 
     if not v1_result["data"] or not v2_result["data"]:
         raise ClientError(

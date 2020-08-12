@@ -91,7 +91,7 @@ def test_domain_diff(monkeypatch, client):
     assert v2_data['si'] == ["yes", ""]
 
 
-@pytest.mark.parametrize("version", ("version", -1, 1))
+@pytest.mark.parametrize("version", ("version", -1, 1, 1.2))
 def test_metadata(monkeypatch, client, version):
     # metadata is always valid
     mock_meta = MagicMock(return_value={"data": "success"})
@@ -99,7 +99,7 @@ def test_metadata(monkeypatch, client, version):
 
     # type checking
     response = client.get(f'/api/v1/metadata/{version}')
-    if isinstance(version, int) and version > 0:
+    if (isinstance(version, int) or isinstance(version, float)) and version > 0:
         assert response.status_code == 200
     else:
         assert response.status_code == 400

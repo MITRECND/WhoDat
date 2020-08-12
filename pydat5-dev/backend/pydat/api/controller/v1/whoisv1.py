@@ -37,12 +37,14 @@ def domains(key, value, low=None, high=None):
         results = elastic.search(
             key, value, filt=None, low=low, high=high, versionSort=versionSort
         )
+    except ValueError:
+        raise ClientError(f"Invalid search of {key}:{value}")
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError(f"Invalid search of {key}:{value}")
-    except Exception as e:
-        raise ServerError(f"Unexpected exception {str(e)}")
+        raise ServerError("Search failed")
+    except RuntimeError:
+        raise ServerError("Failed to process results")
 
     return results
 
@@ -55,8 +57,8 @@ def domains_latest(key, value):
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
         raise ServerError("Failed to retrieve latest version")
-    except Exception as e:
-        raise ServerError(f"Unexpected exception {str(e)}")
+    except RuntimeError:
+        raise ServerError("Failed to process results")
     return domains(key, value, low)
 
 
@@ -116,12 +118,14 @@ def query():
     skip = (page_num - 1) * page_size
     try:
         results = elastic.advanced_search(query, skip, page_size, unique)
+    except ValueError:
+        raise ClientError(f"Invalid search query {query}")
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError(f"Invalid search query {query}")
-    except Exception as e:
-        raise ServerError(f"Unexpected exception {str(e)}")
+        raise ServerError("Search failed")
+    except RuntimeError:
+        raise ServerError("Failed to process results")
 
     if skip > 0 and skip > results["total"]:
         raise ClientError(f"Page number {page_num} is too high")

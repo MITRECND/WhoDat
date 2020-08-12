@@ -4,7 +4,6 @@ from pydat.api.utils import es as elastic
 from urllib import parse
 import socket
 from pydat.api.shared import whois
-import sys
 
 whoisv2_bp = Blueprint("whoisv2", __name__)
 
@@ -97,11 +96,9 @@ def domains(search_key):
             version = float(version)
     except ValueError:
         raise ClientError(f"Version {version} is not an integer")
-    chunk_size = json_data.get("chunk_size", sys.maxsize)
+    chunk_size = json_data.get("chunk_size", 50)
     offset = json_data.get("offset", 0)
     valid_size_offset(chunk_size, offset)
-    if chunk_size == sys.maxsize:
-        offset = 0
 
     search_key = parse.unquote(search_key)
     value = parse.unquote(value)
@@ -117,16 +114,16 @@ def domains(search_key):
         search_results = elastic.search(
             search_key, value, filt=None, low=version, versionSort=versionSort
         )
+    except ValueError:
+        raise ClientError(f"Invalid search of {search_key}:{value}")
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError(f"Invalid search of {search_key}:{value}")
-    except Exception as e:
-        raise ServerError(f"Unexpected exception {str(e)}")
+        raise ServerError("Search failed")
+    except RuntimeError:
+        raise ServerError("Failed to process results")
 
     # Return results based on chunk size and offset
-    if chunk_size == sys.maxsize:
-        chunk_size = search_results["total"]
     start = offset * chunk_size
     if start > 0 and start >= search_results["total"]:
         raise ClientError(
@@ -176,14 +173,16 @@ def query():
         search_results = elastic.advanced_search(
             query, skip, chunk_size, unique, sort=sort
         )
+    except ValueError:
+        raise ClientError(f"Invalid search query {query}")
     except elastic.ESConnectionError:
         raise ServerError("Search failed to connect")
     except elastic.ESQueryError:
-        raise ClientError(f"Invalid query {query} received")
-    except Exception as e:
-        raise ServerError(f"Unexpected exception {str(e)}")
+        raise ServerError("Search failed")
+    except RuntimeError:
+        raise ServerError("Failed to process results")
 
-    if skip > 0 and skip > search_results["total"]:
+    if skip > 0 and skip >= search_results["total"]:
         raise ClientError(f"Offset {offset} is too high")
 
     return {

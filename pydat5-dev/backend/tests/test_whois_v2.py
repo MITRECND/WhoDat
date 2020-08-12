@@ -13,7 +13,7 @@ def test_metadata(monkeypatch, client, version):
 
     # type checking
     response = client.get(f"/api/v2/metadata/{version}")
-    if isinstance(version, int) and version > 0:
+    if (isinstance(version, int) or isinstance(version, float)) and version > 0:
         assert response.status_code == 200
     else:
         assert response.status_code == 400
@@ -21,6 +21,10 @@ def test_metadata(monkeypatch, client, version):
     # error: version doesn't exist
     mock_meta.return_value = {"data": []}
     assert client.get("/api/v2/metadata/1").status_code == 404
+
+    # error: version doesn't exist
+    mock_meta.side_effect = elastic.ESQueryError
+    assert client.get("/api/v2/metadata/1").status_code == 500
 
 
 def test_resolve(monkeypatch, client):
@@ -71,7 +75,7 @@ def test_domains(monkeypatch, config_app, version):
         json={"value": "fake", "version": f"{version}"},
     )
     try:
-        version = int(version)
+        version = float(version)
         assert response.status_code == 200
     except ValueError:
         assert response.status_code == 400
@@ -83,7 +87,7 @@ def test_domains(monkeypatch, config_app, version):
     assert response.is_json
     json_data = response.get_json()
     assert json_data["total"] == mock_search.return_value["total"]
-    assert json_data["results"] == mock_search.return_value["data"]
+    assert json_data["results"] == mock_search.return_value["data"][:50]
     response = client.post(
         "/api/v2/domains/domainName",
         json={
@@ -98,7 +102,7 @@ def test_domains(monkeypatch, config_app, version):
         json={
             "value": "value",
             "chunk_size": mock_search.return_value["total"] / 5,
-            "offset": 6,
+            "offset": 5,
         },
     )
     assert response.status_code == 400
@@ -114,6 +118,12 @@ def test_domains(monkeypatch, config_app, version):
         "/api/v2/domains/domainName", json={"value": "value", "chunk_size": 0}
     )
     assert response.status_code == 400
+
+    # error: failed to process
+    mock_search.side_effect = RuntimeError
+    assert client.post(
+            "/api/v2/domains/domainName", json={"value": "value"}
+        ).status_code == 500
 
 
 def test_domains_diff(monkeypatch, config_app):
@@ -186,7 +196,7 @@ def test_query(monkeypatch, config_app):
 
     mock_adv.side_effect = elastic.ESQueryError
     response = client.post("/api/v2/query", json={"query": "query"})
-    assert response.status_code == 400
+    assert response.status_code == 500
 
 
 def test_connection_error(monkeypatch, config_app):
