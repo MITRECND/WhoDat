@@ -4,6 +4,7 @@ import json
 import sys
 import time
 
+import elasticsearch
 from elasticsearch import Elasticsearch
 from flask_caching import Cache
 from flask import current_app
@@ -55,7 +56,7 @@ def record_count():
         try:
             records = es.cat.count(index=SEARCH_INDEX, h="count")
             CACHE.set("record_count", records)
-        except Exception as e:
+        except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'count' call to ElasticSearch instance: {repr(e)}")
     return int(records)
 
@@ -105,7 +106,7 @@ def cluster_stats():
     if results is None:
         try:
             results = es.search(index=SEARCH_INDEX, body=query)
-        except Exception as e:
+        except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
         # Cache for an hour since this is a relatively expensive query
         # whose results shouldn't change often
@@ -131,7 +132,7 @@ def cluster_health():
         es = _es_connector()
         try:
             health = es.cluster.health()
-        except Exception as e:
+        except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'health' call to ElasticSearch instance: {repr(e)}")
         CACHE.set("cluster_health", health)
     return health["status"]
@@ -158,7 +159,7 @@ def last_version():
                 return result["_source"]["lastVersion"]
             else:
                 raise RuntimeError("Could not process result from ElasticSearch")
-        except Exception as e:
+        except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
     else:
         return lastVersion
@@ -182,7 +183,7 @@ def last_update():
                                 body={"query": {"match_all": {}},
                                     "sort": [{"metadata": {"order": "desc"}}],
                                     "size": 1})
-            except Exception as e:
+            except elasticsearch.ElasticsearchException as e:
                 raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
 
             if res["hits"]["total"] >= 1:
@@ -192,8 +193,8 @@ def last_update():
             else:
                 update = "0.0"
             CACHE.set("update", update)
-    except Exception as e:
-        #TODO: Log? or raise RuntimeError?
+    except KeyError as e:
+        #TODO: Log? or raise RuntimeError? What was trying to be caught here originally?
         update = "0.0"
 
     return update
@@ -223,7 +224,7 @@ def metadata(version=None):
                                     "sort": "metadata",
                                     "size": 999})
                 CACHE.set("all_metadata", res)
-            except Exception as e:
+            except elasticsearch.ElasticsearchException as e:
                 raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
 
         if res["hits"]["total"] > 0:
@@ -237,7 +238,7 @@ def metadata(version=None):
         version = int(version)
         try:
             res = es.get(index=META_INDEX, doc_type=DOC_TYPE, id=version)
-        except Exception as e:
+        except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
         if res["found"]:
             res = [res["_source"]]
@@ -328,7 +329,7 @@ def data_table_search(key, value, skip, pagesize, sortset, sfilter, low, high):
     try:
         domains = es.search(index=SEARCH_INDEX,
                             body=query)
-    except Exception as e:
+    except elasticsearch.ElasticsearchException as e:
         raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
 
     results.update(_process_data_table_search_results(domains))
@@ -366,7 +367,7 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
     try:
         domains = es.search(index=SEARCH_INDEX, body=q,
                             search_type="dfs_query_then_fetch")
-    except Exception as e:
+    except elasticsearch.ElasticsearchException as e:
         raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
 
     results.update(_process_adv_data_table_search(domains))
@@ -389,7 +390,8 @@ def search(key, value, filt=None, limit=10000, low=None, high=None, versionSort=
     Returns: (dict) results blob
 
     Raises:
-        RuntimeError - when  error occurs formatting version filter of ES query, or when processing ElasticSearch results
+        ESConnectionError - when ElasticSearch connection cannot be established.
+        RuntimeError - when  error occurs when creating ES query, or when processing ElasticSearch results
         ESQueryError - when error occurs at ElasticSearch from sent query/request.
         ValueError - when 'low' and 'high' args are not integers
     """
@@ -411,7 +413,7 @@ def search(key, value, filt=None, limit=10000, low=None, high=None, versionSort=
         pass
     try:
         domains = es.search(index=SEARCH_INDEX, body=query)
-    except Exception as e:
+    except elasticsearch.ElasticsearchException as e:
         raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
 
     results.update(_process_search_query_results(domains))
@@ -449,7 +451,7 @@ def advanced_search(search_string, skip=0, size=20, unique=False, sort=None):  #
     try:
         domains = es.search(index=SEARCH_INDEX, body=query,
                             search_type="dfs_query_then_fetch")
-    except Exception as e:
+    except elasticsearch.ElasticsearchException as e:
         raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
 
     results.update(_process_advanced_search_results(domains, skip, size, unique))
@@ -489,8 +491,10 @@ def _es_connector():
                            **security_args)
         CACHE.set("es_client", es, 600)  # cache client handle
         return es
-    except Exception as e:
-        raise ESConnectionError(f"The following exception occured while trying to establish a connection to ElasticSearch: {repr(e)}")
+    except elasticsearch.ImproperlyConfigured as e:
+        raise ESConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
+    except elasticsearch.ElasticsearchException:
+        raise EsConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
 
 
 def _create_search_query(key, value, limit, low, high, versionSort):
@@ -535,7 +539,7 @@ def _create_search_query(key, value, limit, low, high, versionSort):
                             {"term": {"updateVersion": int(lowUpdate)}}
                     version_filter.append(updateVersionQuery)
             except Exception as e:  # TODO XXX
-                raise
+                raise RuntimeError(f"The following unexepcted error ocurred while trying to create search query: {repr(e)}")
         elif high is not None:
             try:
                 version_filter = [{"range":
@@ -899,9 +903,13 @@ def _create_advanced_query(query, skip, size, unique, sort=None):
 
     Raises:
         RuntimeError - when unexpected error occurs creating the advanced query
+        ValueError - when error occurs when yacc parses supplied query string
     """
     try:
-        q = yacc.parse(query)
+        try:
+            q = yacc.parse(query)
+        except (KeyError, ValueError) as e:
+            raise ValueError(f"The following error occured while yacc tried to parse query string: {repr(e)}")
         if not unique:
             if sort is not None and len(sort) > 0:
                 sortParams = list()
@@ -957,4 +965,4 @@ def _create_advanced_query(query, skip, size, unique, sort=None):
                                     "unmapped_type": "long"}}]}}}}}
         return q
     except Exception as e:
-        raise RuntimeError(f"The following unexpected error occured while creating advanced query: {repr(e)}")
+        raise RuntimeError(f"The following runtime error occured while creating advanced query: {repr(e)}")
