@@ -8,7 +8,7 @@ import elasticsearch
 from elasticsearch import Elasticsearch
 from flask_caching import Cache
 from flask import current_app
-from handlers.advanced_es import yacc
+from core.advanced_es import yacc
 
 #TODO: RE usage of settings with  Flask now, the settings.py module can be loaded as well into the app
 #object, and thus accessed here via "current_app.config". But make sure settings.py module is loaded into
