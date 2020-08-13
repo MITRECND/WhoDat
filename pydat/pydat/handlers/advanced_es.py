@@ -767,16 +767,16 @@ yacc.yacc(debug=False)
 def main():
     while 1:
         try:
-            s = raw_input('input > ')
+            s = input('input > ')
         except EOFError:
             break
         try:
             results = yacc.parse(s)
         except ValueError as e:
-            print str(e)
+            print(str(e))
             continue
         except KeyError as e:
-            print str(e)
+            print(str(e))
             continue
 
         print(json.dumps(results))

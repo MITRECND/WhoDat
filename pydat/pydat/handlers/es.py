@@ -380,7 +380,7 @@ def search(key, value, filt=None, limit=10000, low=None, high=None, versionSort=
 
     Args:
         key (str): key field
-        value (): key value
+        value (str): key value
         filt (str): record field to restrict results hits data to
         limit (int): query results limit size
         low (float): lower bound version value
@@ -402,6 +402,7 @@ def search(key, value, filt=None, limit=10000, low=None, high=None, versionSort=
     if key != current_app.config["SEARCHKEYS"][0][0]:
         key = f"details.{key}"
     value = value.lower()
+    low, high = str(low), str(high)
 
     query = _create_search_query(key, value, limit, low, high, versionSort)
 
