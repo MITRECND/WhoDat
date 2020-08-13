@@ -19,6 +19,7 @@ class BaseError(Exception):
 
     def to_dict(self):
         rv = dict(self.payload or ())
+        rv["status"] = self.status_code
         rv["error"] = self.message
         return rv
 

@@ -6,7 +6,8 @@ from flask import (
     jsonify
 )
 from pydat.api.controller.exceptions import ClientError
-from pydat.core.preferences import add_user_pref, get_user_pref
+from pydat.core.preferences import get_user_pref
+# from pydat.core.preferences import add_user_pref
 
 session_bp = Blueprint("session", __name__)
 # Add global preferences

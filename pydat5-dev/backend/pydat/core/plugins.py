@@ -2,7 +2,7 @@ import pkgutil
 import importlib
 import pydat.plugins
 import functools
-from flask import Blueprint
+from flask import Blueprint, current_app
 from pydat.core import preferences
 
 # list of valid Plugin objects
@@ -14,13 +14,14 @@ class PluginBase:
 
     Attributes:
         name: A string that stores the plugin's identifying name.
-        user_pref: A dict mapping plugin parameter's to their value type.
+        blueprint: A Blueprint that defines the plugin.
+        config: A dictionary of specific plugin config details.
     """
-    @property
-    def blueprint(self):
-        """Returns the plugin's Blueprint. Must be overriden."""
-        raise NotImplementedError(
-                'Plugin must have blueprint')
+
+    def __init__(self, name, blueprint, config=None):
+        self.name = name
+        self.blueprint = blueprint
+        self.config = config
 
     @property
     def user_pref(self):
@@ -32,10 +33,60 @@ class PluginBase:
         """Returns a list of plugins' bundled ReactJS files"""
         return []
 
+    def setConfig(self, plugin_config):
+        """Sets available configuration settings for plugin"""
+        self.config = plugin_config
+
+
+class PassivePluginBase(PluginBase):
+    """Plugin base class that all passive plugins should extend.
+
+    Attributes:
+        name: A string that stores the plugin's identifying name.
+        blueprint: A Blueprint that defines the plugin.
+    """
+
+    def __init__(self, name, blueprint):
+        super().__init__(name, blueprint)
+
     @property
-    def name(self):
-        """Returns the plugin's name. Used for preferences and endpoints"""
-        return self.__module__.split('.')[-1]
+    def blueprint(self):
+        """Returns blueprint with added forward and reverse endpoints"""
+        return self._blueprint
+
+    @blueprint.setter
+    def blueprint(self, passive_bp):
+        @passive_bp.route("/forward_pdns", methods=["GET", "POST"])
+        def handle_forward():
+            return self.forward_pdns()
+
+        @passive_bp.route("/reverse_pdns", methods=["GET", "POST"])
+        def handle_reverse():
+            return self.reverse_pdns()
+
+        self._blueprint = passive_bp
+
+    def forward_pdns(self):
+        """Required forward pdns functionality for passive plugin
+
+        Raises:
+            NotImplementedError: subclasses must implement"""
+        raise NotImplementedError("Passive Plugin must have forward pdns")
+
+    def reverse_pdns(self):
+        """Required reverse pdns functionality for passive plugin
+
+        Raises:
+            NotImplementedError: subclasses must implement"""
+        raise NotImplementedError("Passive Plugin must have reverse pdns")
+
+    def setConfig(self, passive_config):
+        """Validates and sets passive configuration settings
+
+        Raises:
+            NotImplementedError: Must check for proper configuration.
+                            Raise ValueError if needed config isn't there"""
+        raise NotImplementedError("Passive Plugin must take in configuration")
 
 
 def get_plugins(ns_pkg=pydat.plugins):
@@ -51,7 +102,7 @@ def get_plugins(ns_pkg=pydat.plugins):
     return PLUGINS
 
 
-def register(func):
+def register_plugin(func):
     """Decorator for registering plugins.
 
     If the plugin is a valid plugin, the plugin object will be added to
@@ -62,24 +113,63 @@ def register(func):
         func: Expects a function that returns a PluginBase subclass object
 
     Raises:
-        TypeError: The function did not return a PluginBase plugin
-        NotImplementedError: The subclass did not override blueprint()
+        TypeError: The function did not return a proper PluginBase plugin
 
     Returns:
-        Wrapped function that registers valid plugins.
+        Wrapped function that registers and returns valid plugins.
     """
+
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
         plugin = func(*args, **kwargs)
         if not isinstance(plugin, PluginBase):
             raise TypeError(
-                'Cannot register plugin: wrong type {}'.format(type(plugin)))
+                f"Cannot register plugin: wrong type {type(plugin)}"
+            )
         plugin_bp = plugin.blueprint
         if not isinstance(plugin_bp, Blueprint):
-            raise TypeError('Cannot register plugin, must return a blueprint')
+            raise TypeError("Cannot register plugin, must return a blueprint")
         PLUGINS.append(plugin)
         # check if there are preferences for the plugin
         if plugin.user_pref is not None:
             preferences.add_user_pref(plugin.name, plugin.user_pref)
         return plugin
+
+    return wrapped
+
+
+def register_passive_plugin(func):
+    """Decorator for registering passive plugins.
+
+    If the plugin is a valid passive plugin, the plugin object will be added to
+    the global PLUGINS. If the plugin has preferences, they will be added
+    to the global USER_PREF with the plugin name as the key.
+
+    Args:
+        func: Expects a function that returns a PassivePluginBase object
+
+    Raises:
+        TypeError: The function did not return a valid PassivePluginBase plugin
+        ValueError: The proper configuration values were not provided
+    Returns:
+        Wrapped function that registers and returns valid passive plugins.
+    """
+
+    @functools.wraps(func)
+    @register_plugin
+    def wrapped(*args, **kwargs):
+        plugin = func(*args, **kwargs)
+        if not isinstance(plugin, PassivePluginBase):
+            raise TypeError(
+                f"Cannot register plugin: wrong type {type(plugin)}"
+            )
+        # check config
+        try:
+            plugin_config = current_app.config["PDNSSOURCES"][plugin.name]
+            plugin.setConfig(plugin_config)
+        except (KeyError, ValueError):
+            raise ValueError("Passive plugin missing proper configuration")
+
+        return plugin
+
     return wrapped

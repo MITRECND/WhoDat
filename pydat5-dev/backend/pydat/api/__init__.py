@@ -4,6 +4,8 @@ from pydat.api.controller import exceptions
 from pydat.core import plugins
 from pydat.core.config_parser import configParser, DEFAULT_CONFIG
 from pydat.api.controller.session import session_bp
+from pydat.api.controller.v1.whois import whoisv1_bp
+from pydat.api.controller.v2.whois import whoisv2_bp
 
 
 def create_app(config=None):
@@ -24,19 +26,27 @@ def create_app(config=None):
 
     # Register Framework Blueprints
     app.register_blueprint(session_bp, url_prefix="/api/v2")
+    app.register_blueprint(whoisv2_bp, url_prefix="/api/v2")
+
+    # version 1 backwards compatibility
+    app.register_blueprint(whoisv1_bp, url_prefix="/api/v1")
 
     # Register Plugin Blueprints and JSfiles
     # add error handling
     included_jsfiles = []
-    for plugin in plugins.get_plugins():
-        app.register_blueprint(
-            plugin.blueprint, url_prefix='/api/v2/' + plugin.name)
-        for jsfile in plugin.jsfiles:
-            included_jsfiles.append(jsfile)
+    with app.app_context():
+        for plugin in plugins.get_plugins():
+            prefix = '/api/v2/'
+            if isinstance(plugin, plugins.PassivePluginBase):
+                prefix = prefix+'passive/'
+            app.register_blueprint(
+                plugin.blueprint, url_prefix=prefix + plugin.name)
+            for jsfile in plugin.jsfiles:
+                included_jsfiles.append(jsfile)
 
     # Catch invalid backend calls
-    @app.route("/api/v2/", defaults={"path": ""})
-    @app.route("/api/v2/<path:path>")
+    @app.route("/api", defaults={"path": ""})
+    @app.route("/api/<path:path>")
     def invalid(path):
         raise exceptions.ClientError("Nonexistant view {}".format(path), 404)
 
