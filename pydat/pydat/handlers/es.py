@@ -8,10 +8,9 @@ import elasticsearch
 from elasticsearch import Elasticsearch
 from flask_caching import Cache
 from flask import current_app
-#from handlers.advanced_es import yacc
-from advanced_es import yacc     # DIRECT-TESTING
+from handlers.advanced_es import yacc
 
-#TODO: RE usage of settings- with  Flask now, the settings.py module can be loaded as well into the app
+#TODO: RE usage of settings with  Flask now, the settings.py module can be loaded as well into the app
 #object, and thus accessed here via "current_app.config". But make sure settings.py module is loaded into
 # Flask app. Currently dont know where in code/bootup that is being done since using blueprints etc..
 
@@ -496,7 +495,7 @@ def _es_connector():
                            **security_args)
         # TODO: originally tried to do 'es.ping()' as a connection test as well
         # but when tested with no ES instance running, this would indefinitely hang
-        
+
         #CACHE.set("es_client", es, 600)  TODO: Right now cant do. The client is not pickle-able (which is what Flask cache does)
         return es
     except elasticsearch.ImproperlyConfigured as e:
