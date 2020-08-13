@@ -8,7 +8,8 @@ import elasticsearch
 from elasticsearch import Elasticsearch
 from flask_caching import Cache
 from flask import current_app
-from handlers.advanced_es import yacc
+#from handlers.advanced_es import yacc
+from advanced_es import yacc     # DIRECT-TESTING
 
 #TODO: RE usage of settings- with  Flask now, the settings.py module can be loaded as well into the app
 #object, and thus accessed here via "current_app.config". But make sure settings.py module is loaded into
@@ -26,7 +27,7 @@ META_INDEX = f".{current_app.config['ELASTICSEARCH']['indexPrefix']}-meta"
 DOC_TYPE = "doc"
 
 
-class ESConnectionError(Execption):
+class ESConnectionError(Exception):
     """Custom error exception that denotes a failure to establish
     a python ElasticSearch client handle, thus implying a connectivity
     problem to the ElasticSearch instance.
@@ -291,7 +292,7 @@ def data_table_search(key, value, skip, pagesize, sortset, sfilter, low, high):
     Args:
         key (str): key field
         value (): key value
-        skip (int): 
+        skip (int): starting results offset
         pagesize (int): number of ElasticSearch result hits to retrieve
         sortset (list): tuples of the form (sort_key, sort_direction)
         sfilter (str): regex search filter
@@ -341,7 +342,7 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
 
     Args:
         query (str): query string
-        skip (int):
+        skip (int): starting results offset
         pagesize (int): number of ElastcSearch result hits to retrieve
         unique (bool):  restrict results to unique set of records
         sort (list): tuples of the form (sort_key, sort_direction)
@@ -353,8 +354,6 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
         RuntimeError - when enexpected exception in creating the query or processing ES results
         ESQueryError - when error occurs at ElasticSearch from sent query/request.
     """
-    results = {"success": False}
-    results["aaData"] = []
     es = _es_connector()
     q = _create_advanced_query(query, skip, pagesize, unique, sort)
 
@@ -370,7 +369,7 @@ def adv_data_table_search(query, skip, pagesize, unique=False, sort=None):
     except elasticsearch.ElasticsearchException as e:
         raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
 
-    results.update(_process_adv_data_table_search(domains))
+    results = _process_adv_data_table_search(domains, unique)
 
     return results
 
@@ -402,9 +401,14 @@ def search(key, value, filt=None, limit=10000, low=None, high=None, versionSort=
     if key != current_app.config["SEARCHKEYS"][0][0]:
         key = f"details.{key}"
     value = value.lower()
-    low, high = str(low), str(high)
 
-    query = _create_search_query(key, value, limit, low, high, versionSort)
+    # preserve None args, otherwise will break in _create_search_query()
+    if low is not None:
+        low = str(low)
+    if high is not None:
+        high = str(high)
+
+    query = _create_search_query(key, value, filt, limit, low, high, versionSort)
 
     # XXX DEBUG CODE
     try:
@@ -435,7 +439,7 @@ def advanced_search(search_string, skip=0, size=20, unique=False, sort=None):  #
 
     Args:
         query (str): search query
-        skip (int): 
+        skip (int): starting results offset
         size: number of result hits to retrieve
         unique (bool): restrict results to unique set of records
         sort (list): tuples of the form (sort_key, sort_direction)
@@ -473,10 +477,10 @@ def _es_connector():
     """
     security_args = dict()
 
-    # Check if client is cached
-    es_client = CACHE.get("es_client")
-    if es_client is not None and es_client.ping():
-        return CACHE.get("es_client")
+    # Check if client is cached      TODO: Right now cant do. The client is not pickle-able (which is what Flask cache does)
+    #es_client = CACHE.get("es_client")
+    #if es_client is not None and es_client.ping():
+    #    return CACHE.get("es_client")
 
     if current_app.config["ELASTICSEARCH"]["user"] is not None and current_app.config["ELASTICSEARCH"]["pass"] is not None:
         security_args["http_auth"] = (current_app.config["ELASTICSEARCH"]["user"],
@@ -490,7 +494,10 @@ def _es_connector():
                            max_retries=100,
                            retry_on_timeout=True,
                            **security_args)
-        CACHE.set("es_client", es, 600)  # cache client handle
+        # TODO: originally tried to do 'es.ping()' as a connection test as well
+        # but when tested with no ES instance running, this would indefinitely hang
+        
+        #CACHE.set("es_client", es, 600)  TODO: Right now cant do. The client is not pickle-able (which is what Flask cache does)
         return es
     except elasticsearch.ImproperlyConfigured as e:
         raise ESConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
@@ -498,7 +505,7 @@ def _es_connector():
         raise EsConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
 
 
-def _create_search_query(key, value, limit, low, high, versionSort):
+def _create_search_query(key, value, filt, limit, low, high, versionSort):
     """
     
     Raises:
@@ -825,12 +832,13 @@ def _process_data_table_search_results(domains):
     return results
 
 
-def _process_adv_data_table_search(domains):
+def _process_adv_data_table_search(domains, unique):
     """
     Raises:
         RuntimError
     """
-    results = {}
+    results = {"success": False}
+    results["aaData"] = []
     try:
         if "error" in domains:
             results["message"] = "Error"
@@ -886,7 +894,7 @@ def _process_adv_data_table_search(domains):
 
             results["success"] = True
     except Exception as e:
-        raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(r)}")
+        raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(e)}")
     return results
 
 
@@ -895,7 +903,7 @@ def _create_advanced_query(query, skip, size, unique, sort=None):
 
     Args:
         query (str): search query
-        skip (int): 
+        skip (int): starting results offset
         size (int): number of result hits to retrieve
         unique (bool): restrict results to unique set of records
         sort (list): tuples of the form (sort_key, sort_direction)
