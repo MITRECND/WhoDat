@@ -44,7 +44,7 @@ class ElasticsearchHandler:
     def init_app(self, app):
         app.config["CACHE_TYPE"] = "simple"
         app.config["CACHE_DEFAULT_TIMEOUT"] = CACHE_TIMEOUT
-        self._cache = Cache(current_app)
+        self._cache = Cache(app)
 
     def record_count(self):
         """Return record count of ES record index.
