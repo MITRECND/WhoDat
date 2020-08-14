@@ -46,6 +46,7 @@ class ElasticsearchHandler:
         self._search_index = f"{app.config['ELASTICSEARCH']['indexPrefix']}-search"
         self._meta_index = f".{app.config['ELASTICSEARCH']['indexPrefix']}-meta"
 
+
     def record_count(self):
         """Return record count of ES record index.
 
@@ -477,7 +478,7 @@ class ElasticsearchHandler:
         if current_app.config["ELASTICSEARCH"].get("user", None) is not None and current_app.config["ELASTICSEARCH"].get("pass" , None) is not None:
             security_args["http_auth"] = (current_app.config["ELASTICSEARCH"]["user"],
                                         current_app.config["ELASTICSEARCH"]["pass"])
-        if current_app.config["ELASTICSEARCH"].get("cacert", None)is not None:
+        if current_app.config["ELASTICSEARCH"].get("cacert", None) is not None:
             security_args["use_ssl"] = True
             security_args["ca_certs"] = current_app.config["ELASTICSEARCH"]["cacert"]
 
