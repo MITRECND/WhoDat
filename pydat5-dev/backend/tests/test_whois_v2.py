@@ -1,15 +1,16 @@
 import pytest
 from unittest.mock import MagicMock
-from pydat.core import es as elastic
+from pydat.core.es import ElasticsearchHandler as elastic
+from pydat.core.es import ESConnectionError, ESQueryError
 import socket
 
 
 # identical code to testing metadata v1 (shared)
 @pytest.mark.parametrize("version", ("version", -1, 1))
-def test_metadata(monkeypatch, client, version):
+def test_metadata(monkeypatch, client, version, es_handler):
     # metadata is always valid
     mock_meta = MagicMock(return_value={"data": "success"})
-    monkeypatch.setattr(elastic, "metadata", mock_meta)
+    monkeypatch.setattr(es_handler, "metadata", mock_meta)
 
     # type checking
     response = client.get(f"/api/v2/metadata/{version}")
@@ -25,11 +26,11 @@ def test_metadata(monkeypatch, client, version):
     assert client.get("/api/v2/metadata/1").status_code == 404
 
     # error: version doesn't exist
-    mock_meta.side_effect = elastic.ESQueryError
+    mock_meta.side_effect = ESQueryError
     assert client.get("/api/v2/metadata/1").status_code == 500
 
 
-def test_resolve(monkeypatch, client):
+def test_resolve(monkeypatch, client, es_handler):
     response = client.get("/api/v2/resolve")
     assert response.status_code == 404
 
@@ -49,11 +50,11 @@ def test_resolve(monkeypatch, client):
 
 
 @pytest.mark.parametrize("version", ("version", -1, 3, 100, 1.2, -0.1))
-def test_domains(monkeypatch, config_app, version):
+def test_domains(monkeypatch, config_app, version, es_handler):
     client = config_app.test_client()
     # search is always valid
     mock_search = MagicMock(return_value={"total": 100, "data": [0] * 100})
-    monkeypatch.setattr(elastic, "search", mock_search)
+    monkeypatch.setattr(es_handler, "search", mock_search)
 
     # test checking valid search keys
     for key in config_app.config["SEARCHKEYS"]:
@@ -128,11 +129,11 @@ def test_domains(monkeypatch, config_app, version):
         ).status_code == 500
 
 
-def test_domains_diff(monkeypatch, config_app):
+def test_domains_diff(monkeypatch, config_app, es_handler):
     client = config_app.test_client()
 
     mock_diff = MagicMock(return_value={"data": [{"success": 1}]})
-    monkeypatch.setattr(elastic, "search", mock_diff)
+    monkeypatch.setattr(es_handler, "search", mock_diff)
     # required parameters
     response = client.post("/api/v2/domains/diff", json={})
     assert response.status_code == 400
@@ -151,11 +152,11 @@ def test_domains_diff(monkeypatch, config_app):
     # diff functionality is equivalent to v1
 
 
-def test_query(monkeypatch, config_app):
+def test_query(monkeypatch, config_app, es_handler):
     client = config_app.test_client()
 
     mock_adv = MagicMock(return_value={"total": 100, "data": []})
-    monkeypatch.setattr(elastic, "advanced_search", mock_adv)
+    monkeypatch.setattr(es_handler, "advanced_search", mock_adv)
 
     response = client.post("/api/v2/query")
     assert response.status_code == 400
@@ -196,19 +197,19 @@ def test_query(monkeypatch, config_app):
     )
     assert response.status_code == 400
 
-    mock_adv.side_effect = elastic.ESQueryError
+    mock_adv.side_effect = ESQueryError
     response = client.post("/api/v2/query", json={"query": "query"})
     assert response.status_code == 500
 
 
-def test_connection_error(monkeypatch, config_app):
-    mock_connection = MagicMock(side_effect=elastic.ESConnectionError)
+def test_connection_error(monkeypatch, config_app, es_handler):
+    mock_connection = MagicMock(side_effect=ESConnectionError)
     client = config_app.test_client()
 
     # search connection error
-    monkeypatch.setattr(elastic, "search", mock_connection)
-    with pytest.raises(elastic.ESConnectionError):
-        assert elastic.search()
+    monkeypatch.setattr(es_handler, "search", mock_connection)
+    with pytest.raises(ESConnectionError):
+        assert es_handler.search()
     # Domains
     response = client.post(
         "/api/v2/domains/domainName", json={"value": "value"}
@@ -220,18 +221,18 @@ def test_connection_error(monkeypatch, config_app):
     )
     assert response.status_code == 500
 
-    monkeypatch.setattr(elastic, "metadata", mock_connection)
-    with pytest.raises(elastic.ESConnectionError):
-        assert elastic.metadata()
+    monkeypatch.setattr(es_handler, "metadata", mock_connection)
+    with pytest.raises(ESConnectionError):
+        assert es_handler.metadata()
     # Metadata
     response = client.get("/api/v2/metadata")
     assert response.status_code == 500
     response = client.get("/api/v2/metadata/1")
     assert response.status_code == 500
 
-    monkeypatch.setattr(elastic, "advanced_search", mock_connection)
-    with pytest.raises(elastic.ESConnectionError):
-        assert elastic.advanced_search()
+    monkeypatch.setattr(es_handler, "advanced_search", mock_connection)
+    with pytest.raises(ESConnectionError):
+        assert es_handler.advanced_search()
     # Query
     response = client.post("/api/v2/query", json={"query": "query"})
     assert response.status_code == 500

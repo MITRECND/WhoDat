@@ -1,5 +1,6 @@
 from pydat.api.controller.exceptions import ClientError, ServerError
-from pydat.core import es as elastic
+from pydat.api import elasticsearch_handler as es_handler
+from pydat.core.es import ESConnectionError, ESQueryError
 
 
 def metadata(version=None):
@@ -27,10 +28,10 @@ def metadata(version=None):
         raise ClientError(f"Version {version} must be a valid float")
 
     try:
-        results = elastic.metadata(version)
-    except elastic.ESConnectionError:
+        results = es_handler.metadata(version)
+    except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
-    except elastic.ESQueryError:
+    except ESQueryError:
         raise ServerError("Unexpected issue when requesting search")
 
     if not results["data"]:
@@ -64,13 +65,13 @@ def diff(domainName, v1, v2):
         raise ClientError("Input paramaters are of the wrong type")
 
     try:
-        v1_result = elastic.search("domainName", domainName, filt=None, low=v1)
-        v2_result = elastic.search("domainName", domainName, filt=None, low=v2)
+        v1_result = es_handler.search("domainName", domainName, filt=None, low=v1)
+        v2_result = es_handler.search("domainName", domainName, filt=None, low=v2)
     except ValueError:
         raise ClientError(f"Invalid search of {domainName} and {v1} or {v2}")
-    except elastic.ESConnectionError:
+    except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
-    except elastic.ESQueryError:
+    except ESQueryError:
         raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")

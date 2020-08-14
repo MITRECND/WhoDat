@@ -1,16 +1,10 @@
 import os
 from flask import Flask, send_from_directory, render_template
-from pydat.api.controller import exceptions
-from pydat.core import plugins
 from pydat.core.config_parser import configParser, DEFAULT_CONFIG
 from pydat.core.es import ElasticsearchHandler
 
-from pydat.api.controller.session import session_bp
-from pydat.api.controller.v1.whois import whoisv1_bp
-from pydat.api.controller.v2.whois import whoisv2_bp
 
-
-es_handler = ElasticsearchHandler()
+elasticsearch_handler = ElasticsearchHandler()
 
 
 def create_app(config=None):
@@ -27,12 +21,16 @@ def create_app(config=None):
     config_parser.parse()
 
     # Initialize Plugins
-    es_handler.init_app(app)
+    elasticsearch_handler.init_app(app)
 
     # Register Error Handler
+    from pydat.api.controller import exceptions
     exceptions.register_errors(app)
 
     # Register Framework Blueprints
+    from pydat.api.controller.session import session_bp
+    from pydat.api.controller.v1.whois import whoisv1_bp
+    from pydat.api.controller.v2.whois import whoisv2_bp
     app.register_blueprint(session_bp, url_prefix="/api/v2")
     app.register_blueprint(whoisv2_bp, url_prefix="/api/v2")
 
@@ -41,6 +39,7 @@ def create_app(config=None):
 
     # Register Plugin Blueprints and JSfiles
     # add error handling
+    from pydat.core import plugins
     included_jsfiles = []
     with app.app_context():
         for plugin in plugins.get_plugins():

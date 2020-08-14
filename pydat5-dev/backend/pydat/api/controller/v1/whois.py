@@ -1,8 +1,10 @@
 from flask import Blueprint, current_app, request
 from pydat.api.controller.exceptions import ClientError, ServerError
-from pydat.core import es as elastic
+from pydat.api import elasticsearch_handler as es_handler
+from pydat.core.es import ESConnectionError, ESQueryError
 from urllib import parse
 from pydat.api.shared import whois
+
 
 whoisv1_bp = Blueprint("whoisv1", __name__)
 
@@ -59,14 +61,14 @@ def domains(key, value, low=None, high=None):
         versionSort = True
 
     try:
-        results = elastic.search(
+        results = es_handler.search(
             key, value, filt=None, low=low, high=high, versionSort=versionSort
         )
     except ValueError:
         raise ClientError(f"Invalid search of {key}:{value}")
-    except elastic.ESConnectionError:
+    except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
-    except elastic.ESQueryError:
+    except ESQueryError:
         raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")
@@ -91,10 +93,10 @@ def domains_latest(key, value):
         dict: All domain hits that matched search with their details
     """
     try:
-        low = elastic.lastVersion()
-    except elastic.ESConnectionError:
+        low = es_handler.last_version()
+    except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
-    except elastic.ESQueryError:
+    except ESQueryError:
         raise ServerError("Unexpected issue when requesting latest version")
     except RuntimeError:
         raise ServerError("Failed to process results")
@@ -215,12 +217,12 @@ def query():
 
     skip = (page_num - 1) * page_size
     try:
-        results = elastic.advanced_search(query, skip, page_size, unique)
+        results = es_handler.advanced_search(query, skip, page_size, unique)
     except ValueError:
         raise ClientError(f"Invalid search query {query}")
-    except elastic.ESConnectionError:
+    except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
-    except elastic.ESQueryError:
+    except ESQueryError:
         raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")

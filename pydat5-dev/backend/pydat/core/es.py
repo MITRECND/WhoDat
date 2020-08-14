@@ -43,9 +43,7 @@ class ElasticsearchHandler:
         app.config["CACHE_TYPE"] = "simple"
         app.config["CACHE_DEFAULT_TIMEOUT"] = CACHE_TIMEOUT
         self._cache = Cache(app)
-        print(">>>>>>>")
-        print(app.config)
-        self._self._search_index = f"{app.config['ELASTICSEARCH']['indexPrefix']}-search"
+        self._search_index = f"{app.config['ELASTICSEARCH']['indexPrefix']}-search"
         self._meta_index = f".{app.config['ELASTICSEARCH']['indexPrefix']}-meta"
 
     def record_count(self):
@@ -476,11 +474,10 @@ class ElasticsearchHandler:
         #es_client = self._cache.get("es_client")
         #if es_client is not None and es_client.ping():
         #    return self._cache.get("es_client")
-
-        if current_app.config["ELASTICSEARCH"]["user"] is not None and current_app.config["ELASTICSEARCH"]["pass"] is not None:
+        if current_app.config["ELASTICSEARCH"].get("user", None) is not None and current_app.config["ELASTICSEARCH"].get("pass" , None) is not None:
             security_args["http_auth"] = (current_app.config["ELASTICSEARCH"]["user"],
                                         current_app.config["ELASTICSEARCH"]["pass"])
-        if current_app.config["ELASTICSEARCH"]["cacert"] is not None:
+        if current_app.config["ELASTICSEARCH"].get("cacert", None)is not None:
             security_args["use_ssl"] = True
             security_args["ca_certs"] = current_app.config["ELASTICSEARCH"]["cacert"]
 
