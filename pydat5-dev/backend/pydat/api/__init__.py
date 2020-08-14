@@ -3,9 +3,14 @@ from flask import Flask, send_from_directory, render_template
 from pydat.api.controller import exceptions
 from pydat.core import plugins
 from pydat.core.config_parser import configParser, DEFAULT_CONFIG
+from pydat.core.es import ElasticsearchHandler
+
 from pydat.api.controller.session import session_bp
 from pydat.api.controller.v1.whois import whoisv1_bp
 from pydat.api.controller.v2.whois import whoisv2_bp
+
+
+es_handler = ElasticsearchHandler()
 
 
 def create_app(config=None):
@@ -20,6 +25,9 @@ def create_app(config=None):
 
     config_parser = configParser(app)
     config_parser.parse()
+
+    # Initialize Plugins
+    es_handler.init_app(app)
 
     # Register Error Handler
     exceptions.register_errors(app)

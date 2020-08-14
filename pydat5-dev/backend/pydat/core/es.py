@@ -16,8 +16,6 @@ from pydat.core.advanced_es import yacc
 
 
 CACHE_TIMEOUT = 300  # Flask cache timeout
-SEARCH_INDEX = f"{current_app.config['ELASTICSEARCH']['indexPrefix']}-search"
-META_INDEX = f".{current_app.config['ELASTICSEARCH']['indexPrefix']}-meta"
 DOC_TYPE = "doc"
 
 
@@ -45,6 +43,10 @@ class ElasticsearchHandler:
         app.config["CACHE_TYPE"] = "simple"
         app.config["CACHE_DEFAULT_TIMEOUT"] = CACHE_TIMEOUT
         self._cache = Cache(app)
+        print(">>>>>>>")
+        print(app.config)
+        self._self._search_index = f"{app.config['ELASTICSEARCH']['indexPrefix']}-search"
+        self._meta_index = f".{app.config['ELASTICSEARCH']['indexPrefix']}-meta"
 
     def record_count(self):
         """Return record count of ES record index.
@@ -59,7 +61,7 @@ class ElasticsearchHandler:
         if records is None:
             es = self._es_connector()
             try:
-                records = es.cat.count(index=SEARCH_INDEX, h="count")
+                records = es.cat.count(index=self._search_index, h="count")
                 self._cache.set("record_count", records)
             except elasticsearch.ElasticsearchException as e:
                 raise ESQueryError(f"The following exception occured while trying to execute 'count' call to ElasticSearch instance: {repr(e)}")
@@ -109,7 +111,7 @@ class ElasticsearchHandler:
         results = self._cache.get("cluster_stats")
         if results is None:
             try:
-                results = es.search(index=SEARCH_INDEX, body=query)
+                results = es.search(index=self._search_index, body=query)
             except elasticsearch.ElasticsearchException as e:
                 raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
             # Cache for an hour since this is a relatively expensive query
@@ -154,7 +156,7 @@ class ElasticsearchHandler:
         if lastVersion is None:
             es = self._es_connector()
             try:
-                result = es.get(index=META_INDEX, doc_type=DOC_TYPE, id=0)
+                result = es.get(index=self._meta_index, doc_type=DOC_TYPE, id=0)
                 if result["found"]:
                     self._cache.set("lastVersion",
                             result["_source"]["lastVersion"])
@@ -180,7 +182,7 @@ class ElasticsearchHandler:
             if update is None:
                 es = self._es_connector()
                 try:
-                    res = es.search(index=META_INDEX,
+                    res = es.search(index=self._meta_index,
                                     body={"query": {"match_all": {}},
                                         "sort": [{"metadata": {"order": "desc"}}],
                                         "size": 1})
@@ -219,7 +221,7 @@ class ElasticsearchHandler:
             res = self._cache.get("all_metadata")
             if res is None:
                 try:
-                    res = es.search(index=META_INDEX,
+                    res = es.search(index=self._meta_index,
                                     body={"query": {"match_all": {}},
                                         "sort": "metadata",
                                         "size": 999})
@@ -237,7 +239,7 @@ class ElasticsearchHandler:
         else:
             version = int(version)
             try:
-                res = es.get(index=META_INDEX, doc_type=DOC_TYPE, id=version)
+                res = es.get(index=self._meta_index, doc_type=DOC_TYPE, id=version)
             except elasticsearch.ElasticsearchException as e:
                 raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
             if res["found"]:
@@ -325,7 +327,7 @@ class ElasticsearchHandler:
                 pass
 
         try:
-            domains = es.search(index=SEARCH_INDEX,
+            domains = es.search(index=self._search_index,
                                 body=query)
         except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
@@ -360,7 +362,7 @@ class ElasticsearchHandler:
             except Exception as e:
                 pass
         try:
-            domains = es.search(index=SEARCH_INDEX, body=q,
+            domains = es.search(index=self._search_index, body=q,
                                 search_type="dfs_query_then_fetch")
         except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
@@ -412,7 +414,7 @@ class ElasticsearchHandler:
         except Exception as e:
             pass
         try:
-            domains = es.search(index=SEARCH_INDEX, body=query)
+            domains = es.search(index=self._search_index, body=query)
         except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
 
@@ -447,7 +449,7 @@ class ElasticsearchHandler:
         es = self._es_connector()
         query = self._create_advanced_query(search_string, skip, size, unique, sort)
         try:
-            domains = es.search(index=SEARCH_INDEX, body=query,
+            domains = es.search(index=self._search_index, body=query,
                                 search_type="dfs_query_then_fetch")
         except elasticsearch.ElasticsearchException as e:
             raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
