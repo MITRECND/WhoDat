@@ -1,6 +1,7 @@
 from flask import Blueprint, request, current_app
 from pydat.api.controller.exceptions import ClientError, ServerError
-from pydat.core import es as elastic
+from pydat.api import elasticsearch_handler as es_handler
+from pydat.core.es import ESConnectionError, ESQueryError
 from urllib import parse
 import socket
 from pydat.api.shared import whois
@@ -173,14 +174,14 @@ def domains(search_key):
     value = parse.unquote(value)
 
     try:
-        search_results = elastic.search(
+        search_results = es_handler.search(
             search_key, value, filt=None, low=version, versionSort=versionSort
         )
     except ValueError:
         raise ClientError(f"Invalid search of {search_key}:{value}")
-    except elastic.ESConnectionError:
+    except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
-    except elastic.ESQueryError:
+    except ESQueryError:
         raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")
@@ -257,14 +258,14 @@ def query():
         sort = None
 
     try:
-        search_results = elastic.advanced_search(
+        search_results = es_handler.advanced_search(
             query, skip, chunk_size, unique, sort=sort
         )
     except ValueError:
         raise ClientError(f"Invalid search query {query}")
-    except elastic.ESConnectionError:
+    except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
-    except elastic.ESQueryError:
+    except ESQueryError:
         raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
         raise ServerError("Failed to process results")

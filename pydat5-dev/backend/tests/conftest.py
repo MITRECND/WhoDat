@@ -1,5 +1,5 @@
 import pytest
-from pydat.api import create_app
+from pydat.api import create_app, elasticsearch_handler
 from pydat.core.plugins import (
     PluginBase,
     register_plugin,
@@ -96,3 +96,9 @@ def create_passive_plugin():
         return TestPassivePlugin(name, bp)
 
     return _create_passive_plugin
+
+
+@pytest.fixture
+def es_handler():
+    """ElasticSearch Handler"""
+    return elasticsearch_handler

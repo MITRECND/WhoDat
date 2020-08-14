@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-DEBUG = False
+DEBUG = False   # TODO: as flask now, this is special variable. Still correct usage?
 
 SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
