@@ -8,8 +8,17 @@ setup(
     zip_safe=False,
     install_requires=[
         "flask",
-        "cerberus"
+        "cerberus",
+        "elasticsearch",
+        "ply",
+        "flask-caching"
         ],
+    tests_require=[
+        "pytest",
+        "pytest-coverage",
+        "flake8",
+        "blinker"
+    ],
     classifiers=["Programming language :: Python :: 3", ],
     python_requires=">=3.6",
     entry_points={

@@ -65,8 +65,10 @@ def diff(domainName, v1, v2):
         raise ClientError("Input paramaters are of the wrong type")
 
     try:
-        v1_result = es_handler.search("domainName", domainName, filt=None, low=v1)
-        v2_result = es_handler.search("domainName", domainName, filt=None, low=v2)
+        v1_result = es_handler.search(
+            "domainName", domainName, filt=None, low=v1)
+        v2_result = es_handler.search(
+            "domainName", domainName, filt=None, low=v2)
     except ValueError:
         raise ClientError(f"Invalid search of {domainName} and {v1} or {v2}")
     except ESConnectionError:

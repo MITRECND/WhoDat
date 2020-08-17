@@ -87,7 +87,7 @@ def t_error(t):
 
 
 # Build the lexer
-import ply.lex as lex
+import ply.lex as lex  # noqa: E402
 lex.lex()
 
 
@@ -424,7 +424,6 @@ def p_specific_fuzzy_quoted(t):
     value = value.lower()
 
     fields1 = []
-    fields2 = []
 
     if key in special_keywords:
         fields1 = special_keywords[key]
@@ -637,7 +636,7 @@ def p_daterange_range(t):
         start = datetime.datetime.strptime(t[3], '%Y-%m-%d')
         end = (datetime.datetime.strptime(t[5], '%Y-%m-%d') +
                datetime.timedelta(1, 0))
-    except Exception as e:
+    except Exception:
         raise ValueError("Invalid Date Range")
 
     if end < start:
@@ -760,7 +759,7 @@ precedence = (
         ('left', 'COLON'),
     )
 
-import ply.yacc as yacc
+import ply.yacc as yacc  # noqa: E402
 yacc.yacc(debug=False)
 
 
