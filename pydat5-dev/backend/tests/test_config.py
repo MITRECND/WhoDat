@@ -1,12 +1,12 @@
 from pydat.api import create_app
-from pydat.core.config_parser import configParser
+from pydat.core.config_parser import ConfigParser
 import pytest
 from unittest import mock
 
 
 def test_config_parser():
     app = create_app()
-    parser = configParser(app)
+    parser = ConfigParser(app)
     parser.parse()
 
 
@@ -19,7 +19,7 @@ def test_config_parser_env_invalid(monkeypatch):
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
         with pytest.raises(ValueError):
-            configParser(app)
+            ConfigParser(app)
 
     app = create_app()
     fake_environ = mock.MagicMock(return_value=[
@@ -29,7 +29,7 @@ def test_config_parser_env_invalid(monkeypatch):
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
         with pytest.raises(AttributeError):
-            configParser(app)
+            ConfigParser(app)
 
 
 def test_config_parser_envvar(monkeypatch):
@@ -42,9 +42,9 @@ def test_config_parser_envvar(monkeypatch):
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.keys', fake_environ_keys)
         monkey.setattr(app, 'config', fake_app_config)
-        configParser(app)
+        ConfigParser(app)
         fake_app_config.from_envvar.assert_called_with(
-            configParser.ENV_CONFIG_FILE)
+            ConfigParser.ENV_CONFIG_FILE)
 
 
 def test_config_parser_env_boolean(monkeypatch):
@@ -56,7 +56,7 @@ def test_config_parser_env_boolean(monkeypatch):
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
         with pytest.raises(ValueError):
-            configParser(app)
+            ConfigParser(app)
 
     app = create_app()
     fake_environ = mock.MagicMock(return_value=[
@@ -65,7 +65,7 @@ def test_config_parser_env_boolean(monkeypatch):
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
         with pytest.raises(ValueError):
-            configParser(app)
+            ConfigParser(app)
 
     app = create_app()
     fake_environ = mock.MagicMock(return_value=[
@@ -73,7 +73,7 @@ def test_config_parser_env_boolean(monkeypatch):
     ])
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        configParser(app)
+        ConfigParser(app)
         assert(not app.config['DEBUG'])
 
     app = create_app()
@@ -82,7 +82,7 @@ def test_config_parser_env_boolean(monkeypatch):
     ])
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        configParser(app)
+        ConfigParser(app)
         assert(app.config['DEBUG'])
 
 
@@ -93,7 +93,7 @@ def test_config_env_fields(monkeypatch):
     ])
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        configParser(app)
+        ConfigParser(app)
         assert(app.config['TEST'] == 'value')
 
 
@@ -104,7 +104,7 @@ def test_config_env_dicts(monkeypatch):
     ])
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        configParser(app)
+        ConfigParser(app)
         assert(app.config['TEST']['FIELD'] == 'value')
 
     app = create_app()
@@ -113,7 +113,7 @@ def test_config_env_dicts(monkeypatch):
     ])
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        configParser(app)
+        ConfigParser(app)
         assert(app.config['TEST']['FIELD']['NESTED'] == 'value')
 
     app = create_app()
@@ -123,7 +123,7 @@ def test_config_env_dicts(monkeypatch):
     ])
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        configParser(app)
+        ConfigParser(app)
         assert(app.config['TEST']['FIELD']['NESTED2'] == 'value')
 
     app = create_app()
@@ -132,7 +132,7 @@ def test_config_env_dicts(monkeypatch):
     ])
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        configParser(app)
+        ConfigParser(app)
         assert(app.config['ELASTICSEARCH']['uri'] == 'localhost:9001')
 
 
@@ -143,6 +143,6 @@ def test_config_invalidated(monkeypatch, capsys):
 
     with monkeypatch.context() as monkey:
         monkey.setattr(app, 'config', fake_app_config)
-        parser = configParser(app)
+        parser = ConfigParser(app)
         with pytest.raises(ValueError):
             parser.parse()

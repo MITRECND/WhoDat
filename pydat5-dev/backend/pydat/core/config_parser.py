@@ -78,7 +78,7 @@ BASE_SCHEMA = {
 }
 
 
-class configParser:
+class ConfigParser:
     ENV_CONFIG_FILE = "PYDATCONFIG"
 
     def __init__(self, app):
@@ -155,12 +155,8 @@ class configParser:
 
         nconfig = v.normalized(tmp_config)
 
-        if 'PDNSSOURCES' not in nconfig:
-            nconfig['PDNSSOURCES'] = dict()
-
-        for key in nconfig['PDNSSOURCES'].keys():
-            nconfig['PDNSSOURCES'][key].update(nconfig['PROXIES'])
-            nconfig['PDNSSOURCES'][key]['SSLVERIFY'] = nconfig['SSLVERIFY']
-            nconfig['PDNSSOURCES'][key]['DEBUG'] = nconfig['DEBUG']
+        for key in ['PDNSSOURCES', 'PLUGINS']:
+            if key not in nconfig:
+                nconfig[key] = dict()
 
         self.app.config.from_mapping(**nconfig)

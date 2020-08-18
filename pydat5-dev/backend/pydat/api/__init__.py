@@ -1,10 +1,14 @@
 import os
+import sys
+import logging
 from flask import Flask, send_from_directory, render_template
-from pydat.core.config_parser import configParser, DEFAULT_CONFIG
+from pydat.core.config_parser import ConfigParser, DEFAULT_CONFIG
 from pydat.core.es import ElasticsearchHandler
+from pydat.core.preferences import UserPreferenceManager
 
 
 elasticsearch_handler = ElasticsearchHandler()
+preferences_manager = UserPreferenceManager()
 
 
 def create_app(config=None):
@@ -17,11 +21,18 @@ def create_app(config=None):
     if config is not None:
         app.config.from_mapping(config)
 
-    config_parser = configParser(app)
+    config_parser = ConfigParser(app)
     config_parser.parse()
+
+    if app.config['DEBUG']:
+        app.logger.setLevel(logging.DEBUG)
+    else:
+        app.logger.setLevel(logging.INFO)
 
     # Initialize Plugins
     elasticsearch_handler.init_app(app)
+
+    preferences_manager.init_app(app)
 
     # Register Error Handler
     from pydat.api.controller import exceptions
@@ -37,19 +48,23 @@ def create_app(config=None):
     # version 1 backwards compatibility
     app.register_blueprint(whoisv1_bp, url_prefix="/api/v1")
 
+    from pydat.core.plugins import PluginManager
+    plugin_manager = PluginManager()
+
     # Register Plugin Blueprints and JSfiles
     # add error handling
-    from pydat.core import plugins
     included_jsfiles = []
     with app.app_context():
-        for plugin in plugins.get_plugins():
-            prefix = '/api/v2/'
-            if isinstance(plugin, plugins.PassivePluginBase):
-                prefix = prefix+'passive/'
-            app.register_blueprint(
-                plugin.blueprint, url_prefix=prefix + plugin.name)
-            for jsfile in plugin.jsfiles:
-                included_jsfiles.append(jsfile)
+        try:
+            plugin_manager.gather_plugins()
+        except ValueError as e:
+            print(f"Unable to instantiate plugins: {str(e)}")
+            sys.exit(1)
+
+        for plugin in plugin_manager.plugins:
+            url_prefix = os.path.join(plugin.prefix, plugin.name)
+            app.register_blueprint(plugin.blueprint, url_prefix=url_prefix)
+            included_jsfiles.extend(plugin.jsfiles)
 
     # Catch invalid backend calls
     @app.route("/api", defaults={"path": ""})

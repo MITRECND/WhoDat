@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock
-from pydat.core.es import ElasticsearchHandler as elastic
 from pydat.core.es import ESConnectionError, ESQueryError
 import socket
 

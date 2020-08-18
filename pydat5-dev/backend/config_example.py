@@ -1,21 +1,22 @@
 DEBUG = True
-SSL_VERIFY = True
+SSLVERIFY = True
 ELASTICSEARCH = {
     'uri': 'localhost:9200',
-    'index_prefix': 'pydat',
+    'indexPrefix': 'pydat',
     'user': None,
     'pass': None,
     'cacert': None,
 }
 
-PDNS_SOURCES = {
-
+PDNSSOURCES = {
+    "dnsdb": {
+        "APIKEY": '1234'
+    }
 }
 
 PROXIES = {
     'http': 'http://127.0.0.1',
     'https': 'https://127.0.0.1',
-
 }
 
 SEARCHKEYS = [

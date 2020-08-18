@@ -1,67 +1,96 @@
-from pydat.core.plugins import PLUGINS
-from flask import Blueprint, session
+from pydat.core import plugins
+from pydat.core.plugins import PluginManager
+from flask import Flask, Blueprint
 from pydat.api import create_app
 from pydat.core.plugins import PluginBase, register_plugin
 import pytest
-from pydat.core import preferences
+# from pydat.core import preferences
 
 
-# tests a valid plugin
-def test_registration(create_plugin):
-    test_pref = {"name": str, "test": True}
-    plugin = create_plugin(
-        test_pref,
-        "test_plugin"
-    )
-    # check valid plugin and registration
-    assert plugin.name == "test_plugin"
-    assert plugin.user_pref == test_pref
-    assert isinstance(plugin.blueprint, Blueprint)
-    assert preferences.get_user_pref("test_plugin") == test_pref
-    plugin_exists = False
-    for obj in PLUGINS:
-        if obj is plugin:
-            plugin_exists = True
-    assert plugin_exists
+def test_registration(sample_plugin):
+    # Reset the PLUGINS Set
+    plugins.PLUGINS = set()
+
+    register_plugin(sample_plugin)
+    assert sample_plugin in plugins.PLUGINS
+
+    app = Flask(__name__)
+    app.config['PDNSSOURCES'] = dict()
+    app.config['PLUGINS'] = {'test_plugin': {}}
+
+    with app.app_context():
+        plugin_manager = PluginManager()
+        plugin_manager.gather_plugins()
+        loaded = plugin_manager.plugins
+        assert len(loaded) == 1
+        assert isinstance(loaded[0], sample_plugin)
+
+
+def test_registration_bp(sample_plugin):
+    # Reset the PLUGINS Set
+    plugins.PLUGINS = set()
 
     # check bp properly registered
-    app = create_app({"TESTING": True, })
+    register_plugin(sample_plugin)
+
+    app = create_app({"TESTING": True, "PLUGINS": {"test_plugin": {}}})
     routes = [str(p) for p in app.url_map.iter_rules()]
-    assert '/api/v2/test_plugin/hello' in routes
+    assert '/api/plugin/test_plugin/hello' in routes
 
     client = app.test_client()
-    response = client.get('/api/v2/test_plugin/hello')
+    response = client.get('/api/plugin/test_plugin/hello')
     assert response.status_code == 200
 
-    with client:
-        response = client.get('/api/v2/session/test_plugin')
-        assert response.is_json
-        json_data = response.get_json()
-        assert test_pref.keys() == json_data.keys()
-        assert "test_plugin" in session.keys()
-        assert test_pref.keys() == session["test_plugin"].keys()
+    # with client:
+    #     response = client.get('/api/v2/session/test_plugin')
+    #     assert response.is_json
+    #     json_data = response.get_json()
+    #     assert test_pref.keys() == json_data.keys()
+    #     assert "test_plugin" in session.keys()
+    #     assert test_pref.keys() == session["test_plugin"].keys()
 
 
 # test invalid plugins
 def test_invalid_plugin():
-    # is not child of PluginBase
+    # Reset the PLUGINS Set
+    plugins.PLUGINS = set()
+
+    # Not child of PluginBase
     class FakePlugin():
         def set_name(self):
             return "fake"
 
-    # does not return blueprint
-    class WrongPlugin(PluginBase):
+    with pytest.raises(TypeError):
+        register_plugin(FakePlugin)
+
+
+def test_invalid_plugin_bp():
+    # Reset the PLUGINS Set
+    plugins.PLUGINS = set()
+
+    # does not return proper blueprint
+    class BadPlugin(PluginBase):
+        def __init__(self):
+            super().__init__('bad_plugin', Blueprint('test', 'test'))
+
         @property
         def blueprint(self):
             return ["fake"]
 
-    @register_plugin
-    def start_plugin(cls):
-        test = cls()
-        return test
+        @blueprint.setter
+        def blueprint(self, newbp):
+            self._blueprint = newbp
 
-    with pytest.raises(TypeError):
-        assert start_plugin(FakePlugin)
+        def setConfig(self, **kwargs):
+            pass
 
-    with pytest.raises(TypeError):
-        assert start_plugin(WrongPlugin)
+    register_plugin(BadPlugin)
+
+    app = Flask(__name__)
+    app.config['PDNSSOURCES'] = dict()
+    app.config['PLUGINS'] = {'bad_plugin': {}}
+
+    with app.app_context():
+        plugin_manager = PluginManager()
+        with pytest.raises(ValueError):
+            plugin_manager.gather_plugins()

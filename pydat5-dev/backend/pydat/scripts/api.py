@@ -7,10 +7,10 @@ def _get_argparser():
 
     parser.add_argument(
         "--debug",
-        action="store",
+        action="store_true",
         dest="debug",
         default=False,
-        help="debug mode for flask"
+        help="Enable debug mode for flask"
     )
 
     parser.add_argument(
@@ -18,7 +18,7 @@ def _get_argparser():
         action="store",
         dest="host",
         default="127.0.0.1",
-        help="host for running app"
+        help="Host for running app"
     )
 
     parser.add_argument(
@@ -26,7 +26,7 @@ def _get_argparser():
         action="store",
         dest="port",
         default=5000,
-        help="port for running app"
+        help="Port for running app"
     )
 
     return parser

@@ -2,7 +2,6 @@ import pytest
 from pydat.api import create_app, elasticsearch_handler
 from pydat.core.plugins import (
     PluginBase,
-    register_plugin,
     PassivePluginBase,
 )
 from flask import Blueprint
@@ -37,65 +36,56 @@ def client():
 
 # simple test plugin, returns created valid plugin
 @pytest.fixture
-def create_plugin():
-    def _create_plugin(user_pref=None, name="hello", jsfiles=[]):
-        bp = Blueprint(name, __name__)
+def sample_plugin():
 
-        @bp.route("/hello")
-        def hello():
+    class TestPlugin(PluginBase):
+        bp = Blueprint('test_plugin', __name__)
+
+        def __init__(self):
+            super().__init__('test_plugin', self.bp)
+            self.bp.route('/hello')(self.hello)
+
+        @property
+        def jsfiles(self):
+            return ['testfile.js', 'testfile2.js']
+
+        def hello(self):
             return "Success!"
 
-        class TestPlugin(PluginBase):
-            @property
-            def user_pref(self):
-                return user_pref
+        def setConfig(self, **kwargs):
+            pass
 
-            @property
-            def jsfiles(self):
-                return jsfiles
-
-        @register_plugin
-        def start_plugin():
-            test = TestPlugin(name, bp)
-            return test
-
-        test_plugin = start_plugin()
-        return test_plugin
-
-    return _create_plugin
+    return TestPlugin
 
 
 # simple test passive plugin, returns created valid plugin
 @pytest.fixture
-def create_passive_plugin():
-    def _create_passive_plugin(name="TestPassive", user_pref=None, jsfiles=[]):
-        bp = Blueprint(name, __name__)
+def sample_passive_plugin():
 
-        @bp.route("/hello")
-        def hello():
+    class TestPassivePlugin(PassivePluginBase):
+        bp = Blueprint('passive_plugin', __name__)
+
+        def __init__(self):
+            super().__init__('passive_plugin', self.bp)
+            self.bp.route("/hello")(self.hello)
+
+        @property
+        def jsfiles(self):
+            return ['testfile1.js', 'testfile2.js']
+
+        def forward(self):
+            return {}
+
+        def reverse(self):
+            return {}
+
+        def setConfig(self, **kwargs):
+            self.config = kwargs
+
+        def hello(self):
             return "Success!"
 
-        class TestPassivePlugin(PassivePluginBase):
-            @property
-            def user_pref(self):
-                return user_pref
-
-            @property
-            def jsfiles(self):
-                return jsfiles
-
-            def forward_pdns(self):
-                return "Forward success!"
-
-            def reverse_pdns(self):
-                return "Reverse success!"
-
-            def setConfig(self, test_config):
-                self.config = test_config
-
-        return TestPassivePlugin(name, bp)
-
-    return _create_passive_plugin
+    return TestPassivePlugin
 
 
 @pytest.fixture

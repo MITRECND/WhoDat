@@ -1,6 +1,8 @@
 from pydat.api import create_app
 from flask import template_rendered
 from contextlib import contextmanager
+from unittest.mock import MagicMock
+import pytest
 
 
 def test_config():
@@ -31,10 +33,7 @@ def captured_templates(app):
         template_rendered.disconnect(record, app)
 
 
-def test_index(create_plugin):
-    plugin = create_plugin(jsfiles=['test.js', 'plugin/hello.js'])
-    assert plugin.jsfiles == ['test.js', 'plugin/hello.js']
-
+def test_index():
     app = create_app({"TESTING": True, })
     with captured_templates(app) as templates:
         response = app.test_client().get("/")
@@ -43,5 +42,16 @@ def test_index(create_plugin):
         template, context = templates[0]
         assert template.name == 'index.html'
 
-        assert isinstance(context["jsfiles"], list)
-        assert context["jsfiles"] == ['test.js', 'plugin/hello.js']
+
+def test_debug():
+    create_app({"DEBUG": True})
+
+
+def test_plugin_failure(monkeypatch):
+    with monkeypatch.context() as m:
+        mockPluginManager = MagicMock(side_effect=ValueError)
+        m.setattr(
+            'pydat.core.plugins.PluginManager.gather_plugins',
+            mockPluginManager)
+        with pytest.raises(SystemExit):
+            create_app()
