@@ -15,7 +15,7 @@ setup(
         ],
     tests_require=[
         "pytest",
-        "pytest-coverage",
+        "pytest-cov",
         "flake8",
         "blinker"
     ],
