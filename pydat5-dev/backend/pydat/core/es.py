@@ -1,19 +1,14 @@
 import collections
-from datetime import date
 import json
 import sys
 import time
+from datetime import date
 
 import elasticsearch
 from elasticsearch import Elasticsearch
-from flask_caching import Cache
 from flask import current_app
+from flask_caching import Cache
 from pydat.core.advanced_es import yacc
-
-#TODO: RE usage of settings with  Flask now, the settings.py module can be loaded as well into the app
-#object, and thus accessed here via "current_app.config". But make sure settings.py module is loaded into
-# Flask app. Currently dont know where in code/bootup that is being done since using blueprints etc..
-
 
 CACHE_TIMEOUT = 300  # Flask cache timeout
 DOC_TYPE = "doc"
@@ -46,12 +41,11 @@ class ElasticsearchHandler:
         self._search_index = f"{app.config['ELASTICSEARCH']['indexPrefix']}-search"
         self._meta_index = f".{app.config['ELASTICSEARCH']['indexPrefix']}-meta"
 
-
     def record_count(self):
         """Return record count of ES record index.
 
         Returns: (int) record count
-        
+
         Raises:
             ESConnectionError - when ElasticSearch connection cannot be established.
             ESQueryError - when error occurs at ElasticSearch from sent query/request.
@@ -82,29 +76,55 @@ class ElasticsearchHandler:
         year_string = "%i-%.2i-01 00:00:00" % (year, month)
 
         query = {"aggs": {
-                    "type": {"terms": {"field": "tld", "size": 10000},
-                            "aggregations":
-                            {"unique":
-                            {"cardinality": {"field": "domainName"}}}},
-                    "created": {"filter": {"range":
-                                {"details.standardRegCreatedDate":
-                                {"gte": year_string}}},
-                                "aggs": {"dates":
-                                        {"date_histogram":
-                                        {"field":
-                                            "details.standardRegCreatedDate",
-                                            "interval": "1M",
-                                            "format": "yyyy-MM"}}}},
-                    "updated": {"filter":
-                                {"range":
-                                {"details.standardRegUpdatedDate":
-                                {"gte": year_string}}},
-                                "aggs": {"dates":
-                                        {"date_histogram":
-                                        {"field":
-                                            "details.standardRegUpdatedDate",
-                                            "interval": "1M",
-                                            "format": "yyyy-MM"}}}}},
+                    "type": {
+                        "terms": {
+                            "field": "tld",
+                            "size": 10000
+                        },
+                        "aggregations": {
+                            "unique": {
+                                "cardinality": {
+                                    "field": "domainName"
+                                }
+                            },
+                        }
+                    },
+                    "created": {
+                        "filter": {
+                            "range": {
+                                "details.standardRegCreatedDate": {
+                                    "gte": year_string
+                                }
+                            }
+                        },
+                        "aggs": {
+                            "dates": {
+                                "date_histogram": {
+                                    "field": "details.standardRegCreatedDate",
+                                    "interval": "1M",
+                                    "format": "yyyy-MM"
+                                }
+                            }
+                        }
+                    },
+                    "updated": {
+                        "filter": {
+                            "range": {
+                                "details.standardRegUpdatedDate": {
+                                    "gte": year_string}
+                            }
+                        },
+                        "aggs": {
+                            "dates": {
+                                "date_histogram": {
+                                    "field": "details.standardRegUpdatedDate",
+                                    "interval": "1M",
+                                    "format": "yyyy-MM"
+                                }
+                            }
+                            }
+                    }
+                },
                 "size": 0}
 
         results = self._cache.get("cluster_stats")
@@ -157,8 +177,7 @@ class ElasticsearchHandler:
             try:
                 result = es.get(index=self._meta_index, doc_type=DOC_TYPE, id=0)
                 if result["found"]:
-                    self._cache.set("lastVersion",
-                            result["_source"]["lastVersion"])
+                    self._cache.set("lastVersion", result["_source"]["lastVersion"])
                     return result["_source"]["lastVersion"]
                 else:
                     raise RuntimeError("Could not process result from ElasticSearch")
@@ -183,8 +202,8 @@ class ElasticsearchHandler:
                 try:
                     res = es.search(index=self._meta_index,
                                     body={"query": {"match_all": {}},
-                                        "sort": [{"metadata": {"order": "desc"}}],
-                                        "size": 1})
+                                          "sort": [{"metadata": {"order": "desc"}}],
+                                          "size": 1})
                 except elasticsearch.ElasticsearchException as e:
                     raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
 
@@ -195,8 +214,8 @@ class ElasticsearchHandler:
                 else:
                     update = "0.0"
                 self._cache.set("update", update)
-        except KeyError as e:
-            #TODO: Log? or raise RuntimeError? What was trying to be caught here originally?
+        except KeyError:
+            # TODO: Log? or raise RuntimeError? What was trying to be caught here originally?
             update = "0.0"
 
         return update
@@ -206,7 +225,7 @@ class ElasticsearchHandler:
 
         Args:
             version (float): data version
-        
+
         Returns: (dict) metadata blob
 
         Raises:
@@ -222,8 +241,8 @@ class ElasticsearchHandler:
                 try:
                     res = es.search(index=self._meta_index,
                                     body={"query": {"match_all": {}},
-                                        "sort": "metadata",
-                                        "size": 999})
+                                          "sort": "metadata",
+                                          "size": 999})
                     self._cache.set("all_metadata", res)
                 except elasticsearch.ElasticsearchException as e:
                     raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
@@ -296,7 +315,7 @@ class ElasticsearchHandler:
             sfilter (str): regex search filter
             low (float): lower bound version value
             high (float): upper bound version value
-        
+
         Returns: (dict) results blob
 
         Raises:
@@ -322,7 +341,7 @@ class ElasticsearchHandler:
             try:
                 sys.stdout.write(f"{json.dumps(query)}\n")
                 sys.stdout.flush()
-            except Exception as e:
+            except Exception:
                 pass
 
         try:
@@ -358,7 +377,7 @@ class ElasticsearchHandler:
             try:
                 sys.stdout.write(f"{json.dumps(q)}\n")
                 sys.stdout.flush()
-            except Exception as e:
+            except Exception:
                 pass
         try:
             domains = es.search(index=self._search_index, body=q,
@@ -410,7 +429,7 @@ class ElasticsearchHandler:
         try:
             sys.stdout.write(f"{json.dumps(query)}\n")
             sys.stdout.flush()
-        except Exception as e:
+        except Exception:
             pass
         try:
             domains = es.search(index=self._search_index, body=query)
@@ -457,9 +476,7 @@ class ElasticsearchHandler:
 
         return results
 
-
     # -- Internal --
-
 
     def _es_connector(self):
         """Return python ElasticSearch client.
@@ -470,36 +487,29 @@ class ElasticsearchHandler:
             ESConnectionError - when cannot create and initialize python client
         """
         security_args = dict()
-
-        # Check if client is cached      TODO: Right now cant do. The client is not pickle-able (which is what Flask cache does)
-        #es_client = self._cache.get("es_client")
-        #if es_client is not None and es_client.ping():
-        #    return self._cache.get("es_client")
-        if current_app.config["ELASTICSEARCH"].get("user", None) is not None and current_app.config["ELASTICSEARCH"].get("pass" , None) is not None:
+        if current_app.config["ELASTICSEARCH"].get("user", None) is not None and current_app.config["ELASTICSEARCH"].get("pass",  None) is not None:
             security_args["http_auth"] = (current_app.config["ELASTICSEARCH"]["user"],
-                                        current_app.config["ELASTICSEARCH"]["pass"])
+                                          current_app.config["ELASTICSEARCH"]["pass"])
         if current_app.config["ELASTICSEARCH"].get("cacert", None) is not None:
             security_args["use_ssl"] = True
             security_args["ca_certs"] = current_app.config["ELASTICSEARCH"]["cacert"]
 
         try:
             es = Elasticsearch(current_app.config["ELASTICSEARCH"]["uri"],
-                            max_retries=100,
-                            retry_on_timeout=True,
-                            **security_args)
+                               max_retries=100,
+                               retry_on_timeout=True,
+                               **security_args)
             # TODO: originally tried to do 'es.ping()' as a connection test as well
             # but when tested with no ES instance running, this would indefinitely hang
-
-            #self._cache.set("es_client", es, 600)  TODO: Right now cant do. The client is not pickle-able (which is what Flask cache does)
             return es
         except elasticsearch.ImproperlyConfigured as e:
             raise ESConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
-        except elasticsearch.ElasticsearchException:
-            raise EsConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
+        except elasticsearch.ElasticsearchException as e:
+            raise ESConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
 
     def _create_search_query(self, key, value, filt, limit, low, high, versionSort):
         """
-        
+
         Raises:
             ValueError
         """
@@ -517,7 +527,7 @@ class ElasticsearchHandler:
 
         try:
             (low, lowUpdate) = low.split('.')
-        except Exception as e:
+        except Exception:
             pass
 
         if low is not None:
@@ -527,13 +537,26 @@ class ElasticsearchHandler:
                     if lowUpdate is not None:
                         if int(lowUpdate) == 0:
                             updateVersionQuery = \
-                                {"bool":
-                                {"should":
-                                [{"bool":
-                                    {"must_not":
-                                    {"exists":
-                                    {"field": "updateVersion"}}}},
-                                {"term": {"updateVersion": int(lowUpdate)}}]}}
+                                {
+                                    "bool": {
+                                        "should": [
+                                            {
+                                                "bool": {
+                                                    "must_not": {
+                                                        "exists": {
+                                                            "field": "updateVersion"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "term": {
+                                                    "updateVersion": int(lowUpdate)
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
                         else:
                             updateVersionQuery = \
                                 {"term": {"updateVersion": int(lowUpdate)}}
@@ -542,23 +565,34 @@ class ElasticsearchHandler:
                     raise RuntimeError(f"The following unexepcted error ocurred while trying to create search query: {repr(e)}")
             elif high is not None:
                 try:
-                    version_filter = [{"range":
-                                    {"dataVersion":
-                                        {"gte": int(low), "lte": int(high)}}}]
-                except Exception as e:
+                    version_filter = [
+                        {
+                            "range": {
+                                "dataVersion": {
+                                    "gte": int(low),
+                                    "lte": int(high)
+                                }
+                            }
+                        }
+                    ]
+                except Exception:
                     raise ValueError("Low and High values must be integers")
 
         if version_filter is not None:
             final_filter.extend(version_filter)
 
-        query = {"query": {
+        query = {
+            "query": {
                 "bool": {
-                "filter": final_filter}},
-                "size": limit}
+                    "filter": final_filter
+                }
+            },
+            "size": limit
+        }
 
         if versionSort:
             query["sort"] = [{"dataVersion": {"order": "asc"}},
-                            {"updateVersion": {"order": "asc",
+                             {"updateVersion": {"order": "asc",
                                                 "missing": 0,
                                                 "unmapped_type": "long"}}]
         if es_source:
@@ -602,7 +636,7 @@ class ElasticsearchHandler:
 
     def _process_advanced_search_results(self, domains, skip, size, unique):
         """
-        
+
         Raises:
             RuntimeError
         """
@@ -669,9 +703,11 @@ class ElasticsearchHandler:
         Returns: (dict) processed stats blob
 
         """
-        stats = {"domainStats": {},
-                    "histogram": {},
-                    "creation": results["cache_time"]}
+        stats = {
+            "domainStats": {},
+            "histogram": {},
+            "creation": results["cache_time"]
+        }
 
         try:
             for bucket in results["aggregations"]["type"]["buckets"]:
@@ -694,14 +730,15 @@ class ElasticsearchHandler:
 
             stats["histogram"] = \
                 collections.OrderedDict(sorted(stats["histogram"].items()))
-        except Exception as e:
-            CACHE.delete("cluster_stats")
-            #TODO: Log? or raise runtime error?
+        except Exception:
+            self._cache.delete("cluster_stats")
+            # TODO: Log? or raise runtime error?
 
         return stats
 
     def _create_data_table_search_query(self, key, value, skip, pagesize, sortset, sfilter, low, high):
         """ """
+        results = {"success": False}
         query_filter = {"term": {key: value}}
         final_filter = [query_filter]
         version_filter = None
@@ -709,36 +746,55 @@ class ElasticsearchHandler:
 
         try:
             (low, lowUpdate) = low.split('.')
-        except Exception as e:
+        except Exception:
             pass
 
         if low is not None:
             if low == high or high is None:  # single version
                 try:
                     version_filter = [{"term": {"dataVersion": int(low)}}]
-                except Exception as e:
+                except Exception:
                     raise ValueError("Low must be interger value")
 
                 if lowUpdate is not None:
                     if int(lowUpdate) == 0:
-                        updateVersionQuery = \
-                            {"bool":
-                            {"should":
-                            [{"bool":
-                                {"must_not":
-                                {"exists":
-                                {"field": "updateVersion"}}}},
-                                {"term": {"updateVersion": int(lowUpdate)}}]}}
+                        updateVersionQuery = {
+                            "bool": {
+                                "should": [
+                                    {
+                                        "bool": {
+                                            "must_not": {
+                                                "exists": {
+                                                    "field": "updateVersion"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "term": {
+                                            "updateVersion": int(lowUpdate)
+                                        }
+                                    }
+                                ]
+                            }
+                        }
                     else:
                         updateVersionQuery = \
                             {"term": {"updateVersion": int(lowUpdate)}}
                     version_filter.append(updateVersionQuery)
             elif high is not None:
                 try:
-                    version_filter = [{"range":
-                                    {"dataVersion":
-                                        {"gte": int(low), "lte": int(high)}}}]
-                except Exception as e:
+                    version_filter = [
+                        {
+                            "range": {
+                                "dataVersion": {
+                                    "gte": int(low),
+                                    "lte": int(high)
+                                }
+                            }
+                        }
+                    ]
+                except Exception:
                     raise ValueError("Low and High values must be integers")
 
         if version_filter is not None:
@@ -749,7 +805,7 @@ class ElasticsearchHandler:
         if sfilter is not None:
             try:
                 regx = ".*%s.*" % sfilter
-            except Exception as e:
+            except Exception:
                 results["aaData"] = []
                 results["iTotalRecords"] = self.record_count()
                 results["iTotalDisplayRecords"] = 0
@@ -764,17 +820,18 @@ class ElasticsearchHandler:
                         snkey = "details.{skey}"
                     else:
                         snkey = skey
-                    exp = {"regexp":
-                        {snkey:
-                            {"value": regx}}}
+                    exp = {
+                        "regexp": {
+                            snkey: {
+                              "value": regx}}}
 
                     shoulds.append(exp)
 
                 qquery = {"should": shoulds}
 
         query = {"query": {"bool": {"filter": final_filter}},
-                "from": skip,
-                "size": pagesize}
+                 "from": skip,
+                 "size": pagesize}
 
         if qquery is not None:
             query["query"]["bool"].update(qquery)
@@ -786,7 +843,7 @@ class ElasticsearchHandler:
 
             query["sort"] = sorter
 
-        return query 
+        return query
 
     def _process_data_table_search_results(self, domains):
         results = {}
@@ -798,24 +855,24 @@ class ElasticsearchHandler:
                 for domain in domains["hits"]["hits"]:
                     updateVersion = domain["_source"].get("updateVersion", 0)
                     entryVersion = "%d.%d" % (domain["_source"]["dataVersion"],
-                                            updateVersion)
+                                              updateVersion)
                     # First element is placeholder for expansion cell
                     # TODO Make this configurable?
                     details = domain["_source"]["details"]
                     dom_arr = ["&nbsp;",
-                            domain["_source"]["domainName"],
-                            details["registrant_name"],
-                            details["contactEmail"],
-                            details["standardRegCreatedDate"],
-                            details["registrant_telephone"],
-                            entryVersion]
+                               domain["_source"]["domainName"],
+                               details["registrant_name"],
+                               details["contactEmail"],
+                               details["standardRegCreatedDate"],
+                               details["registrant_telephone"],
+                               entryVersion]
                     results["aaData"].append(dom_arr)
 
             # Number of Records after any sort of filtering/searching
             results["iTotalDisplayRecords"] = domains["hits"]["total"]
             results["success"] = True
         except Exception as e:
-            raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(r)}")
+            raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(e)}")
         return results
 
     def _process_adv_data_table_search(self, domains, unique):
@@ -840,17 +897,17 @@ class ElasticsearchHandler:
                         details = pdomain["details"]
                         updateVersion = pdomain.get("updateVersion", 0)
                         entryVersion = "%d.%d" % (pdomain["dataVersion"],
-                                                updateVersion)
+                                                  updateVersion)
                         # Take each key in details (if any) and stuff
                         # it in top level dict.
                         dom_arr = ["&nbsp;",
-                                pdomain["domainName"],
-                                details["registrant_name"],
-                                details["contactEmail"],
-                                details["standardRegCreatedDate"],
-                                details["registrant_telephone"],
-                                entryVersion,
-                                "%.2f" % round(domain["_score"], 2)]
+                                   pdomain["domainName"],
+                                   details["registrant_name"],
+                                   details["contactEmail"],
+                                   details["standardRegCreatedDate"],
+                                   details["registrant_telephone"],
+                                   entryVersion,
+                                   "%.2f" % round(domain["_score"], 2)]
                         results["aaData"].append(dom_arr)
 
                 results["success"] = True
@@ -868,13 +925,13 @@ class ElasticsearchHandler:
                     # For some reason the _score goes away in the
                     # aggregations if you sort by it
                     dom_arr = ["&nbsp;",
-                            pdomain["domainName"],
-                            details["registrant_name"],
-                            details["contactEmail"],
-                            details["standardRegCreatedDate"],
-                            details["registrant_telephone"],
-                            entryVersion,
-                            "%.2f" % round(domain["sort"][0], 2)]
+                               pdomain["domainName"],
+                               details["registrant_name"],
+                               details["contactEmail"],
+                               details["standardRegCreatedDate"],
+                               details["registrant_telephone"],
+                               entryVersion,
+                               "%.2f" % round(domain["sort"][0], 2)]
 
                     results["aaData"].append(dom_arr)
 
@@ -913,9 +970,9 @@ class ElasticsearchHandler:
                         sortParams.append({field: {"order": direction}})
                         if field == "dataVersion":
                             sortParams.append({"updateVersion":
-                                            {"order": "desc",
-                                                "missing": 0,
-                                                "unmapped_type": "long"}})
+                                              {"order": "desc",
+                                               "missing": 0,
+                                               "unmapped_type": "long"}})
 
                     if "_score" not in fields:
                         sortParams.append({"_score": {"order": "desc"}})
@@ -926,7 +983,7 @@ class ElasticsearchHandler:
                     if "dataVersion" not in fields:
                         sortParams.extend(
                             [{"dataVersion": {"order": "desc"}},
-                            {"updateVersion": {"order": "desc",
+                             {"updateVersion": {"order": "desc",
                                                 "missing": 0,
                                                 "unmapped_type": "long"}}])
                 else:
@@ -935,8 +992,8 @@ class ElasticsearchHandler:
                         {"domainName": {"order": "asc"}},
                         {"dataVersion": {"order": "desc"}},
                         {"updateVersion": {"order": "desc",
-                                        "missing": 0,
-                                        "unmapped_type": "long"}}]
+                                           "missing": 0,
+                                           "unmapped_type": "long"}}]
                 q["sort"] = sortParams
                 q["size"] = size
                 q["from"] = skip
@@ -944,19 +1001,19 @@ class ElasticsearchHandler:
                 q["size"] = 0
                 q["aggs"] = {"domains": {
                             "terms": {"field": "domainName",
-                                    "size": size,
-                                    "order": {"max_score": "desc"}},
+                                      "size": size,
+                                      "order": {"max_score": "desc"}},
                             "aggs": {"max_score": {"max": {"script": "_score"}},
-                                    "top_domains": {
-                                    "top_hits": {
+                                     "top_domains": {
+                                     "top_hits": {
                                         "size": 1,
                                         "sort":
                                         [{"_score": {"order": "desc"}},
-                                        {"dataVersion": {"order": "desc"}},
-                                        {"updateVersion":
-                                        {"order": "desc",
-                                        "missing": 0,
-                                        "unmapped_type": "long"}}]}}}}}
+                                         {"dataVersion": {"order": "desc"}},
+                                         {"updateVersion":
+                                         {"order": "desc",
+                                          "missing": 0,
+                                          "unmapped_type": "long"}}]}}}}}
             return q
         except Exception as e:
             raise RuntimeError(f"The following runtime error occured while creating advanced query: {repr(e)}")
