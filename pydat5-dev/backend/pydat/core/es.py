@@ -38,8 +38,10 @@ class ElasticsearchHandler:
         app.config["CACHE_TYPE"] = "simple"
         app.config["CACHE_DEFAULT_TIMEOUT"] = CACHE_TIMEOUT
         self._cache = Cache(app)
-        self._search_index = f"{app.config['ELASTICSEARCH']['indexPrefix']}-search"
-        self._meta_index = f".{app.config['ELASTICSEARCH']['indexPrefix']}-meta"
+        self._search_index = (
+            f"{app.config['ELASTICSEARCH']['indexPrefix']}-search")
+        self._meta_index = (
+            f".{app.config['ELASTICSEARCH']['indexPrefix']}-meta")
 
     def record_count(self):
         """Return record count of ES record index.
@@ -47,8 +49,10 @@ class ElasticsearchHandler:
         Returns: (int) record count
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            ESQueryError - when error occurs at ElasticSearch
+                from sent query/request.
         """
         records = self._cache.get("record_count")
         if records is None:
@@ -57,7 +61,9 @@ class ElasticsearchHandler:
                 records = es.cat.count(index=self._search_index, h="count")
                 self._cache.set("record_count", records)
             except elasticsearch.ElasticsearchException as e:
-                raise ESQueryError(f"The following exception occured while trying to execute 'count' call to ElasticSearch instance: {repr(e)}")
+                raise ESQueryError(
+                    "The following exception occured while trying to execute "
+                    f"'count' call to ElasticSearch instance: {repr(e)}")
         return int(records)
 
     def cluster_stats(self):
@@ -66,8 +72,10 @@ class ElasticsearchHandler:
         Returns: (dict) stats blob
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            ESQueryError - when error occurs at ElasticSearch
+                from sent query/request.
         """
         es = self._es_connector()
         tstr = date.today().timetuple()
@@ -132,7 +140,9 @@ class ElasticsearchHandler:
             try:
                 results = es.search(index=self._search_index, body=query)
             except elasticsearch.ElasticsearchException as e:
-                raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
+                raise ESQueryError(
+                    "The following exception occured while trying to execute "
+                    f"'search' call to ElasticSearch instance: {repr(e)}")
             # Cache for an hour since this is a relatively expensive query
             # whose results shouldn't change often
             results["cache_time"] = time.time()
@@ -148,8 +158,10 @@ class ElasticsearchHandler:
         Returns: (str) status of the cluster
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            ESQueryError - when error occurs at ElasticSearch from
+                sent query/request.
         """
         health = self._cache.get("cluster_health")
         if health is None:
@@ -157,7 +169,9 @@ class ElasticsearchHandler:
             try:
                 health = es.cluster.health()
             except elasticsearch.ElasticsearchException as e:
-                raise ESQueryError(f"The following exception occured while trying to execute 'health' call to ElasticSearch instance: {repr(e)}")
+                raise ESQueryError(
+                    "The following exception occured while trying to execute "
+                    f"'health' call to ElasticSearch instance: {repr(e)}")
             self._cache.set("cluster_health", health)
         return health["status"]
 
@@ -167,22 +181,31 @@ class ElasticsearchHandler:
         Returns: (float) version number
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            ESQueryError - when error occurs at ElasticSearch
+                from sent query/request.
             RuntimeError - when error occurs processing ElasticSearch response
         """
         lastVersion = self._cache.get("lastVersion")
         if lastVersion is None:
             es = self._es_connector()
             try:
-                result = es.get(index=self._meta_index, doc_type=DOC_TYPE, id=0)
+                result = es.get(
+                    index=self._meta_index, doc_type=DOC_TYPE, id=0)
                 if result["found"]:
-                    self._cache.set("lastVersion", result["_source"]["lastVersion"])
+                    self._cache.set(
+                        "lastVersion",
+                        result["_source"]["lastVersion"]
+                    )
                     return result["_source"]["lastVersion"]
                 else:
-                    raise RuntimeError("Could not process result from ElasticSearch")
+                    raise RuntimeError(
+                        "Could not process result from ElasticSearch")
             except elasticsearch.ElasticsearchException as e:
-                raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
+                raise ESQueryError(
+                    "The following exception occured while trying to execute "
+                    f"'get' call to ElasticSearch instance: {repr(e)}")
         else:
             return lastVersion
 
@@ -192,20 +215,26 @@ class ElasticsearchHandler:
         Returns: (float) last update version
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            ESQueryError - when error occurs at ElasticSearch from
+                sent query/request.
         """
         try:
             update = self._cache.get("lastUpdate")
             if update is None:
                 es = self._es_connector()
                 try:
-                    res = es.search(index=self._meta_index,
-                                    body={"query": {"match_all": {}},
-                                          "sort": [{"metadata": {"order": "desc"}}],
-                                          "size": 1})
+                    res = es.search(
+                        index=self._meta_index,
+                        body={"query": {"match_all": {}},
+                              "sort": [{"metadata": {"order": "desc"}}],
+                              "size": 1})
                 except elasticsearch.ElasticsearchException as e:
-                    raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
+                    raise ESQueryError(
+                        "The following exception occured while trying to "
+                        "execute 'search' call to ElasticSearch "
+                        f"instance: {repr(e)}")
 
                 if res["hits"]["total"] >= 1:
                     data = res["hits"]["hits"][0]["_source"]
@@ -215,7 +244,8 @@ class ElasticsearchHandler:
                     update = "0.0"
                 self._cache.set("update", update)
         except KeyError:
-            # TODO: Log? or raise RuntimeError? What was trying to be caught here originally?
+            # TODO: Log? or raise RuntimeError? What was trying to be caught
+            # here originally?
             update = "0.0"
 
         return update
@@ -229,8 +259,10 @@ class ElasticsearchHandler:
         Returns: (dict) metadata blob
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            ESQueryError - when error occurs at ElasticSearch from
+                sent query/request.
         """
         results = {"success": False}
         es = self._es_connector()
@@ -245,7 +277,10 @@ class ElasticsearchHandler:
                                           "size": 999})
                     self._cache.set("all_metadata", res)
                 except elasticsearch.ElasticsearchException as e:
-                    raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
+                    raise ESQueryError(
+                        "The following exception occured while trying to "
+                        "execute 'search' call to ElasticSearch "
+                        f"instance: {repr(e)}")
 
             if res["hits"]["total"] > 0:
                 newres = []
@@ -257,9 +292,12 @@ class ElasticsearchHandler:
         else:
             version = int(version)
             try:
-                res = es.get(index=self._meta_index, doc_type=DOC_TYPE, id=version)
+                res = es.get(
+                    index=self._meta_index, doc_type=DOC_TYPE, id=version)
             except elasticsearch.ElasticsearchException as e:
-                raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
+                raise ESQueryError(
+                    "The following exception occured while trying to execute "
+                    f"'get' call to ElasticSearch instance: {repr(e)}")
             if res["found"]:
                 res = [res["_source"]]
             else:
@@ -303,7 +341,9 @@ class ElasticsearchHandler:
 
         return (sort_key, direction)
 
-    def data_table_search(self, key, value, skip, pagesize, sortset, sfilter, low, high):
+    def data_table_search(
+            self, key, value, skip, pagesize,
+            sortset, sfilter, low, high):
         """
 
         Args:
@@ -319,10 +359,13 @@ class ElasticsearchHandler:
         Returns: (dict) results blob
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
             ValueError - if 'low' and 'high' args are not integers.
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
-            RuntimeError - when unexpected error processing ElasticSearch results
+            ESQueryError - when error occurs at ElasticSearch from
+                sent query/request.
+            RuntimeError - when unexpected error processing
+                ElasticSearch results
         """
         results = {"success": False}
         es = self._es_connector()
@@ -330,12 +373,13 @@ class ElasticsearchHandler:
         if key != current_app.config["SEARCHKEYS"][0][0]:
             key = f"details.{key}"
 
-        # All data in ES is lowercased (during ingestion/analysis) and we're using
-        # a term filter to take advantage of filter caching, we could probably
-        # use a match query instead, but these seems more efficient
+        # All data in ES is lowercased (during ingestion/analysis) and we're
+        # using a term filter to take advantage of filter caching, we could
+        # probably use a match query instead, but these seems more efficient
         value = value.lower()
 
-        query = self._create_data_table_search_query(key, value, skip, pagesize, sortset, sfilter, low, high)
+        query = self._create_data_table_search_query(
+            key, value, skip, pagesize, sortset, sfilter, low, high)
 
         if current_app.config["DEBUG"]:
             try:
@@ -348,12 +392,15 @@ class ElasticsearchHandler:
             domains = es.search(index=self._search_index,
                                 body=query)
         except elasticsearch.ElasticsearchException as e:
-            raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
+            raise ESQueryError(
+                "The following exception occured while trying to execute "
+                f"'get' call to ElasticSearch instance: {repr(e)}")
 
         results.update(self._process_data_table_search_results(domains))
         return results
 
-    def adv_data_table_search(self, query, skip, pagesize, unique=False, sort=None):
+    def adv_data_table_search(
+            self, query, skip, pagesize, unique=False, sort=None):
         """
 
         Args:
@@ -366,9 +413,12 @@ class ElasticsearchHandler:
         Returns: (dict) results blob
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            RuntimeError - when enexpected exception in creating the query or processing ES results
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            RuntimeError - when enexpected exception in creating
+                the query or processing ES results
+            ESQueryError - when error occurs at ElasticSearch from
+                sent query/request.
         """
         es = self._es_connector()
         q = self._create_advanced_query(query, skip, pagesize, unique, sort)
@@ -383,13 +433,17 @@ class ElasticsearchHandler:
             domains = es.search(index=self._search_index, body=q,
                                 search_type="dfs_query_then_fetch")
         except elasticsearch.ElasticsearchException as e:
-            raise ESQueryError(f"The following exception occured while trying to execute 'search' call to ElasticSearch instance: {repr(e)}")
+            raise ESQueryError(
+                "The following exception occured while trying to execute "
+                f"'search' call to ElasticSearch instance: {repr(e)}")
 
         results = self._process_adv_data_table_search(domains, unique)
 
         return results
 
-    def search(self, key, value, filt=None, limit=10000, low=None, high=None, versionSort=False):
+    def search(
+            self, key, value, filt=None, limit=10000,
+            low=None, high=None, versionSort=False):
         """Search whois index for records with supplied key/values.
 
         Args:
@@ -404,14 +458,17 @@ class ElasticsearchHandler:
         Returns: (dict) results blob
 
         Raises:
-            ESConnectionError - when ElasticSearch connection cannot be established.
-            RuntimeError - when  error occurs when creating ES query, or when processing ElasticSearch results
-            ESQueryError - when error occurs at ElasticSearch from sent query/request.
+            ESConnectionError - when ElasticSearch connection
+                cannot be established.
+            RuntimeError - when  error occurs when creating ES query,
+                or when processing ElasticSearch results
+            ESQueryError - when error occurs at ElasticSearch from
+                sent query/request.
             ValueError - when 'low' and 'high' args are not integers
         """
         results = {"success": False}
         es = self._es_connector()
-        index = f"{current_app.config['ELASTICSEARCH']['indexPrefix']}-*"
+        # index = f"{current_app.config['ELASTICSEARCH']['indexPrefix']}-*"
 
         if key != current_app.config["SEARCHKEYS"][0][0]:
             key = f"details.{key}"
@@ -423,7 +480,8 @@ class ElasticsearchHandler:
         if high is not None:
             high = str(high)
 
-        query = self._create_search_query(key, value, filt, limit, low, high, versionSort)
+        query = self._create_search_query(
+            key, value, filt, limit, low, high, versionSort)
 
         # XXX DEBUG CODE
         try:
@@ -434,20 +492,24 @@ class ElasticsearchHandler:
         try:
             domains = es.search(index=self._search_index, body=query)
         except elasticsearch.ElasticsearchException as e:
-            raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
+            raise ESQueryError(
+                "The following exception occured while trying to execute "
+                f"'get' call to ElasticSearch instance: {repr(e)}")
 
         results.update(self._process_search_query_results(domains))
         return results
 
     def test_query(self, search_string):
         try:
-            query = yacc.parse(search_string)
+            yacc.parse(search_string)
         except Exception as e:
             return str(e)
 
         return None
 
-    def advanced_search(self, search_string, skip=0, size=20, unique=False, sort=None):  # TODO XXX versions, dates, etc
+    def advanced_search(
+            self, search_string, skip=0, size=20,
+            unique=False, sort=None):  # TODO XXX versions, dates, etc
         """Search whois index with advanced search, via supplied regex.
 
         Args:
@@ -461,18 +523,23 @@ class ElasticsearchHandler:
 
         Raises:
             ESConnectionError - when cannot create and initialize python client
-            RuntimeError - when unexpected error occurs when creating advanced query or processing results from Elasticsearch
+            RuntimeError - when unexpected error occurs when creating
+                advanced query or processing results from Elasticsearch
         """
         results = {"success": False}
         es = self._es_connector()
-        query = self._create_advanced_query(search_string, skip, size, unique, sort)
+        query = self._create_advanced_query(
+            search_string, skip, size, unique, sort)
         try:
             domains = es.search(index=self._search_index, body=query,
                                 search_type="dfs_query_then_fetch")
         except elasticsearch.ElasticsearchException as e:
-            raise ESQueryError(f"The following exception occured while trying to execute 'get' call to ElasticSearch instance: {repr(e)}")
+            raise ESQueryError(
+                "The following exception occured while trying to execute "
+                f"'get' call to ElasticSearch instance: {repr(e)}")
 
-        results.update(self._process_advanced_search_results(domains, skip, size, unique))
+        results.update(self._process_advanced_search_results(
+            domains, skip, size, unique))
 
         return results
 
@@ -487,27 +554,38 @@ class ElasticsearchHandler:
             ESConnectionError - when cannot create and initialize python client
         """
         security_args = dict()
-        if current_app.config["ELASTICSEARCH"].get("user", None) is not None and current_app.config["ELASTICSEARCH"].get("pass",  None) is not None:
-            security_args["http_auth"] = (current_app.config["ELASTICSEARCH"]["user"],
-                                          current_app.config["ELASTICSEARCH"]["pass"])
+        if (current_app.config["ELASTICSEARCH"].get(
+                "user", None) is not None and
+            current_app.config["ELASTICSEARCH"].get(
+                "pass",  None) is not None):
+            security_args["http_auth"] = (
+                current_app.config["ELASTICSEARCH"]["user"],
+                current_app.config["ELASTICSEARCH"]["pass"])
         if current_app.config["ELASTICSEARCH"].get("cacert", None) is not None:
             security_args["use_ssl"] = True
-            security_args["ca_certs"] = current_app.config["ELASTICSEARCH"]["cacert"]
+            security_args[
+                "ca_certs"] = current_app.config["ELASTICSEARCH"]["cacert"]
 
         try:
             es = Elasticsearch(current_app.config["ELASTICSEARCH"]["uri"],
                                max_retries=100,
                                retry_on_timeout=True,
                                **security_args)
-            # TODO: originally tried to do 'es.ping()' as a connection test as well
-            # but when tested with no ES instance running, this would indefinitely hang
+            # TODO: originally tried to do 'es.ping()' as a
+            # connection test as well but when tested with no ES instance
+            # running, this would indefinitely hang
             return es
         except elasticsearch.ImproperlyConfigured as e:
-            raise ESConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
+            raise ESConnectionError(
+                "The following ElasticSearch client config error "
+                f"occured: {repr(e)}")
         except elasticsearch.ElasticsearchException as e:
-            raise ESConnectionError(f"The following ElasticSearch client config error occured: {repr(e)}")
+            raise ESConnectionError(
+                "The following ElasticSearch client config error "
+                f"occured: {repr(e)}")
 
-    def _create_search_query(self, key, value, filt, limit, low, high, versionSort):
+    def _create_search_query(
+            self, key, value, filt, limit, low, high, versionSort):
         """
 
         Raises:
@@ -536,33 +614,32 @@ class ElasticsearchHandler:
                     version_filter = [{"term": {"dataVersion": int(low)}}]
                     if lowUpdate is not None:
                         if int(lowUpdate) == 0:
-                            updateVersionQuery = \
-                                {
-                                    "bool": {
-                                        "should": [
-                                            {
-                                                "bool": {
-                                                    "must_not": {
-                                                        "exists": {
-                                                            "field": "updateVersion"
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            {
-                                                "term": {
-                                                    "updateVersion": int(lowUpdate)
+                            updateVersionQuery = {
+                                "bool": {"should": [
+                                    {
+                                        "bool": {
+                                            "must_not": {
+                                                "exists": {
+                                                    "field": "updateVersion"
                                                 }
                                             }
-                                        ]
+                                        }
+                                    },
+                                    {
+                                        "term": {
+                                            "updateVersion": int(lowUpdate)
+                                        }
                                     }
-                                }
+                                ]}
+                            }
                         else:
                             updateVersionQuery = \
                                 {"term": {"updateVersion": int(lowUpdate)}}
                         version_filter.append(updateVersionQuery)
                 except Exception as e:  # TODO XXX
-                    raise RuntimeError(f"The following unexepcted error ocurred while trying to create search query: {repr(e)}")
+                    raise RuntimeError(
+                        "The following unexepcted error ocurred while trying "
+                        f"to create search query: {repr(e)}")
             elif high is not None:
                 try:
                     version_filter = [
@@ -611,7 +688,8 @@ class ElasticsearchHandler:
         try:
             for domain in domains["hits"]["hits"]:
                 pdomain = domain["_source"]
-                # Take each key in details (if any) and stuff it in top level dict.
+                # Take each key in details (if any) and stuff it in
+                # top level dict.
                 if "details" in pdomain:
                     for k, v in pdomain["details"].items():
                         pdomain[k] = v
@@ -631,7 +709,9 @@ class ElasticsearchHandler:
             results["avail"] = len(results["data"])
             results["success"] = True
         except Exception as e:
-            raise RuntimeError(f"The following error occured while processing results from Elasticsearch: {repr(e)}")
+            raise RuntimeError(
+                "The following error occured while processing results "
+                f"from Elasticsearch: {repr(e)}")
         return results
 
     def _process_advanced_search_results(self, domains, skip, size, unique):
@@ -648,7 +728,8 @@ class ElasticsearchHandler:
 
                 for domain in domains["hits"]["hits"]:
                     pdomain = domain["_source"]
-                    # Take each key in details (if any) and stuff it in top level dict.
+                    # Take each key in details (if any) and stuff it in top
+                    # level dict.
                     if "details" in pdomain:
                         for k, v in pdomain["details"].items():
                             pdomain[k] = v
@@ -673,7 +754,8 @@ class ElasticsearchHandler:
                 for bucket in buckets:
                     domain = bucket["top_domains"]["hits"]["hits"][0]
                     pdomain = domain["_source"]
-                    # Take each key in details (if any) and stuff it in top level dict.
+                    # Take each key in details (if any) and stuff it in top
+                    # level dict.
                     if "details" in pdomain:
                         for k, v in pdomain["details"].items():
                             pdomain[k] = v
@@ -691,7 +773,9 @@ class ElasticsearchHandler:
                 results["page_size"] = size
                 results["success"] = True
         except Exception as e:
-            raise RuntimeError(f"The following error occured while processing results from Elasticsearch: {repr(e)}")
+            raise RuntimeError(
+                "The following error occured while processing results from "
+                f"Elasticsearch: {repr(e)}")
         return results
 
     def _process_cluster_stats_results(self, results):
@@ -716,13 +800,15 @@ class ElasticsearchHandler:
             stats["domainStats"] = \
                 collections.OrderedDict(sorted(stats["domainStats"].items()))
 
-            for bucket in results["aggregations"]["created"]["dates"]["buckets"]:
+            for bucket in results[
+                    "aggregations"]["created"]["dates"]["buckets"]:
                 date_label = "/".join(bucket["key_as_string"].split("-"))
                 if date_label not in stats["histogram"]:
                     stats["histogram"][date_label] = {}
                 stats["histogram"][date_label]["created"] = bucket["doc_count"]
 
-            for bucket in results["aggregations"]["updated"]["dates"]["buckets"]:
+            for bucket in results[
+                    "aggregations"]["updated"]["dates"]["buckets"]:
                 date_label = "/".join(bucket["key_as_string"].split("-"))
                 if date_label not in stats["histogram"]:
                     stats["histogram"][date_label] = {}
@@ -736,7 +822,8 @@ class ElasticsearchHandler:
 
         return stats
 
-    def _create_data_table_search_query(self, key, value, skip, pagesize, sortset, sfilter, low, high):
+    def _create_data_table_search_query(
+            self, key, value, skip, pagesize, sortset, sfilter, low, high):
         """ """
         results = {"success": False}
         query_filter = {"term": {key: value}}
@@ -813,7 +900,8 @@ class ElasticsearchHandler:
                 return results
             else:
                 shoulds = []
-                for skey in [keys[0] for keys in current_app.config["SEARCHKEYS"]]:
+                for skey in [
+                        keys[0] for keys in current_app.config["SEARCHKEYS"]]:
                     if skey == key:  # Don"t bother filtering on the key field
                         continue
                     if skey != current_app.config["SEARCHKEYS"][0][0]:
@@ -872,7 +960,9 @@ class ElasticsearchHandler:
             results["iTotalDisplayRecords"] = domains["hits"]["total"]
             results["success"] = True
         except Exception as e:
-            raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(e)}")
+            raise RuntimeError(
+                "Unexpected error processing domain results from "
+                f"ElasticSearch: {repr(e)}")
         return results
 
     def _process_adv_data_table_search(self, domains, unique):
@@ -921,7 +1011,8 @@ class ElasticsearchHandler:
                     pdomain = domain["_source"]
                     details = pdomain["details"]
                     updateVersion = pdomain.get("updateVersion", 0)
-                    entryVersion = "%d.%d" % (pdomain["dataVersion"], updateVersion)
+                    entryVersion = (
+                        "%d.%d" % (pdomain["dataVersion"], updateVersion))
                     # For some reason the _score goes away in the
                     # aggregations if you sort by it
                     dom_arr = ["&nbsp;",
@@ -937,7 +1028,9 @@ class ElasticsearchHandler:
 
                 results["success"] = True
         except Exception as e:
-            raise RuntimeError(f"Unexpected error processing domain results from ElasticSearch: {repr(e)}")
+            raise RuntimeError(
+                "Unexpected error processing domain results from "
+                f"ElasticSearch: {repr(e)}")
         return results
 
     def _create_advanced_query(self, query, skip, size, unique, sort=None):
@@ -953,14 +1046,18 @@ class ElasticsearchHandler:
         Returns: (dict) ElasticSearch query object
 
         Raises:
-            RuntimeError - when unexpected error occurs creating the advanced query
-            ValueError - when error occurs when yacc parses supplied query string
+            RuntimeError - when unexpected error occurs creating the
+                advanced query
+            ValueError - when error occurs when yacc parses supplied
+                query string
         """
         try:
             try:
                 q = yacc.parse(query)
             except (KeyError, ValueError) as e:
-                raise ValueError(f"The following error occured while yacc tried to parse query string: {repr(e)}")
+                raise ValueError(
+                    "The following error occured while yacc tried to parse "
+                    f"query string: {repr(e)}")
             if not unique:
                 if sort is not None and len(sort) > 0:
                     sortParams = list()
@@ -999,21 +1096,26 @@ class ElasticsearchHandler:
                 q["from"] = skip
             else:
                 q["size"] = 0
-                q["aggs"] = {"domains": {
-                            "terms": {"field": "domainName",
-                                      "size": size,
-                                      "order": {"max_score": "desc"}},
-                            "aggs": {"max_score": {"max": {"script": "_score"}},
-                                     "top_domains": {
-                                     "top_hits": {
-                                        "size": 1,
-                                        "sort":
-                                        [{"_score": {"order": "desc"}},
-                                         {"dataVersion": {"order": "desc"}},
-                                         {"updateVersion":
-                                         {"order": "desc",
-                                          "missing": 0,
-                                          "unmapped_type": "long"}}]}}}}}
+                q["aggs"] = {
+                    "domains": {
+                        "terms": {
+                            "field": "domainName",
+                            "size": size,
+                            "order": {"max_score": "desc"}},
+                        "aggs": {
+                            "max_score": {"max": {"script": "_score"}},
+                            "top_domains": {
+                                "top_hits": {
+                                    "size": 1,
+                                    "sort": [
+                                        {"_score": {"order": "desc"}},
+                                        {"dataVersion": {"order": "desc"}},
+                                        {"updateVersion": {
+                                            "order": "desc",
+                                            "missing": 0,
+                                            "unmapped_type": "long"}}]}}}}}
             return q
         except Exception as e:
-            raise RuntimeError(f"The following runtime error occured while creating advanced query: {repr(e)}")
+            raise RuntimeError(
+                "The following runtime error occured while creating "
+                f"advanced query: {repr(e)}")
