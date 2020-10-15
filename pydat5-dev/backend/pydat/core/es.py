@@ -8,7 +8,7 @@ import elasticsearch
 from elasticsearch import Elasticsearch
 from flask import current_app
 from flask_caching import Cache
-from pydat.core.advanced_es import yacc
+from pydat.core.advanced_es import parseQuery
 
 CACHE_TIMEOUT = 300  # Flask cache timeout
 DOC_TYPE = "doc"
@@ -501,7 +501,7 @@ class ElasticsearchHandler:
 
     def test_query(self, search_string):
         try:
-            yacc.parse(search_string)
+            parseQuery(search_string)
         except Exception as e:
             return str(e)
 
@@ -1048,15 +1048,15 @@ class ElasticsearchHandler:
         Raises:
             RuntimeError - when unexpected error occurs creating the
                 advanced query
-            ValueError - when error occurs when yacc parses supplied
+            ValueError - when error occurs when parseQuey parses supplied
                 query string
         """
         try:
             try:
-                q = yacc.parse(query)
+                q = parseQuery(query)
             except (KeyError, ValueError) as e:
                 raise ValueError(
-                    "The following error occured while yacc tried to parse "
+                    "The following error occured while trying to parse "
                     f"query string: {repr(e)}")
             if not unique:
                 if sort is not None and len(sort) > 0:

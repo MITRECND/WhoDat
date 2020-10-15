@@ -6,7 +6,7 @@ _tabversion = '3.10'
 
 _lr_method = 'LALR'
 
-_lr_signature = 'leftANDORrightNOTleftCOLONAND COLON DATE FUZZY LPAREN NOT NULL OR QUOTED REGEX RPAREN WILDCARD WORDquery : LPAREN query RPARENquery : NOT queryquery : query query %prec ANDquery : query AND queryquery : query OR queryquery : specific\n             | daterange\n             | termqueryspecific : FUZZY WORD COLON WORDspecific : WORD COLON WORDspecific : FUZZY WORD COLON QUOTEDspecific : WORD COLON QUOTEDspecific : WORD COLON NULLspecific : WORD COLON WILDCARDspecific : WORD COLON REGEXdaterange : WORD COLON DATEdaterange : WORD COLON DATE COLON DATEtermquery : QUOTEDtermquery : WORD'
+_lr_signature = 'leftANDORrightNOTleftCOLONAND COLON DATE FUZZY LPAREN NOT NULL OR QUOTED REGEX RPAREN WILDCARD WORDquery : LPAREN query RPARENquery : NOT queryquery : query query %prec ANDquery : query AND queryquery : query OR queryquery : specific\n                | daterange\n                | termqueryspecific : FUZZY WORD COLON WORDspecific : WORD COLON WORDspecific : FUZZY WORD COLON QUOTEDspecific : WORD COLON QUOTEDspecific : WORD COLON NULLspecific : WORD COLON WILDCARDspecific : WORD COLON REGEXdaterange : WORD COLON DATEdaterange : WORD COLON DATE COLON DATEtermquery : QUOTEDtermquery : WORD'
     
 _lr_action_items = {'LPAREN':([0,1,2,3,4,5,6,8,9,10,11,12,13,14,17,18,19,21,22,23,24,25,26,27,28,30,],[2,2,2,2,-6,-7,-8,-19,-18,-3,2,2,2,-2,-4,-5,-1,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'NOT':([0,1,2,3,4,5,6,8,9,10,11,12,13,14,17,18,19,21,22,23,24,25,26,27,28,30,],[3,3,3,3,-6,-7,-8,-19,-18,3,3,3,3,3,3,3,-1,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'FUZZY':([0,1,2,3,4,5,6,8,9,10,11,12,13,14,17,18,19,21,22,23,24,25,26,27,28,30,],[7,7,7,7,-6,-7,-8,-19,-18,-3,7,7,7,-2,-4,-5,-1,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'WORD':([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,16,17,18,19,20,21,22,23,24,25,26,27,28,30,],[8,8,8,8,-6,-7,-8,15,-19,-18,-3,8,8,8,-2,21,-4,-5,-1,27,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'QUOTED':([0,1,2,3,4,5,6,8,9,10,11,12,13,14,16,17,18,19,20,21,22,23,24,25,26,27,28,30,],[9,9,9,9,-6,-7,-8,-19,-18,-3,9,9,9,-2,22,-4,-5,-1,28,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'$end':([1,4,5,6,8,9,10,14,17,18,19,21,22,23,24,25,26,27,28,30,],[0,-6,-7,-8,-19,-18,-3,-2,-4,-5,-1,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'AND':([1,4,5,6,8,9,10,13,14,17,18,19,21,22,23,24,25,26,27,28,30,],[11,-6,-7,-8,-19,-18,-3,11,-2,-4,-5,-1,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'OR':([1,4,5,6,8,9,10,13,14,17,18,19,21,22,23,24,25,26,27,28,30,],[12,-6,-7,-8,-19,-18,-3,12,-2,-4,-5,-1,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'RPAREN':([4,5,6,8,9,10,13,14,17,18,19,21,22,23,24,25,26,27,28,30,],[-6,-7,-8,-19,-18,-3,19,-2,-4,-5,-1,-10,-12,-13,-14,-15,-16,-9,-11,-17,]),'COLON':([8,15,26,],[16,20,29,]),'NULL':([16,],[23,]),'WILDCARD':([16,],[24,]),'REGEX':([16,],[25,]),'DATE':([16,29,],[26,30,]),}
 
@@ -27,23 +27,23 @@ for _k, _v in _lr_goto_items.items():
 del _lr_goto_items
 _lr_productions = [
   ("S' -> query","S'",1,None,None,None),
-  ('query -> LPAREN query RPAREN','query',3,'p_query_group','advanced_es.py',296),
-  ('query -> NOT query','query',2,'p_query_not','advanced_es.py',301),
-  ('query -> query query','query',2,'p_query_query','advanced_es.py',324),
-  ('query -> query AND query','query',3,'p_query_and_query','advanced_es.py',329),
-  ('query -> query OR query','query',3,'p_query_or_query','advanced_es.py',334),
-  ('query -> specific','query',1,'p_query_terminals','advanced_es.py',348),
-  ('query -> daterange','query',1,'p_query_terminals','advanced_es.py',349),
-  ('query -> termquery','query',1,'p_query_terminals','advanced_es.py',350),
-  ('specific -> FUZZY WORD COLON WORD','specific',4,'p_specific_fuzzy_word','advanced_es.py',386),
-  ('specific -> WORD COLON WORD','specific',3,'p_specific_word','advanced_es.py',403),
-  ('specific -> FUZZY WORD COLON QUOTED','specific',4,'p_specific_fuzzy_quoted','advanced_es.py',415),
-  ('specific -> WORD COLON QUOTED','specific',3,'p_specific_quoted','advanced_es.py',460),
-  ('specific -> WORD COLON NULL','specific',3,'p_field_missing','advanced_es.py',519),
-  ('specific -> WORD COLON WILDCARD','specific',3,'p_specific_wildcard','advanced_es.py',587),
-  ('specific -> WORD COLON REGEX','specific',3,'p_specific_regex','advanced_es.py',596),
-  ('daterange -> WORD COLON DATE','daterange',3,'p_daterange_single','advanced_es.py',621),
-  ('daterange -> WORD COLON DATE COLON DATE','daterange',5,'p_daterange_range','advanced_es.py',634),
-  ('termquery -> QUOTED','termquery',1,'p_termquery_quoted','advanced_es.py',650),
-  ('termquery -> WORD','termquery',1,'p_termquery_word','advanced_es.py',703),
+  ('query -> LPAREN query RPAREN','query',3,'p_query_group','advanced_es.py',285),
+  ('query -> NOT query','query',2,'p_query_not','advanced_es.py',289),
+  ('query -> query query','query',2,'p_query_query','advanced_es.py',310),
+  ('query -> query AND query','query',3,'p_query_and_query','advanced_es.py',314),
+  ('query -> query OR query','query',3,'p_query_or_query','advanced_es.py',318),
+  ('query -> specific','query',1,'p_query_terminals','advanced_es.py',331),
+  ('query -> daterange','query',1,'p_query_terminals','advanced_es.py',332),
+  ('query -> termquery','query',1,'p_query_terminals','advanced_es.py',333),
+  ('specific -> FUZZY WORD COLON WORD','specific',4,'p_specific_fuzzy_word','advanced_es.py',367),
+  ('specific -> WORD COLON WORD','specific',3,'p_specific_word','advanced_es.py',383),
+  ('specific -> FUZZY WORD COLON QUOTED','specific',4,'p_specific_fuzzy_quoted','advanced_es.py',394),
+  ('specific -> WORD COLON QUOTED','specific',3,'p_specific_quoted','advanced_es.py',437),
+  ('specific -> WORD COLON NULL','specific',3,'p_field_missing','advanced_es.py',495),
+  ('specific -> WORD COLON WILDCARD','specific',3,'p_specific_wildcard','advanced_es.py',561),
+  ('specific -> WORD COLON REGEX','specific',3,'p_specific_regex','advanced_es.py',569),
+  ('daterange -> WORD COLON DATE','daterange',3,'p_daterange_single','advanced_es.py',592),
+  ('daterange -> WORD COLON DATE COLON DATE','daterange',5,'p_daterange_range','advanced_es.py',604),
+  ('termquery -> QUOTED','termquery',1,'p_termquery_quoted','advanced_es.py',619),
+  ('termquery -> WORD','termquery',1,'p_termquery_word','advanced_es.py',671),
 ]
