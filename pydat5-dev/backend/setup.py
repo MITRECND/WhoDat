@@ -11,7 +11,8 @@ setup(
         "cerberus",
         "elasticsearch",
         "ply",
-        "flask-caching"
+        "flask-caching",
+        "requests"
         ],
     tests_require=[
         "pytest",
