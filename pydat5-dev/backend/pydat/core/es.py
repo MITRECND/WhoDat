@@ -740,6 +740,8 @@ class ElasticsearchHandler:
                     if "updateVersion" in pdomain:
                         pdomain["UpdateVersion"] = pdomain["updateVersion"]
                         del pdomain["updateVersion"]
+                    if "_score" in domain.keys():
+                        pdomain["score"] = domain["_score"]
                     results["data"].append(pdomain)
 
                 results["avail"] = len(results["data"])
@@ -766,6 +768,8 @@ class ElasticsearchHandler:
                     if "updateVersion" in pdomain:
                         pdomain["UpdateVersion"] = pdomain["updateVersion"]
                         del pdomain["updateVersion"]
+                    if "_score" in domain.keys():
+                        pdomain["score"] = domain["_score"]
                     results["data"].append(pdomain)
 
                 results["avail"] = len(buckets)
