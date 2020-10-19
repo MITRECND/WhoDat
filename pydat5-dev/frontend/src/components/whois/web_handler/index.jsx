@@ -7,6 +7,7 @@ import IconButton from '@material-ui/core/IconButton'
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
 import Grid from '@material-ui/core/Grid'
+import CircularProgress from '@material-ui/core/CircularProgress'
 import { useHistory } from 'react-router-dom';
 
 import {queryFetcher} from '../../helpers/fetchers'
@@ -178,6 +179,8 @@ const WebHandler = (props) => {
     ]
 
     useEffect(() => {
+        setPending(true)
+        setQueryResults([])
         setQueryParams(update(queryParams, {
             query: {$set: props.queryData.query},
             chunk_size: {$set: initialPageSize},
@@ -203,8 +206,6 @@ const WebHandler = (props) => {
     }
 
     const fetchData = () => {
-        setPending(true)
-
         const asyncfetch = async () => {
             try {
                 let results = await queryFetcher({
@@ -240,6 +241,7 @@ const WebHandler = (props) => {
                 paginationRowsPerPageOptions={[50, 100, 1000, 10000]}
                 paginationTotalRows={queryResults.total}
                 progressPending={pending}
+                progressComponent={<CircularProgress color="secondary"/>}
                 striped
                 highlightOnHover
                 expandableRows
