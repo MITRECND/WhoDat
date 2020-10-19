@@ -346,9 +346,39 @@ const DNSDB = ({}) => {
         ...reverseQueryTypes
     }
 
+    let location = useLocation()
+    let history = useHistory()
+
+    useEffect(() => {
+        let query_params = qs.parse(location.search, {
+            ignoreQueryPrefix: true
+        })
+
+        if (!!query_params) {
+            if ('type' in query_params && 'value' in query_params) {
+                let updated = update(formData, {
+                    type: {$set: query_params.type},
+                    value: {$set: query_params.value}
+                })
+                setFormData(updated)
+                setQueryData(updated)
+            }
+
+        }
+    }, [])
+
 
     const handleOnSubmit = (e) => {
         e.preventDefault()
+
+        history.push({
+            pathname: location.pathname,
+            search: (
+                `?type=${encodeURIComponent(formData.type)}&` +
+                `value=${encodeURIComponent(formData.value)}`
+            )
+        })
+
         setQueryData({...formData})
     }
 

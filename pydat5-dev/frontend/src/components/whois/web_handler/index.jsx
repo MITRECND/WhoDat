@@ -52,6 +52,8 @@ const DropDownCell = (props) => {
 }
 
 const DomainNameCell = ({row, handleWebPivot}) => {
+    let history = useHistory()
+
     return (
         <DropDownCell
              friendly={"domain"}
@@ -62,7 +64,7 @@ const DomainNameCell = ({row, handleWebPivot}) => {
             >
                 Pivot Search
             </MenuItem>
-            <MenuItem onClick={() => {}}>Search Passive</MenuItem>
+            <MenuItem onClick={() => {history.push(`/passive?type=domain&value=${encodeURIComponent(row.domainName)}`)}}>Search Passive</MenuItem>
         </DropDownCell>
     )
 }
