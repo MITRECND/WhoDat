@@ -1,4 +1,5 @@
-import React from 'react';
+import React, {createContext, useState, useEffect} from 'react';
+import {useLocation} from 'react-router-dom'
 import clsx from 'clsx';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
 import Drawer from '@material-ui/core/Drawer';
@@ -81,7 +82,7 @@ const useStyles = makeStyles((theme) => ({
 const Dashboard = (props) => {
   const classes = useStyles();
   const theme = useTheme();
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -100,7 +101,7 @@ const Dashboard = (props) => {
           [classes.appBarShift]: open,
         })}
       >
-        <Toolbar>
+        <Toolbar variant="dense">
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -111,7 +112,7 @@ const Dashboard = (props) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap>
-            Pydat 5
+            PyDat 5
           </Typography>
         </Toolbar>
       </AppBar>
@@ -131,7 +132,7 @@ const Dashboard = (props) => {
         </div>
         <Divider />
         <List>
-            <MainListItems />
+            <MainListItems handleDrawerClose={handleDrawerClose} />
         </List>
       </Drawer>
       <main

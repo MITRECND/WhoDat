@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react'
+import React, {useEffect, useState, useContext} from 'react'
 import { useLocation, useHistory } from 'react-router-dom'
 import update from 'immutability-helper'
 import qs from 'qs'
@@ -17,10 +17,15 @@ import Menu from '@material-ui/core/Menu'
 import Input from '@material-ui/core/Input'
 import Typography from '@material-ui/core/Typography'
 import Container from '@material-ui/core/Container'
+import Paper from '@material-ui/core/Paper'
+
 
 import DNSDBWebHandler from './web_handler'
 import DNSDBTextHandler from './text_handler'
 import { BackdropLoader } from '../../helpers/loaders'
+import { makeStyles } from '@material-ui/core'
+import {UserPreferencesContext} from '../../helpers/preferences'
+import {DashboardContext} from '../../layout/dashboard'
 
 
 const dnsdbFetcher = async ({
@@ -114,7 +119,7 @@ const MenuProps = {
 
 
 const DNSDBGeneralOptions = ({formData, setFormData}) => {
-
+    const preferences = useContext(UserPreferencesContext)
     const AllRRTypesList = [
         'any',
         'a',
@@ -313,6 +318,18 @@ const DNSDBResults = (props) => {
 
 }
 
+const useStyles = makeStyles((theme) => ({
+    root: {
+        flexGrow: 1
+    },
+    searchContainer: {
+        paddingBottom: theme.spacing(2)
+    },
+    searchPaper: {
+        padding: theme.spacing(2)
+    }
+}))
+
 const DNSDB = ({}) => {
     const [formData, setFormData] = useState({
         value: "",
@@ -346,6 +363,8 @@ const DNSDB = ({}) => {
         ...reverseQueryTypes
     }
 
+    const classes = useStyles()
+
     let location = useLocation()
     let history = useHistory()
 
@@ -363,7 +382,6 @@ const DNSDB = ({}) => {
                 setFormData(updated)
                 setQueryData(updated)
             }
-
         }
     }, [])
 
@@ -401,95 +419,99 @@ const DNSDB = ({}) => {
     }
 
     return (
-        <Grid container>
-            <Grid item xs={12}>
-                <form onSubmit={handleOnSubmit}>
-                    <Grid container spacing={1}>
-                        <Grid container item xs={11}>
-                            <Grid item xs={1}>
-                                <InputLabel id="passive-type-label">Type</InputLabel>
-                                <Select
-                                    name="type"
-                                    labelId="passive-type-label"
-                                    id="passive-type-select"
-                                    onChange={handleOnChangeType}
-                                    value={formData.type}
-                                >
-                                    {/* <ListSubheader>Forward</ListSubheader> */}
-                                    {Object.keys(forwardQueryTypes).map((name, index) => {
-                                        return (
-                                            <MenuItem value={name} key={index}>
-                                                {forwardQueryTypes[name]}
-                                            </MenuItem>
-                                        )
-                                    })}
-                                    {/* <ListSubheader>Reverse</ListSubheader> */}
-                                    {Object.keys(reverseQueryTypes).map((name, index) => {
-                                        return (
-                                            <MenuItem value={name} key={index}>
-                                                {reverseQueryTypes[name]}
-                                            </MenuItem>
-                                        )
-                                    })}
-                                </Select>
-                            </Grid>
-                            <Grid item xs={1}>
-                                <InputLabel id="output-format-label">Format</InputLabel>
-                                <Select
-                                    name="format"
-                                    labelId="output-format-label"
-                                    id="output-format-select"
-                                    onChange={handleOnChangeFormat}
-                                    value={formData.format}
-                                >
-                                    <MenuItem value={'WEB'}>Web</MenuItem>
-                                    <MenuItem value={'JSON'}>JSON</MenuItem>
-                                    <MenuItem value={'CSV'}>CSV</MenuItem>
-                                    <MenuItem value={'LIST'}>List</MenuItem>
-                                </Select>
-                            </Grid>
-                            <Grid item xs={10}>
-                                <TextField
-                                    label={allQueryTypes[formData.type]}
-                                    variant="outlined"
-                                    name="value"
-                                    value={formData.value}
-                                    onChange={handleOnChangeValue}
-                                    fullWidth
-                                />
-                            </Grid>
-                        </Grid>
-                        <Grid item xs={1}>
-                            <Button variant="outlined" type="submit">
-                                Search
-                            </Button>
-                        </Grid>
-                        <Grid container item xs={12}>
-                            <Grid
-                                container
-                                direction="row"
-                                // alignItems="left"
-                                spacing={1}
-                            >
-                                {
-                                    <DNSDBGeneralOptions
-                                        formData={formData}
-                                        setFormData={setFormData}
+        <React.Fragment>
+            <Container className={classes.searchContainer} maxWidth="xl">
+                <Paper className={classes.searchPaper}>
+                    <form onSubmit={handleOnSubmit}>
+                        <Grid container spacing={1} justify="center" alignItems="flex-end">
+                            <Grid container justify="center" alignItems="flex-end" item xs={11}>
+                                <Grid item xs={1}>
+                                    <InputLabel id="passive-type-label">Type</InputLabel>
+                                    <Select
+                                        name="type"
+                                        labelId="passive-type-label"
+                                        id="passive-type-select"
+                                        onChange={handleOnChangeType}
+                                        value={formData.type}
+                                    >
+                                        {Object.keys(forwardQueryTypes).map((name, index) => {
+                                            return (
+                                                <MenuItem value={name} key={index}>
+                                                    {forwardQueryTypes[name]}
+                                                </MenuItem>
+                                            )
+                                        })}
+                                        {Object.keys(reverseQueryTypes).map((name, index) => {
+                                            return (
+                                                <MenuItem value={name} key={index}>
+                                                    {reverseQueryTypes[name]}
+                                                </MenuItem>
+                                            )
+                                        })}
+                                    </Select>
+                                </Grid>
+                                <Grid item xs={1}>
+                                    <InputLabel id="output-format-label">Format</InputLabel>
+                                    <Select
+                                        name="format"
+                                        labelId="output-format-label"
+                                        id="output-format-select"
+                                        onChange={handleOnChangeFormat}
+                                        value={formData.format}
+                                    >
+                                        <MenuItem value={'WEB'}>Web</MenuItem>
+                                        <MenuItem value={'JSON'}>JSON</MenuItem>
+                                        <MenuItem value={'CSV'}>CSV</MenuItem>
+                                        <MenuItem value={'LIST'}>List</MenuItem>
+                                    </Select>
+                                </Grid>
+                                <Grid item xs={10}>
+                                    <TextField
+                                        label={allQueryTypes[formData.type]}
+                                        variant="outlined"
+                                        name="value"
+                                        value={formData.value}
+                                        onChange={handleOnChangeValue}
+                                        fullWidth
                                     />
-                                }
+                                </Grid>
                             </Grid>
-
+                            <Grid item xs={1}>
+                                <Button variant="outlined" type="submit" fullWidth>
+                                    Search
+                                </Button>
+                            </Grid>
+                            <Grid container item xs={12}>
+                                <Grid
+                                    container
+                                    direction="row"
+                                    // alignItems="left"
+                                    spacing={1}
+                                >
+                                    {
+                                        <DNSDBGeneralOptions
+                                            formData={formData}
+                                            setFormData={setFormData}
+                                        />
+                                    }
+                                </Grid>
+                            </Grid>
                         </Grid>
-                    </Grid>
-                </form>
-            </Grid>
+                    </form>
+                </Paper>
+            </Container>
             {!!queryData.value &&
                 queryData.value != "" &&
-                <DNSDBResults
-                    queryData={queryData}
-                />
+                <Paper>
+                    <DNSDBResults
+                        queryData={queryData}
+                    />
+                </Paper>
             }
-        </Grid>
+        </React.Fragment>
+
+
+
     )
 }
 

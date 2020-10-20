@@ -12,6 +12,8 @@ import { useHistory } from 'react-router-dom';
 
 import {queryFetcher} from '../../helpers/fetchers'
 import ExpandedEntryRow from './expandable'
+import {UserPreferencesContext} from '../../helpers/preferences'
+import { useContext } from 'react';
 
 
 const DropDownCell = (props) => {
@@ -26,30 +28,28 @@ const DropDownCell = (props) => {
     }
 
     return (
-        <Grid container direction="row" alignItems="center">
-            <Grid item>
-                <IconButton
-                    aria-controls={`${props.friendly}-menu`}
-                    onClick={handleClick}
-                >
-                    <ArrowDropDownIcon />
-                </IconButton>
-                <Menu
-                    anchorEl={anchorEl}
-                    keepMounted
-                    open={Boolean(anchorEl)}
-                    onClose={handleClose}
-                >
-                    {props.children}
-                </Menu>
-            </Grid>
-            <Grid item>
-                {props.value}
-            </Grid>
-        </Grid>
+        <React.Fragment>
+            <IconButton
+                aria-controls={`${props.friendly}-menu`}
+                onClick={handleClick}
+                size='small'
+            >
+                <ArrowDropDownIcon />
+            </IconButton>
+            <Menu
+                anchorEl={anchorEl}
+                keepMounted
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+            >
+                {props.children}
+            </Menu>
+            {props.value}
+        </React.Fragment>
 
     )
 }
+
 
 const DomainNameCell = ({row, handleWebPivot}) => {
     let history = useHistory()
@@ -64,7 +64,13 @@ const DomainNameCell = ({row, handleWebPivot}) => {
             >
                 Pivot Search
             </MenuItem>
-            <MenuItem onClick={() => {history.push(`/passive?type=domain&value=${encodeURIComponent(row.domainName)}`)}}>Search Passive</MenuItem>
+            <MenuItem onClick={() => {
+                let domain = `*.${row.domainName}`
+                history.push(`/passive?type=domain&value=${encodeURIComponent(domain)}`)
+                }}
+            >
+                Search Passive
+            </MenuItem>
         </DropDownCell>
     )
 }
@@ -115,7 +121,9 @@ const TelephoneCell = ({row, handleWebPivot}) => {
 }
 
 const WebHandler = (props) => {
-    const initialPageSize = 50
+    const preferences = useContext(UserPreferencesContext)
+
+    const initialPageSize = preferences.getPref('whois', 'page_size', 50)
     const [pending, setPending] = useState(true)
     const [queryParams, setQueryParams] = useState({
         query: props.queryData.query,
@@ -172,11 +180,14 @@ const WebHandler = (props) => {
         },
         {
             name: 'Version',
-            selector: 'Version'
+            selector: 'Version',
+            maxWidth: "5vh"
         },
         {
             name: 'Score',
-            selector: 'score'
+            selector: 'score',
+            maxWidth: "10vh",
+            cell: (row) => row.score.toFixed(3)
         }
     ]
 
@@ -205,6 +216,7 @@ const WebHandler = (props) => {
             chunk_size: {$set: perPage},
             offset: {$set: page - 1}
         }))
+        preferences.setPref('whois', 'page_size', perPage)
     }
 
     const fetchData = () => {

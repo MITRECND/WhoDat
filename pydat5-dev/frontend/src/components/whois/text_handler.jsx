@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react'
+import React, {useState, useEffect, useContext} from 'react'
 import update from 'immutability-helper'
 import Grid from '@material-ui/core/Grid'
 import TextField from '@material-ui/core/TextField'
@@ -7,14 +7,16 @@ import InputLabel from '@material-ui/core/InputLabel'
 import MenuItem from '@material-ui/core/MenuItem'
 
 import {queryFetcher} from '../helpers/fetchers'
+import {UserPreferencesContext} from '../helpers/preferences'
 
 export const TextOptions = ({formData, setFormData}) => {
-
+    const preferences = useContext(UserPreferencesContext)
     const handleOnChange = (e) => {
         console.log(e.target)
         setFormData(update(formData, {
             [e.target.name]: {$set: e.target.value}
         }))
+        preferences.setPref('whois', e.target.name, e.target.value)
     }
 
     return (

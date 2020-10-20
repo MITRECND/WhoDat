@@ -14,6 +14,7 @@ import Select from '@material-ui/core/Select'
 
 
 import { BackdropLoader } from '../../helpers/loaders'
+import { useHistory } from 'react-router-dom';
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
@@ -35,14 +36,101 @@ const cleanData = (data) => {
     }
 }
 
+const DropDownCell = (props) => {
+    const [anchorEl, setAnchorEl] = useState(null)
+
+    const handleClick = (e) => {
+        setAnchorEl(e.currentTarget)
+    }
+
+    const handleClose = () => {
+        setAnchorEl(null)
+    }
+
+    return (
+        <React.Fragment>
+            <IconButton
+                aria-controls={`${props.friendly}-menu`}
+                onClick={handleClick}
+            >
+                <ArrowDropDownIcon />
+            </IconButton>
+            <Menu
+                anchorEl={anchorEl}
+                keepMounted
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+            >
+                {props.children}
+            </Menu>
+            {props.value}
+        </React.Fragment>
+
+    )
+}
+
+const DomainMenu = ({value}) => {
+    let history = useHistory()
+
+    return (
+        <DropDownCell
+            friendly={"domain"}
+            value={cleanData(value)}
+        >
+            <MenuItem
+                onClick={() => {history.push(`/whois?query=dn%3A${encodeURIComponent(cleanData(value))}`)}}
+            >
+                Search WhoIs
+            </MenuItem>
+        </DropDownCell>
+
+    )
+}
+
+const IPMenu = ({value}) => {
+    let history = useHistory()
+
+    return (
+        <DropDownCell
+            friendly={"ip"}
+            value={value}
+        >
+            <MenuItem
+                onClick={() => {history.push(`/passive?type=ip&value=${encodeURIComponent(value)}`)}}
+            >
+                Search Passive
+            </MenuItem>
+        </DropDownCell>
+
+    )
+}
+
+const RRNameCell = ({row}) => {
+    return (
+        <Grid item xs={12}>
+            <DomainMenu row={row} value={row.rrname} />
+        </Grid>
+    )
+}
+
+
 const RDataCell = ({row}) => {
     return (
         <Grid container>
-            {row.rdata.map((value, index) => (
-                <Grid item xs={12} key={index}>
-                    {cleanData(value)}
-                </Grid>
-            ))}
+            {row.rdata.map((value, index) => {
+                let data = cleanData(value)
+                if (['ns', 'cname', 'mx'].includes(row.rrtype.toLowerCase())) {
+                    data = (<DomainMenu row={row} value={data} />)
+                } else if (['a', 'aaaa'].includes(row.rrtype.toLowerCase())) {
+                    data = (<IPMenu row={row} value={data} />)
+                }
+
+                return (
+                    <Grid item xs={12} key={index}>
+                        {data}
+                    </Grid>
+                )
+            })}
         </Grid>
     )
 }
@@ -144,7 +232,7 @@ const DNSDBWebHandler = (props) => {
             name: 'RRName',
             selector: 'rrname',
             maxWidth: '20vw',
-            cell: (row) => cleanData(row.rrname)
+            cell: (row) => <RRNameCell row={row} />
         },
         {
             name: 'RData',

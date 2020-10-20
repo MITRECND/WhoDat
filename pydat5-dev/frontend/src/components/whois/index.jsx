@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react'
+import React, {useState, useEffect, useRef, useContext} from 'react'
 import {useHistory, useLocation, useParams, withRouter} from 'react-router-dom'
 import update from 'immutability-helper'
 import qs from 'qs'
@@ -12,18 +12,23 @@ import MenuItem from '@material-ui/core/MenuItem'
 import CheckBox from '@material-ui/core/Checkbox'
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
+import Container from '@material-ui/core/Container'
+import Paper from '@material-ui/core/Paper'
 
 import WebHandler from './web_handler'
 import TextHandler, {TextOptions} from './text_handler'
+import {UserPreferencesContext} from '../helpers/preferences'
 
 export const GeneralOptions = ({ formData, setFormData }) => {
     const [fangStatus, setFangStatus] = useState(formData.fang)
+    const preferences = useContext(UserPreferencesContext)
 
     const toggleFangOption = () => {
         setFangStatus(!fangStatus)
         setFormData(update(formData, {
             fang: {$set: !fangStatus}
         }))
+        preferences.setPref('whois', 'fang', !fangStatus)
     }
 
     return (
@@ -81,12 +86,17 @@ const WhoisResults = (props) => {
 }
 
 const WhoisHandler = (props) => {
-    const [formData, setFormData] = useState({
-        query: "",
-        format: 'WEB',
+    const preferences = useContext(UserPreferencesContext)
+    const formPrefs = preferences.getPrefs('whois', {
         limit: 1000,
         field: "domainName",
         fang: true,
+    })
+
+    const [formData, setFormData] = useState({
+        query: "",
+        format: 'WEB',
+        ...formPrefs
     })
 
     const [queryData, setQueryData] = useState({
@@ -185,11 +195,11 @@ const WhoisHandler = (props) => {
     }
 
     return (
-        <Grid container>
-            <Grid item xs={12}>
+        <React.Fragment>
+            <Container>
                 <form onSubmit={handleOnSubmit}>
-                    <Grid container spacing={1}>
-                        <Grid container item xs={11}>
+                    <Grid container spacing={1} justify="center" alignItems="flex-end">
+                        <Grid container item xs={11} justify="center" alignItems="flex-end">
                             <Grid item xs={1}>
                                 <InputLabel id="query-format-label">Format</InputLabel>
                                 <Select
@@ -234,19 +244,20 @@ const WhoisHandler = (props) => {
                                 />
                                 {queryOptions}
                             </Grid>
-
                         </Grid>
                     </Grid>
                 </form>
-            </Grid>
+            </Container>
             {!!queryData.query &&
                 queryData.query != "" &&
-                <WhoisResults
-                    queryData={queryData}
-                    handleWebPivot={handleWebPivot}
-                />
+                <Paper>
+                    <WhoisResults
+                        queryData={queryData}
+                        handleWebPivot={handleWebPivot}
+                    />
+                </Paper>
             }
-        </Grid>
+        </React.Fragment>
     )
 }
 
