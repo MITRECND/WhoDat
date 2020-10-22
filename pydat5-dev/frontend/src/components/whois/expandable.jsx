@@ -7,27 +7,21 @@ import Tabs from '@material-ui/core/Tabs'
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
-import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import Grid from '@material-ui/core/Grid'
 import Dialog from '@material-ui/core/Dialog';
-import DialogActions from '@material-ui/core/DialogActions';
 import DialogContent from '@material-ui/core/DialogContent';
-import DialogContentText from '@material-ui/core/DialogContentText';
-// import DialogTitle from '@material-ui/core/DialogTitle';
 import Button from '@material-ui/core/Button'
 import IconButton from '@material-ui/core/IconButton';
 import CloseIcon from '@material-ui/icons/Close';
 import MuiDialogTitle from '@material-ui/core/DialogTitle';
-import MuiDialogContent from '@material-ui/core/DialogContent';
-import MuiDialogActions from '@material-ui/core/DialogActions';
 import { withStyles } from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
 import { Container, makeStyles } from '@material-ui/core'
 
 
-import {domainFetcher} from '../../helpers/fetchers'
+import {domainFetcher} from '../helpers/fetchers'
 import clsx from 'clsx';
 
 const detailsDialogStyles = (theme) => ({
@@ -248,7 +242,7 @@ const RecordDetailsTab = (props) => {
 
     });
 
-    Object.keys(dateEntries).map((name, index) => {
+    Object.keys(dateEntries).forEach((name, index) => {
         date_rows.push(
             <TableRow key={index}>
                 <TableCell>

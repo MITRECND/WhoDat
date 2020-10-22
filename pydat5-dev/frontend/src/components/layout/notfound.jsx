@@ -2,7 +2,7 @@ import { Typography } from '@material-ui/core'
 import React from 'react'
 
 
-const NotFound = ({}) => {
+const NotFound = () => {
     console.log("not found")
     return (
         <React.Fragment>

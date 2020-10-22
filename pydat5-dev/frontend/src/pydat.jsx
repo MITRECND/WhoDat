@@ -22,7 +22,7 @@ import './plugins'
 const WhoisHandler = React.lazy(() => import('./components/whois'))
 const PassiveHandler = React.lazy(() => import ('./components/passive'))
 
-const Pydat = ({}) => {
+const Pydat = () => {
     const routes = useContext(PyDatPluginContext).routes
     const enableDarkMode = useMediaQuery('@media (prefers-color-scheme: dark')
 

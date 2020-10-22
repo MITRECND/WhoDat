@@ -9,22 +9,16 @@ import Select from '@material-ui/core/Select'
 import Button from '@material-ui/core/Button'
 import InputLabel from '@material-ui/core/InputLabel'
 import MenuItem from '@material-ui/core/MenuItem'
-import CheckBox from '@material-ui/core/Checkbox'
-import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
-import ListSubheader from '@material-ui/core/ListSubheader'
-import Menu from '@material-ui/core/Menu'
 import Input from '@material-ui/core/Input'
 import Typography from '@material-ui/core/Typography'
 import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
-
+import { makeStyles } from '@material-ui/core'
 
 import DNSDBWebHandler from './web_handler'
 import { BackdropLoader } from '../../helpers/loaders'
-import { makeStyles } from '@material-ui/core'
 import {UserPreferencesContext} from '../../helpers/preferences'
-import {DashboardContext} from '../../layout/dashboard'
 
 
 const dnsdbFetcher = async ({
@@ -40,7 +34,7 @@ const dnsdbFetcher = async ({
 
     let url;
     let data = {}
-    if (type == 'domain') {
+    if (type === 'domain') {
         url = '/api/plugin/passive/dnsdb/forward'
         data['domain'] = value
     } else {
@@ -67,7 +61,7 @@ const dnsdbFetcher = async ({
     ];
 
     timeFields.forEach((name) => {
-         if (data[name] == "") {
+         if (data[name] === "") {
             delete data[name]
          } else {
             let parsed = data[name].split('-')

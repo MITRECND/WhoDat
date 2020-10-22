@@ -135,7 +135,7 @@ function not(a, b) {
                     inputProps={{ 'aria-labelledby': labelId }}
                   />
                 </ListItemIcon>
-                <ListItemText id={labelId} primary={`${value + 1}`} />
+                <ListItemText id={labelId} primary={`${value}`} />
               </ListItem>
             );
           })}

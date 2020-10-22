@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react'
-import update from 'immutability-helper'
+import { useHistory } from 'react-router-dom';
 import DataTable from 'react-data-table-component'
 
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
@@ -9,22 +9,17 @@ import MenuItem from '@material-ui/core/MenuItem'
 import Grid from '@material-ui/core/Grid'
 import Button from '@material-ui/core/Button';
 import Input from '@material-ui/core/Input'
-import InputLabel from '@material-ui/core/InputLabel'
 import Select from '@material-ui/core/Select'
-import Toolbar from '@material-ui/core/Toolbar'
-import AppBar from '@material-ui/core/AppBar'
 
 import SearchTools from '../../helpers/search_tools'
-
 import { BackdropLoader } from '../../helpers/loaders'
-import { useHistory } from 'react-router-dom';
-import { Typography } from '@material-ui/core';
+
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
     let year = date.getFullYear()
     let month = `0${date.getMonth() + 1}`.slice(-2)
-    let day = `0${date.getDay()}`.slice(-2)
+    let day = `0${date.getDay() + 1}`.slice(-2)
 
     let timestring = `${year}-${month}-${day}`
 
@@ -33,7 +28,7 @@ const convertTimestampToDate = (timestamp) => {
 
 const cleanData = (data) => {
     // Remove trailing '.'
-    if (data.slice(-1) == '.') {
+    if (data.slice(-1) === '.') {
         return data.slice(0, -1)
     } else {
         return data
@@ -219,9 +214,9 @@ const DNSDBWebHandler = (props) => {
         }
 
         let data = []
-        Object.keys(props.queryResults.results).map((record_type) => {
+        Object.keys(props.queryResults.results).forEach((record_type) => {
             if (filterItems.length === 0 || filterItems.includes(record_type.toLowerCase())) {
-                props.queryResults.results[record_type].map((entry) => {
+                props.queryResults.results[record_type].forEach((entry) => {
                     data.push(entry)
                 })
             }

@@ -12,7 +12,7 @@ import FormControl from '@material-ui/core/FormControl';
 import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
 
-import WebHandler from './web_handler'
+import WhoisTable from './whois_table'
 import {UserPreferencesContext} from '../helpers/preferences'
 import {SearchSettings} from '../layout/dialogs'
 
@@ -60,7 +60,7 @@ const WhoisResults = (props) => {
         // console.log(query)
         setQueryResults(
             <React.Fragment>
-                <WebHandler
+                <WhoisTable
                     queryData={props.queryData}
                     handleWebPivot={props.handleWebPivot}
                 />

@@ -9,11 +9,11 @@ import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
 import CircularProgress from '@material-ui/core/CircularProgress'
 
-import {queryFetcher} from '../../helpers/fetchers'
+import {queryFetcher} from '../helpers/fetchers'
 import ExpandedEntryRow from './expandable'
-import {UserPreferencesContext} from '../../helpers/preferences'
-import { BackdropLoader } from '../../helpers/loaders';
-import SearchTools from '../../helpers/search_tools'
+import {UserPreferencesContext} from '../helpers/preferences'
+import { BackdropLoader } from '../helpers/loaders';
+import SearchTools from '../helpers/search_tools'
 
 
 const DropDownCell = (props) => {
@@ -120,7 +120,7 @@ const TelephoneCell = ({row, handleWebPivot}) => {
     )
 }
 
-const WebHandler = (props) => {
+const WhoisTable = (props) => {
     const preferences = useContext(UserPreferencesContext)
 
     const initialPageSize = preferences.getPref('whois', 'page_size', 50)
@@ -279,4 +279,4 @@ const WebHandler = (props) => {
     )
 }
 
-export default WebHandler
+export default WhoisTable
