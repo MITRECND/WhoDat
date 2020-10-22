@@ -21,7 +21,6 @@ import Paper from '@material-ui/core/Paper'
 
 
 import DNSDBWebHandler from './web_handler'
-import DNSDBTextHandler from './text_handler'
 import { BackdropLoader } from '../../helpers/loaders'
 import { makeStyles } from '@material-ui/core'
 import {UserPreferencesContext} from '../../helpers/preferences'
@@ -277,23 +276,14 @@ const DNSDBResults = (props) => {
                     rate: results.rate
                 }
 
-                if (props.queryData.format == 'WEB') {
-                    setQueryBlock(
-                        <React.Fragment>
-                            <DNSDBWebHandler
-                                queryResults={queryResults}
-                            />
-                        </React.Fragment>
-                    )
-                } else {
-                    setQueryBlock(
-                        <React.Fragment>
-                            <DNSDBTextHandler
-                                queryResults={queryResults}
-                            />
-                        </React.Fragment>
-                    )
-                }
+                setQueryBlock(
+                    <React.Fragment>
+                        <DNSDBWebHandler
+                            queryResults={queryResults}
+                        />
+                    </React.Fragment>
+                )
+
             } catch (err) {
                 if (err.status === 404) {
                     setQueryBlock(
@@ -333,7 +323,6 @@ const useStyles = makeStyles((theme) => ({
 const DNSDB = ({}) => {
     const [formData, setFormData] = useState({
         value: "",
-        format: "WEB",
         limit: 10000,
         field: "RRName",
         type: "domain",
@@ -406,12 +395,6 @@ const DNSDB = ({}) => {
         }))
     }
 
-    const handleOnChangeFormat = (e) => {
-        setFormData(update(formData, {
-            format: {$set: e.targetvalue}
-        }))
-    }
-
     const handleOnChangeType = (e) => {
         setFormData(update(formData,{
             type: {$set: e.target.value}
@@ -450,22 +433,7 @@ const DNSDB = ({}) => {
                                         })}
                                     </Select>
                                 </Grid>
-                                <Grid item xs={1}>
-                                    <InputLabel id="output-format-label">Format</InputLabel>
-                                    <Select
-                                        name="format"
-                                        labelId="output-format-label"
-                                        id="output-format-select"
-                                        onChange={handleOnChangeFormat}
-                                        value={formData.format}
-                                    >
-                                        <MenuItem value={'WEB'}>Web</MenuItem>
-                                        <MenuItem value={'JSON'}>JSON</MenuItem>
-                                        <MenuItem value={'CSV'}>CSV</MenuItem>
-                                        <MenuItem value={'LIST'}>List</MenuItem>
-                                    </Select>
-                                </Grid>
-                                <Grid item xs={10}>
+                                <Grid item xs={11}>
                                     <TextField
                                         label={allQueryTypes[formData.type]}
                                         variant="outlined"

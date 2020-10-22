@@ -1,14 +1,11 @@
-import React, {useState, useEffect, useRef, useContext} from 'react'
-import {useHistory, useLocation, useParams, withRouter} from 'react-router-dom'
+import React, {useState, useEffect, useContext} from 'react'
+import {useHistory, useLocation} from 'react-router-dom'
 import update from 'immutability-helper'
 import qs from 'qs'
 
 import Grid from '@material-ui/core/Grid'
 import TextField from '@material-ui/core/TextField'
-import Select from '@material-ui/core/Select'
 import Button from '@material-ui/core/Button'
-import InputLabel from '@material-ui/core/InputLabel'
-import MenuItem from '@material-ui/core/MenuItem'
 import CheckBox from '@material-ui/core/Checkbox'
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
@@ -79,9 +76,7 @@ const WhoisResults = (props) => {
     )
 }
 
-
-
-const WhoisHandler = (props) => {
+const WhoisHandler = ({}) => {
     const preferences = useContext(UserPreferencesContext)
     const formPrefs = preferences.getPrefs('whois', {
         fang: true,

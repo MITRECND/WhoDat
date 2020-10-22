@@ -7,20 +7,13 @@ import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import IconButton from '@material-ui/core/IconButton'
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
-import Grid from '@material-ui/core/Grid'
 import CircularProgress from '@material-ui/core/CircularProgress'
-
-import BuildIcon from '@material-ui/icons/Build';
 
 import {queryFetcher} from '../../helpers/fetchers'
 import ExpandedEntryRow from './expandable'
 import {UserPreferencesContext} from '../../helpers/preferences'
 import { BackdropLoader } from '../../helpers/loaders';
-import {
-    JSONExporter,
-    CSVExporter,
-    ListExporter
-} from '../../helpers/data_exporters'
+import SearchTools from '../../helpers/search_tools'
 
 
 const DropDownCell = (props) => {
@@ -124,81 +117,6 @@ const TelephoneCell = ({row, handleWebPivot}) => {
                 Pivot Search
             </MenuItem>
         </DropDownCell>
-    )
-}
-
-const SearchTools = ({data, children}) => {
-    const [anchorEl, setAnchorEl] = useState(null)
-    const [openJSONDialog, setOpenJSONDialog] = useState(false)
-    const [openCSVDialog, setOpenCSVDialog] = useState(false)
-    const [openListDialog, setOpenListDialog] = useState(false)
-
-    const handleClick = (e) => {
-        setAnchorEl(e.currentTarget)
-    }
-
-    const handleClose = () => {
-        setAnchorEl(null)
-    }
-
-    return (
-        <React.Fragment>
-            <IconButton
-                onClick={handleClick}
-                size='small'
-            >
-                <BuildIcon fontSize="small"/>
-            </IconButton>
-            <Menu
-                anchorEl={anchorEl}
-                keepMounted
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-            >
-                <MenuItem
-                    onClick={() => {setOpenJSONDialog(true); handleClose()}}
-                >
-                    Export JSON
-                </MenuItem>
-                <JSONExporter
-                    data={data}
-                    open={openJSONDialog}
-                    onClose={() => {setOpenJSONDialog(false)}}
-                />
-                <MenuItem
-                    onClick={() => {setOpenCSVDialog(true); handleClose()}}
-                >
-                    Export CSV
-                </MenuItem>
-                <CSVExporter
-                    data={data}
-                    open={openCSVDialog}
-                    onClose={() => {setOpenCSVDialog(false)}}
-                />
-                <MenuItem
-                    onClick={() => {setOpenListDialog(true); handleClose()}}
-                >
-                    Export List
-                </MenuItem>
-                <ListExporter
-                    field={'domainName'}
-                    data={data}
-                    open={openListDialog}
-                    onClose={() => {setOpenListDialog(false)}}
-                />
-                {React.Children.map(children, (child) => {
-                    const props = {
-                        data: data,
-                        handleClose: handleClose,
-                    }
-                    if (React.isValidElement(child)) {
-                        return React.cloneElement(child, props)
-                    } else {
-                        return child
-                    }
-                })}
-            </Menu>
-        </React.Fragment>
     )
 }
 
@@ -336,8 +254,8 @@ const WebHandler = (props) => {
                 columns={columns}
                 data={queryResults.results}
                 // fixedHeader
-                pagination={true}
-                paginationServer={true}
+                pagination
+                paginationServer
                 paginationDefaultPage={1}
                 paginationPerPage={queryParams.chunk_size}
                 paginationRowsPerPageOptions={[50, 100, 1000, 10000]}
@@ -347,14 +265,14 @@ const WebHandler = (props) => {
                 striped
                 highlightOnHover
                 expandableRows
-                noHeader={true}
+                noHeader
                 expandableRowsComponent={<ExpandedEntryRow/>}
                 onChangeRowsPerPage={handleChunkChange}
                 onChangePage={handlePageChange}
                 subHeader
                 subHeaderAlign="right"
                 subHeaderComponent={
-                    <SearchTools data={queryResults.results} />
+                    <SearchTools data={queryResults.results} defaultListField={'domainName'} />
                 }
             />
         </React.Fragment>

@@ -11,10 +11,14 @@ import Button from '@material-ui/core/Button';
 import Input from '@material-ui/core/Input'
 import InputLabel from '@material-ui/core/InputLabel'
 import Select from '@material-ui/core/Select'
+import Toolbar from '@material-ui/core/Toolbar'
+import AppBar from '@material-ui/core/AppBar'
 
+import SearchTools from '../../helpers/search_tools'
 
 import { BackdropLoader } from '../../helpers/loaders'
 import { useHistory } from 'react-router-dom';
+import { Typography } from '@material-ui/core';
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
@@ -34,6 +38,10 @@ const cleanData = (data) => {
     } else {
         return data
     }
+}
+
+const cleanEntry = (entry) => {
+    // clean a record and return it
 }
 
 const DropDownCell = (props) => {
@@ -199,7 +207,9 @@ const TableFilter = ({filterItems, onFilter, onClear}) => {
 }
 
 const DNSDBWebHandler = (props) => {
+    const [pageSize, setPageSize] = useState(100)
     const [displayData, setDisplayData] = useState([])
+    const [displaySlice, setDisplaySlice] = useState([])
     const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
     const [filterItems, setFilterItems] = useState([])
 
@@ -219,6 +229,7 @@ const DNSDBWebHandler = (props) => {
         })
 
         setDisplayData(data)
+        setDisplaySlice(data.slice(0, pageSize))
     }, [props.queryResults, filterItems])
 
     const columns = [
@@ -261,6 +272,19 @@ const DNSDBWebHandler = (props) => {
         },
     ]
 
+    const handlePageChange = async (page) => {
+        let start = (page - 1) * pageSize
+        let end = start + pageSize
+        setDisplaySlice(displayData.slice(start, end))
+    }
+
+    const handleChunkChange = async (perPage, page) => {
+        setPageSize(perPage)
+        let start = (page - 1) * perPage
+        let end = start + perPage
+        setDisplaySlice(displayData.slice(start, end))
+    }
+
     const subHeaderComponentMemo = React.useMemo(() => {
         const handleClear = () => {
             if (filterItems.length > 0) {
@@ -270,13 +294,17 @@ const DNSDBWebHandler = (props) => {
         }
 
         return (
-            <TableFilter
-                onFilter={e => setFilterItems(e.target.value)}
-                onClear={handleClear}
-                filterItems={filterItems}
-            />
+            <React.Fragment>
+                <TableFilter
+                    onFilter={e => setFilterItems(e.target.value)}
+                    onClear={handleClear}
+                    filterItems={filterItems}
+                />
+                <SearchTools data={displaySlice} defaultListField={'rrname'} />
+            </React.Fragment>
+
         )
-    }, [filterItems, resetPaginationToggle])
+    }, [filterItems, resetPaginationToggle, displaySlice])
 
     if (props.queryResults === null) {
         return (<BackdropLoader />)
@@ -286,14 +314,22 @@ const DNSDBWebHandler = (props) => {
         <React.Fragment>
             <DataTable
                 columns={columns}
-                data={displayData}
-                // fixedHeader
+                data={displaySlice}
                 pagination
+                paginationServer
+                paginationDefaultPage={1}
+                paginationPerPage={pageSize}
+                paginationRowsPerPageOptions={[50, 100, 200, 500, 1000]}
+                paginationTotalRows={displayData.length}
                 paginationResetDefaultPage={resetPaginationToggle}
                 subHeader
                 subHeaderComponent={subHeaderComponentMemo}
+                // subHeaderAlign="right"
                 striped
                 highlightOnHover
+                noHeader
+                onChangeRowsPerPage={handleChunkChange}
+                onChangePage={handlePageChange}
             />
         </React.Fragment>
     )
