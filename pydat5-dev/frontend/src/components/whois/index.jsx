@@ -16,12 +16,16 @@ import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
 
 import WebHandler from './web_handler'
-import TextHandler, {TextOptions} from './text_handler'
 import {UserPreferencesContext} from '../helpers/preferences'
+import {SearchSettings} from '../layout/dialogs'
 
 export const GeneralOptions = ({ formData, setFormData }) => {
     const [fangStatus, setFangStatus] = useState(formData.fang)
     const preferences = useContext(UserPreferencesContext)
+
+    useEffect(() => {
+        setFangStatus(formData.fang)
+    }, [formData.fang])
 
     const toggleFangOption = () => {
         setFangStatus(!fangStatus)
@@ -56,25 +60,15 @@ const WhoisResults = (props) => {
     )
 
     useEffect(() => {
-        if (props.queryData.format === 'WEB') {
-            // console.log(query)
-            setQueryResults(
-                <React.Fragment>
-                    <WebHandler
-                        queryData={props.queryData}
-                        handleWebPivot={props.handleWebPivot}
-                    />
-                </React.Fragment>
-            )
-        } else {
-            setQueryResults(
-                <React.Fragment>
-                    <TextHandler
-                        queryData={props.queryData}
-                    />
-                </React.Fragment>
-            )
-        }
+        // console.log(query)
+        setQueryResults(
+            <React.Fragment>
+                <WebHandler
+                    queryData={props.queryData}
+                    handleWebPivot={props.handleWebPivot}
+                />
+            </React.Fragment>
+        )
     }, [props.queryData])
 
 
@@ -85,17 +79,16 @@ const WhoisResults = (props) => {
     )
 }
 
+
+
 const WhoisHandler = (props) => {
     const preferences = useContext(UserPreferencesContext)
     const formPrefs = preferences.getPrefs('whois', {
-        limit: 1000,
-        field: "domainName",
         fang: true,
     })
 
     const [formData, setFormData] = useState({
         query: "",
-        format: 'WEB',
         ...formPrefs
     })
 
@@ -169,81 +162,35 @@ const WhoisHandler = (props) => {
 
     }
 
-    const handleOnChangeFormat = (e) => {
-        // Reset/delete queryData
-        setQueryData(update(queryData, {
-            query: {$set: ""}
-        }))
-
-        setFormData(update(formData, {
-            format: {$set: e.target.value}
-        }))
-
-    }
-
-    let queryOptions = (<React.Fragment> </React.Fragment>)
-
-    if (formData.format !== 'WEB') {
-        queryOptions = (
-            <React.Fragment>
-                <TextOptions
-                    formData={formData}
-                    setFormData={setFormData}
-                />
-            </React.Fragment>
-        )
-    }
-
     return (
         <React.Fragment>
-            <Container>
+            <Container style={{paddingBottom: '1rem'}}>
                 <form onSubmit={handleOnSubmit}>
                     <Grid container spacing={1} justify="center" alignItems="flex-end">
                         <Grid container item xs={11} justify="center" alignItems="flex-end">
-                            <Grid item xs={1}>
-                                <InputLabel id="query-format-label">Format</InputLabel>
-                                <Select
-                                    name="format"
-                                    labelId="query-format-label"
-                                    id="query-format-select"
-                                    onChange={handleOnChangeFormat}
-                                    value={formData.format}
-                                >
-                                    <MenuItem value={'WEB'}>Web</MenuItem>
-                                    <MenuItem value={'JSON'}>JSON</MenuItem>
-                                    <MenuItem value={'CSV'}>CSV</MenuItem>
-                                    <MenuItem value={'LIST'}>List</MenuItem>
-                                </Select>
-                            </Grid>
-                            <Grid item xs={11}>
-                                <TextField
-                                    label="Query"
-                                    variant="outlined"
-                                    name="query"
-                                    value={formData.query}
-                                    onChange={handleOnChangeQuery}
-                                    fullWidth
-                                />
-                            </Grid>
+                            <TextField
+                                label="Query"
+                                variant="outlined"
+                                name="query"
+                                value={formData.query}
+                                onChange={handleOnChangeQuery}
+                                fullWidth
+                                InputProps={{
+                                    endAdornment: (
+                                        <SearchSettings title={"Search Settings"}>
+                                            <GeneralOptions
+                                                formData={formData}
+                                                setFormData={setFormData}
+                                            />
+                                        </SearchSettings>
+                                    )
+                                }}
+                            />
                         </Grid>
                         <Grid item xs={1}>
                             <Button variant="outlined" type="submit">
                                 Search
                             </Button>
-                        </Grid>
-                        <Grid container item xs={12}>
-                            <Grid
-                                container
-                                direction="row"
-                                // alignItems="left"
-                                spacing={1}
-                            >
-                                <GeneralOptions
-                                    formData={formData}
-                                    setFormData={setFormData}
-                                />
-                                {queryOptions}
-                            </Grid>
                         </Grid>
                     </Grid>
                 </form>

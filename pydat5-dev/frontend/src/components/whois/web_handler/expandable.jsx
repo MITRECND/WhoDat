@@ -81,26 +81,24 @@ const FullDetailsDialog = ({data}) => {
             >
                 <DialogTitle onClose={handleClose}>{`Domain "${data.domainName}"`}</DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Value</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {Object.keys(data).sort().map((name, index) => {
-                                    return (
-                                        <TableRow key={index}>
-                                            <TableCell>{`${name}`}</TableCell>
-                                            <TableCell>{data[name]}</TableCell>
-                                        </TableRow>
-                                    )
-                                })}
-                            </TableBody>
-                        </Table>
-                    </DialogContentText>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Name</TableCell>
+                                <TableCell>Value</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {Object.keys(data).sort().map((name, index) => {
+                                return (
+                                    <TableRow key={index}>
+                                        <TableCell>{`${name}`}</TableCell>
+                                        <TableCell>{data[name]}</TableCell>
+                                    </TableRow>
+                                )
+                            })}
+                        </TableBody>
+                    </Table>
                 </DialogContent>
             </Dialog>
         </React.Fragment>
@@ -160,27 +158,25 @@ const DiffDetailsDialog = ({previous, current}) => {
                     {`Domain "${current.domainName}" ${previous.Version} -> ${current.Version}`}
                 </DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Entry</TableCell>
-                                    <TableCell>{`Version: ${previous.Version}`}</TableCell>
-                                    <TableCell>{`Version: ${current.Version}`}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {Object.keys(current).sort().map((name, index) => {
-                                    return createCompareRow(
-                                        name,
-                                        previous[name],
-                                        current[name],
-                                        index
-                                    )
-                                })}
-                            </TableBody>
-                        </Table>
-                    </DialogContentText>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Entry</TableCell>
+                                <TableCell>{`Version: ${previous.Version}`}</TableCell>
+                                <TableCell>{`Version: ${current.Version}`}</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {Object.keys(current).sort().map((name, index) => {
+                                return createCompareRow(
+                                    name,
+                                    previous[name],
+                                    current[name],
+                                    index
+                                )
+                            })}
+                        </TableBody>
+                    </Table>
                 </DialogContent>
             </Dialog>
         </React.Fragment>

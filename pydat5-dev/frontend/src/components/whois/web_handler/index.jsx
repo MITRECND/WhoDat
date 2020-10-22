@@ -1,4 +1,5 @@
-import React, {useState, useEffect} from 'react'
+import React, {useState, useEffect, useContext} from 'react'
+import { useHistory } from 'react-router-dom';
 import update from 'immutability-helper'
 import DataTable from 'react-data-table-component'
 
@@ -8,12 +9,18 @@ import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
 import Grid from '@material-ui/core/Grid'
 import CircularProgress from '@material-ui/core/CircularProgress'
-import { useHistory } from 'react-router-dom';
+
+import BuildIcon from '@material-ui/icons/Build';
 
 import {queryFetcher} from '../../helpers/fetchers'
 import ExpandedEntryRow from './expandable'
 import {UserPreferencesContext} from '../../helpers/preferences'
-import { useContext } from 'react';
+import { BackdropLoader } from '../../helpers/loaders';
+import {
+    JSONExporter,
+    CSVExporter,
+    ListExporter
+} from '../../helpers/data_exporters'
 
 
 const DropDownCell = (props) => {
@@ -120,6 +127,81 @@ const TelephoneCell = ({row, handleWebPivot}) => {
     )
 }
 
+const SearchTools = ({data, children}) => {
+    const [anchorEl, setAnchorEl] = useState(null)
+    const [openJSONDialog, setOpenJSONDialog] = useState(false)
+    const [openCSVDialog, setOpenCSVDialog] = useState(false)
+    const [openListDialog, setOpenListDialog] = useState(false)
+
+    const handleClick = (e) => {
+        setAnchorEl(e.currentTarget)
+    }
+
+    const handleClose = () => {
+        setAnchorEl(null)
+    }
+
+    return (
+        <React.Fragment>
+            <IconButton
+                onClick={handleClick}
+                size='small'
+            >
+                <BuildIcon fontSize="small"/>
+            </IconButton>
+            <Menu
+                anchorEl={anchorEl}
+                keepMounted
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+            >
+                <MenuItem
+                    onClick={() => {setOpenJSONDialog(true); handleClose()}}
+                >
+                    Export JSON
+                </MenuItem>
+                <JSONExporter
+                    data={data}
+                    open={openJSONDialog}
+                    onClose={() => {setOpenJSONDialog(false)}}
+                />
+                <MenuItem
+                    onClick={() => {setOpenCSVDialog(true); handleClose()}}
+                >
+                    Export CSV
+                </MenuItem>
+                <CSVExporter
+                    data={data}
+                    open={openCSVDialog}
+                    onClose={() => {setOpenCSVDialog(false)}}
+                />
+                <MenuItem
+                    onClick={() => {setOpenListDialog(true); handleClose()}}
+                >
+                    Export List
+                </MenuItem>
+                <ListExporter
+                    field={'domainName'}
+                    data={data}
+                    open={openListDialog}
+                    onClose={() => {setOpenListDialog(false)}}
+                />
+                {React.Children.map(children, (child) => {
+                    const props = {
+                        data: data,
+                        handleClose: handleClose,
+                    }
+                    if (React.isValidElement(child)) {
+                        return React.cloneElement(child, props)
+                    } else {
+                        return child
+                    }
+                })}
+            </Menu>
+        </React.Fragment>
+    )
+}
+
 const WebHandler = (props) => {
     const preferences = useContext(UserPreferencesContext)
 
@@ -131,7 +213,7 @@ const WebHandler = (props) => {
         offset: 0
     })
 
-    const [queryResults, setQueryResults] = useState([])
+    const [queryResults, setQueryResults] = useState(null)
 
     const columns = [
         {
@@ -193,7 +275,7 @@ const WebHandler = (props) => {
 
     useEffect(() => {
         setPending(true)
-        setQueryResults([])
+        setQueryResults(null)
         setQueryParams(update(queryParams, {
             query: {$set: props.queryData.query},
             chunk_size: {$set: initialPageSize},
@@ -242,6 +324,12 @@ const WebHandler = (props) => {
         asyncfetch()
     }
 
+    if (queryResults === null) {
+        return (
+            <BackdropLoader />
+        )
+    }
+
     return (
         <React.Fragment>
             <DataTable
@@ -259,9 +347,15 @@ const WebHandler = (props) => {
                 striped
                 highlightOnHover
                 expandableRows
+                noHeader={true}
                 expandableRowsComponent={<ExpandedEntryRow/>}
                 onChangeRowsPerPage={handleChunkChange}
                 onChangePage={handlePageChange}
+                subHeader
+                subHeaderAlign="right"
+                subHeaderComponent={
+                    <SearchTools data={queryResults.results} />
+                }
             />
         </React.Fragment>
     )

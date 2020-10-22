@@ -7,13 +7,14 @@ import {
 } from 'react-router-dom'
 
 import { ThemeProvider } from '@material-ui/styles'
+import useMediaQuery from '@material-ui/core/useMediaQuery'
 
 import {PluginManagers, PyDatPluginContext} from './components/plugins'
 import {UserPreferences, UserPreferencesContext} from './components/helpers/preferences'
 import Dashboard from './components/layout/dashboard'
 import NotFound from './components/layout/notfound'
 import {BackdropLoader} from './components/helpers/loaders'
-import { defaultTheme } from './components/layout/themes'
+import { defaultTheme, darkTheme } from './components/layout/themes'
 
 import './plugins'
 
@@ -23,11 +24,14 @@ const PassiveHandler = React.lazy(() => import ('./components/passive'))
 
 const Pydat = ({}) => {
     const routes = useContext(PyDatPluginContext).routes
+    const enableDarkMode = useMediaQuery('@media (prefers-color-scheme: dark')
+
+    const theme = enableDarkMode ? darkTheme : defaultTheme
 
     return (
         <React.Fragment>
             <UserPreferencesContext.Provider value={UserPreferences}>
-                <ThemeProvider theme={defaultTheme}>
+                <ThemeProvider theme={theme}>
                     <PyDatPluginContext.Provider value={PluginManagers}>
                         <Router>
                             <Dashboard>
