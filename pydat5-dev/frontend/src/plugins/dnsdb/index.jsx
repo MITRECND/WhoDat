@@ -8,7 +8,7 @@ import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import LanguageIcon from '@material-ui/icons/Language'
 
-import {PluginManagers} from '../../plugins'
+import {PluginManagers} from '../../components/plugins'
 
 const DNSDB = React.lazy(() => import ('./dnsdb'))
 

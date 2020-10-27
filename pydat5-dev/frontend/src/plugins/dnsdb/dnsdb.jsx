@@ -17,8 +17,8 @@ import Paper from '@material-ui/core/Paper'
 import { makeStyles } from '@material-ui/core'
 
 import DNSDBWebHandler from './web_handler'
-import { BackdropLoader } from '../../helpers/loaders'
-import {UserPreferencesContext} from '../../helpers/preferences'
+import { BackdropLoader } from '../../components/helpers/loaders'
+import {UserPreferencesContext} from '../../components/helpers/preferences'
 
 
 

@@ -11,10 +11,10 @@ import Button from '@material-ui/core/Button';
 import Input from '@material-ui/core/Input'
 import Select from '@material-ui/core/Select'
 
-import SearchTools from '../../helpers/search_tools'
-import { BackdropLoader } from '../../helpers/loaders'
-import DropDownCell from '../../helpers/dropdown_cell'
-import { PluginManagers } from '../../plugins';
+import SearchTools from '../../components/helpers/search_tools'
+import { BackdropLoader } from '../../components/helpers/loaders'
+import DropDownCell from '../../components/helpers/dropdown_cell'
+import { PluginManagers } from '../../components/plugins';
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
