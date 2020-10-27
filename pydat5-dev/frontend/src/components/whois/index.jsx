@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useContext} from 'react'
+import React, {useState, useEffect, useContext, useMemo} from 'react'
 import {useHistory, useLocation} from 'react-router-dom'
 import update from 'immutability-helper'
 import qs from 'qs'
@@ -57,12 +57,11 @@ const WhoisResults = (props) => {
     )
 
     useEffect(() => {
-        // console.log(query)
+        console.log(props)
         setQueryResults(
             <React.Fragment>
                 <WhoisTable
                     queryData={props.queryData}
-                    handleWebPivot={props.handleWebPivot}
                 />
             </React.Fragment>
         )
@@ -91,10 +90,11 @@ const WhoisHandler = ({}) => {
         ...formData
     })
 
-    let location = useLocation()
+    const location = useLocation()
     let history = useHistory()
 
     useEffect(() => {
+        console.log(location)
         let query_param = qs.parse(location.search, {
             ignoreQueryPrefix: true
         }).query
@@ -107,23 +107,7 @@ const WhoisHandler = ({}) => {
             setFormData(updated)
             setQueryData(updated)
         }
-
-    }, [])
-
-    const handleWebPivot = (newQuery) => {
-        let updated = update(formData, {
-            query: {$set: newQuery}
-        })
-
-        setFormData(updated)
-
-        history.push({
-            pathname: '/whois',
-            search: `?query=${encodeURIComponent(newQuery)}`
-        })
-
-        setQueryData(updated)
-    }
+    }, [location])
 
     const handleOnSubmit = (e) => {
         e.preventDefault()
@@ -147,15 +131,27 @@ const WhoisHandler = ({}) => {
             search: `?query=${encodeURIComponent(updated.query)}`
         })
 
-        setQueryData(updated)
     }
 
     const handleOnChangeQuery = (e) => {
         setFormData(update(formData, {
             query: {$set: e.target.value}
         }))
-
     }
+
+    const wtable = useMemo(() => {
+        if (!!queryData.query && queryData != "") {
+            return (
+                <Paper>
+                    <Grid item xs={12}>
+                        <WhoisTable
+                            queryData={queryData}
+                        />
+                    </Grid>
+                </Paper>
+            )
+        }
+    }, [queryData])
 
     return (
         <React.Fragment>
@@ -190,15 +186,7 @@ const WhoisHandler = ({}) => {
                     </Grid>
                 </form>
             </Container>
-            {!!queryData.query &&
-                queryData.query != "" &&
-                <Paper>
-                    <WhoisResults
-                        queryData={queryData}
-                        handleWebPivot={handleWebPivot}
-                    />
-                </Paper>
-            }
+            {wtable}
         </React.Fragment>
     )
 }

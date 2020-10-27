@@ -1,14 +1,22 @@
-import { createContext } from 'react'
+import React, { createContext, forwardRef } from 'react'
 
 class RoutePlugin {
-    constructor(path, component, extra) {
+    constructor(path, title, component, extra) {
         this.path = path
+        this.title = title
         this.component = component
         this.extra = extra
 
         if (this.extra === null) {
             this.extra = {}
         }
+    }
+}
+
+class ToolPlugin {
+    constructor(text, component) {
+        this.text = text
+        this.component = component
     }
 }
 
@@ -28,14 +36,39 @@ class DrawerPluginContainer extends PluginContainer {
     }
 }
 
+
+class MenuPlugin {
+    constructor(text, action, extra) {
+        this.text = text
+        this.action = action
+        this.extra = extra
+
+        if (this.extra === null) {
+            this.extra = {}
+        }
+    }
+}
+
 class MenuPluginContainer extends PluginContainer {
+    constructor() {
+        super()
+        this._plugins = {
+            tld: {},
+            domain: {},
+            ip: {},
+            email: {}
+        }
+    }
+
     addPlugin(name, type, component) {
         const validKeys = [
+            'tld',
             'domain',
             'ip',
+            'email'
         ]
         if (!validKeys.includes(type)) {
-            // some error
+            throw('type must be "tld", "domain", "ip", or "email"')
         }
 
         if (!Object.keys(this._plugins).includes(type)) {
@@ -52,11 +85,15 @@ class RoutePluginContainer extends PluginContainer {
     }
 }
 
+class ToolPluginContainer extends PluginContainer {
+    addPlugin(name, text, component) {
+        this._plugins[name] = new ToolPlugin(text, component)
+    }
+}
+
 export const PluginManagers = {
     drawer: new DrawerPluginContainer(),
     routes: new RoutePluginContainer(),
-    menu: new MenuPluginContainer()
+    menu: new MenuPluginContainer(),
+    tool: new ToolPluginContainer(),
 }
-
-
-export const PyDatPluginContext = createContext(PluginManagers)

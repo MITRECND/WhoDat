@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import {useLocation} from 'react-router-dom'
 import clsx from 'clsx';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
 import Drawer from '@material-ui/core/Drawer';
@@ -14,6 +15,7 @@ import ChevronLeftIcon from '@material-ui/icons/ChevronLeft';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
 
 import {MainListItems} from './dashboard_items'
+import {PluginManagers} from '../plugins'
 
 
 // https://material-ui.com/components/drawers/#persistent-drawer
@@ -82,6 +84,29 @@ const Dashboard = (props) => {
   const classes = useStyles();
   const theme = useTheme();
   const [open, setOpen] = useState(false);
+  const location = useLocation()
+  const title = React.useMemo(() => {
+    const local_path = location.pathname
+    const native_paths = {
+      '/whois': 'WhoIS',
+      '/stats': 'Stats',
+      '/help': 'Help'
+    }
+
+    if (local_path in native_paths) {
+      return native_paths[local_path]
+    }
+
+    const route_plugins = PluginManagers.routes.plugins
+
+    for (const name in route_plugins) {
+      if(route_plugins[name].path === local_path) {
+        return route_plugins[name].title
+      }
+    }
+
+    return null
+  }, [location.pathname])
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -90,6 +115,8 @@ const Dashboard = (props) => {
   const handleDrawerClose = () => {
     setOpen(false);
   };
+
+  console.log(title)
 
   return (
     <div className={classes.root}>
@@ -111,7 +138,7 @@ const Dashboard = (props) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap>
-            PyDat 5
+            PyDat 5 {title !== null && `- ${title}`}
           </Typography>
         </Toolbar>
       </AppBar>

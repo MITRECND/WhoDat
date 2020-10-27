@@ -44,7 +44,7 @@ class UserPreferencesContainer {
             return inprefs
         }
 
-        console.log(outprefs)
+        // console.log(outprefs)
         return outprefs
     }
 

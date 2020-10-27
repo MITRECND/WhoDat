@@ -1,7 +1,8 @@
-import React, {useState, useEffect, useContext} from 'react'
+import React, {useState, useEffect, useContext, useMemo} from 'react'
 import { useHistory } from 'react-router-dom';
 import update from 'immutability-helper'
 import DataTable from 'react-data-table-component'
+import qs from 'qs'
 
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import IconButton from '@material-ui/core/IconButton'
@@ -14,45 +15,21 @@ import ExpandedEntryRow from './expandable'
 import {UserPreferencesContext} from '../helpers/preferences'
 import { BackdropLoader } from '../helpers/loaders';
 import SearchTools from '../helpers/search_tools'
+import DropDownCell from '../helpers/dropdown_cell'
+import {PluginManagers} from '../plugins'
 
 
-const DropDownCell = (props) => {
-    const [anchorEl, setAnchorEl] = useState(null)
-
-    const handleClick = (e) => {
-        setAnchorEl(e.currentTarget)
-    }
-
-    const handleClose = () => {
-        setAnchorEl(null)
-    }
-
-    return (
-        <React.Fragment>
-            <IconButton
-                aria-controls={`${props.friendly}-menu`}
-                onClick={handleClick}
-                size='small'
-            >
-                <ArrowDropDownIcon />
-            </IconButton>
-            <Menu
-                anchorEl={anchorEl}
-                keepMounted
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-            >
-                {props.children}
-            </Menu>
-            {props.value}
-        </React.Fragment>
-
+const createSearchString = (query) => {
+    return(
+        '?' + qs.stringify({
+            query: query
+        })
     )
 }
 
-
-const DomainNameCell = ({row, handleWebPivot}) => {
+const DomainNameCell = ({row}) => {
     let history = useHistory()
+    const menu_plugins = PluginManagers.menu.plugins.tld
 
     return (
         <DropDownCell
@@ -60,29 +37,45 @@ const DomainNameCell = ({row, handleWebPivot}) => {
              value={row.domainName}
         >
             <MenuItem
-                onClick={() => handleWebPivot(`dn:"${row.domainName}"`)}
+                onClick={() => history.push({
+                    pathname: '/whois',
+                    search: createSearchString(`dn:"${row.domainName}"`)
+                })}
             >
                 Pivot Search
             </MenuItem>
-            <MenuItem onClick={() => {
-                let domain = `*.${row.domainName}`
-                history.push(`/passive?type=domain&value=${encodeURIComponent(domain)}`)
-                }}
-            >
-                Search Passive
-            </MenuItem>
+            {Object.keys(menu_plugins).map((name, index) => {
+                let Component = menu_plugins[name]
+                return (
+                    <Component domainName={row.domainName} key={index} />
+                )
+            })}
         </DropDownCell>
     )
 }
 
-const RegistrantCell = ({row, handleWebPivot}) => {
+
+const RegistrantCell = ({row}) => {
+    let history = useHistory()
+
+    if (row.registrant_name === null || row.registrant_name === "") {
+        return (
+            <React.Fragment></React.Fragment>
+        )
+    }
+
+
     return (
         <DropDownCell
             friendly={"registrantname"}
             value={row.registrant_name}
         >
+
             <MenuItem
-                onClick={() => handleWebPivot(`registrant_name:"${row.registrant_name}"`)}
+                onClick={() => history.push({
+                        pathname: '/whois',
+                        search: createSearchString(`registrant_name:"${row.registrant_name}"`)
+                    })}
             >
                 Pivot Search
             </MenuItem>
@@ -90,14 +83,25 @@ const RegistrantCell = ({row, handleWebPivot}) => {
     )
 }
 
-const EmailCell = ({row, handleWebPivot}) => {
+const EmailCell = ({row}) => {
+    let history = useHistory()
+
+    if (row.registrant_email === null || row.registrant_email === "") {
+        return (
+            <React.Fragment></React.Fragment>
+        )
+    }
+
     return (
         <DropDownCell
             friendly={"email"}
             value={row.registrant_email}
         >
             <MenuItem
-                onClick={() => handleWebPivot(`registrant_email:"${row.registrant_email}"`)}
+                onClick={() => history.push({
+                    pathname: '/whois',
+                    search: createSearchString(`registrant_email:"${row.registrant_email}"`)
+                })}
             >
                 Pivot Search
             </MenuItem>
@@ -105,20 +109,85 @@ const EmailCell = ({row, handleWebPivot}) => {
     )
 }
 
-const TelephoneCell = ({row, handleWebPivot}) => {
+const TelephoneCell = ({row}) => {
+    let history = useHistory()
+
+    if (row.registrant_telephone === null || row.registrant_telephone === "") {
+        return (
+            <React.Fragment></React.Fragment>
+        )
+    }
+
     return (
         <DropDownCell
             friendly={"telephone"}
             value={row.registrant_telephone}
         >
             <MenuItem
-                onClick={() => handleWebPivot(`registrant_telephone:"${row.registrant_telephone}"`)}
+                onClick={() => history.push({
+                    pathname: '/whois',
+                    search: createSearchString(`registrant_telephone:"${row.registrant_telephone}"`)
+                })}
             >
                 Pivot Search
             </MenuItem>
         </DropDownCell>
     )
 }
+
+const TableColumns = () => { return [
+    {
+        name: 'Domain Name',
+        selector: 'domainName',
+        cell: (row) => (
+            <DomainNameCell
+                row={row}
+            />
+        )
+    },
+    {
+        name: 'Registrant',
+        selector: 'registrant_name',
+        cell: (row) => (
+            <RegistrantCell
+                row={row}
+            />
+        )
+    },
+    {
+        name: 'Email',
+        selector: 'registrant_email',
+        cell: (row) => (
+            <EmailCell
+                row={row}
+            />
+        )
+    },
+    {
+        name: 'Created',
+        selector: 'createdDate'
+    },
+    {
+        name: 'Telephone',
+        selector: 'registrant_telephone',
+        cell: (row) => (
+            <TelephoneCell
+                row={row}
+            />
+        )
+    },
+    {
+        name: 'Version',
+        selector: 'Version',
+        maxWidth: "5vh"
+    },
+    {
+        name: 'Score',
+        selector: 'score',
+        maxWidth: "10vh",
+        cell: (row) => row.score.toFixed(3)
+    }
+]}
 
 const WhoisTable = (props) => {
     const preferences = useContext(UserPreferencesContext)
@@ -132,68 +201,9 @@ const WhoisTable = (props) => {
     })
 
     const [queryResults, setQueryResults] = useState(null)
-
-    const columns = [
-        {
-            name: 'Domain Name',
-            selector: 'domainName',
-            cell: (row) => (
-                <DomainNameCell
-                    row={row}
-                    handleWebPivot={props.handleWebPivot}
-                />
-            )
-        },
-        {
-            name: 'Registrant',
-            selector: 'registrant_name',
-            cell: (row) => (
-                <RegistrantCell
-                    row={row}
-                    handleWebPivot={props.handleWebPivot}
-                />
-            )
-        },
-        {
-            name: 'Email',
-            selector: 'registrant_email',
-            cell: (row) => (
-                <EmailCell
-                    row={row}
-                    handleWebPivot={props.handleWebPivot}
-                />
-            )
-        },
-        {
-            name: 'Created',
-            selector: 'createdDate'
-        },
-        {
-            name: 'Telephone',
-            selector: 'registrant_telephone',
-            cell: (row) => (
-                <TelephoneCell
-                    row={row}
-                    handleWebPivot={props.handleWebPivot}
-                />
-            )
-        },
-        {
-            name: 'Version',
-            selector: 'Version',
-            maxWidth: "5vh"
-        },
-        {
-            name: 'Score',
-            selector: 'score',
-            maxWidth: "10vh",
-            cell: (row) => row.score.toFixed(3)
-        }
-    ]
+    const columns = useMemo(() => TableColumns(), [])
 
     useEffect(() => {
-        setPending(true)
-        setQueryResults(null)
         setQueryParams(update(queryParams, {
             query: {$set: props.queryData.query},
             chunk_size: {$set: initialPageSize},
@@ -202,6 +212,7 @@ const WhoisTable = (props) => {
     }, [props.queryData])
 
     useEffect(() => {
+        setPending(true)
         fetchData()
     }, [queryParams])
 
@@ -230,6 +241,7 @@ const WhoisTable = (props) => {
 
                 setQueryResults({
                     total: results.total,
+                    page_size: queryParams.chunk_size,
                     results: results.results
                 })
                 setPending(false)
@@ -257,7 +269,7 @@ const WhoisTable = (props) => {
                 pagination
                 paginationServer
                 paginationDefaultPage={1}
-                paginationPerPage={queryParams.chunk_size}
+                paginationPerPage={queryResults.page_size}
                 paginationRowsPerPageOptions={[50, 100, 1000, 10000]}
                 paginationTotalRows={queryResults.total}
                 progressPending={pending}

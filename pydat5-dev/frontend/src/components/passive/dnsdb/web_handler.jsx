@@ -13,7 +13,8 @@ import Select from '@material-ui/core/Select'
 
 import SearchTools from '../../helpers/search_tools'
 import { BackdropLoader } from '../../helpers/loaders'
-
+import DropDownCell from '../../helpers/dropdown_cell'
+import { PluginManagers } from '../../plugins';
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
@@ -39,70 +40,36 @@ const cleanEntry = (entry) => {
     // clean a record and return it
 }
 
-const DropDownCell = (props) => {
-    const [anchorEl, setAnchorEl] = useState(null)
-
-    const handleClick = (e) => {
-        setAnchorEl(e.currentTarget)
-    }
-
-    const handleClose = () => {
-        setAnchorEl(null)
-    }
-
-    return (
-        <React.Fragment>
-            <IconButton
-                aria-controls={`${props.friendly}-menu`}
-                onClick={handleClick}
-            >
-                <ArrowDropDownIcon />
-            </IconButton>
-            <Menu
-                anchorEl={anchorEl}
-                keepMounted
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-            >
-                {props.children}
-            </Menu>
-            {props.value}
-        </React.Fragment>
-
-    )
-}
-
 const DomainMenu = ({value}) => {
-    let history = useHistory()
+    let menu_plugins = PluginManagers.menu.plugins.domain
+    const cleanValue = cleanData(value)
 
     return (
         <DropDownCell
             friendly={"domain"}
-            value={cleanData(value)}
+            value={cleanValue}
         >
-            <MenuItem
-                onClick={() => {history.push(`/whois?query=dn%3A${encodeURIComponent(cleanData(value))}`)}}
-            >
-                Search WhoIs
-            </MenuItem>
+        {Object.keys(menu_plugins).map((name, index) => {
+            let Component = menu_plugins[name]
+            return (<Component domainName={cleanValue} key={index} />)
+        })}
         </DropDownCell>
 
     )
 }
 
 const IPMenu = ({value}) => {
-    let history = useHistory()
+    let menu_plugins = PluginManagers.menu.plugins.ip
 
     return (
         <DropDownCell
             friendly={"ip"}
             value={value}
         >
-            <MenuItem
-                onClick={() => {history.push(`/passive?type=ip&value=${encodeURIComponent(value)}`)}}
-            >
-                Search Passive
-            </MenuItem>
+            {Object.keys(menu_plugins).map((name, index) => {
+            let Component = menu_plugins[name]
+            return (<Component ip={value} key={index} />)
+        })}
         </DropDownCell>
 
     )
