@@ -364,15 +364,16 @@ class DnsdbPlugin(PassivePluginBase):
                 if rrtype == 'MX':
                     # Strip the MX weight.
                     tmp['rdata'] = [rd.split()[1] for rd in tmp['rdata']]
-                elif rrtype == 'NS':
-                    # Normalize time field
-                    if 'zone_time_first' in tmp and 'time_first' not in tmp:
-                        tmp['time_first'] = tmp['zone_time_first']
-                        del tmp['zone_time_first']
 
-                    if 'zone_time_last' in tmp and 'time_last' not in tmp:
-                        tmp['time_last'] = tmp['zone_time_last']
-                        del tmp['zone_time_last']
+                tmp['time_source'] = 'passive'
+
+                if 'zone_time_first' in tmp and 'time_first' not in tmp:
+                    tmp['time_source'] = 'zone'
+                    tmp['time_first'] = tmp['zone_time_first']
+
+                if 'zone_time_last' in tmp and 'time_last' not in tmp:
+                    tmp['time_source'] = 'zone'
+                    tmp['time_last'] = tmp['zone_time_last']
 
                 try:
                     response['data'][rrtype].append(tmp)
