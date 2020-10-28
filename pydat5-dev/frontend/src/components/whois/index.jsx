@@ -1,29 +1,35 @@
-import React, {useState, useEffect, useRef} from 'react'
-import {useHistory, useLocation, useParams, withRouter} from 'react-router-dom'
+import React, {useState, useEffect, useContext, useMemo} from 'react'
+import {useHistory, useLocation} from 'react-router-dom'
 import update from 'immutability-helper'
 import qs from 'qs'
 
 import Grid from '@material-ui/core/Grid'
 import TextField from '@material-ui/core/TextField'
-import Select from '@material-ui/core/Select'
 import Button from '@material-ui/core/Button'
-import InputLabel from '@material-ui/core/InputLabel'
-import MenuItem from '@material-ui/core/MenuItem'
 import CheckBox from '@material-ui/core/Checkbox'
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
+import Container from '@material-ui/core/Container'
+import Paper from '@material-ui/core/Paper'
 
-import WebHandler from './web_handler'
-import TextHandler, {TextOptions} from './text_handler'
+import WhoisTable from './whois_table'
+import {UserPreferencesContext} from '../helpers/preferences'
+import {SearchSettings} from '../layout/dialogs'
 
 export const GeneralOptions = ({ formData, setFormData }) => {
     const [fangStatus, setFangStatus] = useState(formData.fang)
+    const preferences = useContext(UserPreferencesContext)
+
+    useEffect(() => {
+        setFangStatus(formData.fang)
+    }, [formData.fang])
 
     const toggleFangOption = () => {
         setFangStatus(!fangStatus)
         setFormData(update(formData, {
             fang: {$set: !fangStatus}
         }))
+        preferences.setPref('whois', 'fang', !fangStatus)
     }
 
     return (
@@ -51,25 +57,14 @@ const WhoisResults = (props) => {
     )
 
     useEffect(() => {
-        if (props.queryData.format === 'WEB') {
-            // console.log(query)
-            setQueryResults(
-                <React.Fragment>
-                    <WebHandler
-                        queryData={props.queryData}
-                        handleWebPivot={props.handleWebPivot}
-                    />
-                </React.Fragment>
-            )
-        } else {
-            setQueryResults(
-                <React.Fragment>
-                    <TextHandler
-                        queryData={props.queryData}
-                    />
-                </React.Fragment>
-            )
-        }
+        console.log(props)
+        setQueryResults(
+            <React.Fragment>
+                <WhoisTable
+                    queryData={props.queryData}
+                />
+            </React.Fragment>
+        )
     }, [props.queryData])
 
 
@@ -80,23 +75,26 @@ const WhoisResults = (props) => {
     )
 }
 
-const WhoisHandler = (props) => {
+const WhoisHandler = ({}) => {
+    const preferences = useContext(UserPreferencesContext)
+    const formPrefs = preferences.getPrefs('whois', {
+        fang: true,
+    })
+
     const [formData, setFormData] = useState({
         query: "",
-        format: 'WEB',
-        limit: 1000,
-        field: "domainName",
-        fang: true,
+        ...formPrefs
     })
 
     const [queryData, setQueryData] = useState({
         ...formData
     })
 
-    let location = useLocation()
+    const location = useLocation()
     let history = useHistory()
 
     useEffect(() => {
+        console.log(location)
         let query_param = qs.parse(location.search, {
             ignoreQueryPrefix: true
         }).query
@@ -109,23 +107,7 @@ const WhoisHandler = (props) => {
             setFormData(updated)
             setQueryData(updated)
         }
-
-    }, [])
-
-    const handleWebPivot = (newQuery) => {
-        let updated = update(formData, {
-            query: {$set: newQuery}
-        })
-
-        setFormData(updated)
-
-        history.push({
-            pathname: '/whois',
-            search: `?query=${encodeURIComponent(newQuery)}`
-        })
-
-        setQueryData(updated)
-    }
+    }, [location])
 
     const handleOnSubmit = (e) => {
         e.preventDefault()
@@ -149,104 +131,63 @@ const WhoisHandler = (props) => {
             search: `?query=${encodeURIComponent(updated.query)}`
         })
 
-        setQueryData(updated)
     }
 
     const handleOnChangeQuery = (e) => {
         setFormData(update(formData, {
             query: {$set: e.target.value}
         }))
-
     }
 
-    const handleOnChangeFormat = (e) => {
-        // Reset/delete queryData
-        setQueryData(update(queryData, {
-            query: {$set: ""}
-        }))
-
-        setFormData(update(formData, {
-            format: {$set: e.target.value}
-        }))
-
-    }
-
-    let queryOptions = (<React.Fragment> </React.Fragment>)
-
-    if (formData.format !== 'WEB') {
-        queryOptions = (
-            <React.Fragment>
-                <TextOptions
-                    formData={formData}
-                    setFormData={setFormData}
-                />
-            </React.Fragment>
-        )
-    }
+    const wtable = useMemo(() => {
+        if (!!queryData.query && queryData != "") {
+            return (
+                <Paper>
+                    <Grid item xs={12}>
+                        <WhoisTable
+                            queryData={queryData}
+                        />
+                    </Grid>
+                </Paper>
+            )
+        }
+    }, [queryData])
 
     return (
-        <Grid container>
-            <Grid item xs={12}>
+        <React.Fragment>
+            <Container style={{paddingBottom: '1rem'}}>
                 <form onSubmit={handleOnSubmit}>
-                    <Grid container spacing={1}>
-                        <Grid container item xs={11}>
-                            <Grid item xs={1}>
-                                <InputLabel id="query-format-label">Format</InputLabel>
-                                <Select
-                                    name="format"
-                                    labelId="query-format-label"
-                                    id="query-format-select"
-                                    onChange={handleOnChangeFormat}
-                                    value={formData.format}
-                                >
-                                    <MenuItem value={'WEB'}>Web</MenuItem>
-                                    <MenuItem value={'JSON'}>JSON</MenuItem>
-                                    <MenuItem value={'CSV'}>CSV</MenuItem>
-                                    <MenuItem value={'LIST'}>List</MenuItem>
-                                </Select>
-                            </Grid>
-                            <Grid item xs={11}>
-                                <TextField
-                                    label="Query"
-                                    variant="outlined"
-                                    name="query"
-                                    value={formData.query}
-                                    onChange={handleOnChangeQuery}
-                                    fullWidth
-                                />
-                            </Grid>
+                    <Grid container spacing={1} justify="center" alignItems="flex-end">
+                        <Grid container item xs={11} justify="center" alignItems="flex-end">
+                            <TextField
+                                label="Query"
+                                variant="outlined"
+                                name="query"
+                                value={formData.query}
+                                onChange={handleOnChangeQuery}
+                                fullWidth
+                                InputProps={{
+                                    endAdornment: (
+                                        <SearchSettings title={"Search Settings"}>
+                                            <GeneralOptions
+                                                formData={formData}
+                                                setFormData={setFormData}
+                                            />
+                                        </SearchSettings>
+                                    )
+                                }}
+                            />
                         </Grid>
                         <Grid item xs={1}>
                             <Button variant="outlined" type="submit">
                                 Search
                             </Button>
                         </Grid>
-                        <Grid container item xs={12}>
-                            <Grid
-                                container
-                                direction="row"
-                                // alignItems="left"
-                                spacing={1}
-                            >
-                                <GeneralOptions
-                                    formData={formData}
-                                    setFormData={setFormData}
-                                />
-                                {queryOptions}
-                            </Grid>
-
-                        </Grid>
                     </Grid>
                 </form>
-            </Grid>
-            {!!queryData.query &&
-                queryData.query != "" &&
-                <WhoisResults
-                    queryData={queryData}
-                    handleWebPivot={handleWebPivot}
-                />
-            }
-        </Grid>
+            </Container>
+            {wtable}
+        </React.Fragment>
     )
 }
 

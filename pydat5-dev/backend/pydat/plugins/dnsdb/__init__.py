@@ -263,9 +263,8 @@ class DnsdbPlugin(PassivePluginBase):
         self.logger.info(
             f"Received non-200 response from dnsdb:\n{response.text}"
         )
-        if response.status_code == 404:
-            raise ClientError("No data was found", status_code=404)
-        elif response.status_code == 400:
+
+        if response.status_code == 400:
             raise ClientError('Request possibly misconfigured')
         elif response.status_code == 403:
             raise ServerError("API key not valid", status_code=503)
@@ -323,7 +322,7 @@ class DnsdbPlugin(PassivePluginBase):
             except Exception as e:
                 raise RuntimeError(e)
 
-            if r.status_code != 200:
+            if r.status_code not in [200, 404]:
                 self.check_return_code(r)
                 return
 
@@ -340,6 +339,10 @@ class DnsdbPlugin(PassivePluginBase):
                     "unable to find rate information in response")
 
             self.logger.debug(r.text)
+
+            if r.status_code == 404:
+                continue
+
             # Each line of the response is an individual JSON blob.
             for line in r.text.split('\n'):
                 # Skip empty lines.
@@ -358,9 +361,19 @@ class DnsdbPlugin(PassivePluginBase):
                 if isinstance(tmp['rdata'], str):
                     tmp['rdata'] = [tmp['rdata']]
 
-                # Strip the MX weight.
                 if rrtype == 'MX':
+                    # Strip the MX weight.
                     tmp['rdata'] = [rd.split()[1] for rd in tmp['rdata']]
+
+                tmp['time_source'] = 'passive'
+
+                if 'zone_time_first' in tmp and 'time_first' not in tmp:
+                    tmp['time_source'] = 'zone'
+                    tmp['time_first'] = tmp['zone_time_first']
+
+                if 'zone_time_last' in tmp and 'time_last' not in tmp:
+                    tmp['time_source'] = 'zone'
+                    tmp['time_last'] = tmp['zone_time_last']
 
                 try:
                     response['data'][rrtype].append(tmp)
