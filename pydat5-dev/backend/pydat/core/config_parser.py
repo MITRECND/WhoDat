@@ -3,6 +3,8 @@ import cerberus
 
 
 DEFAULT_CONFIG = type('config', (), {
+    'STATICFOLDER': '',
+    'DISABLERESOLVE': False,
     'ELASTICSEARCH': {
         'uri': 'localhost:9200',
         'indexPrefix': 'pydat',
@@ -24,6 +26,8 @@ DEFAULT_CONFIG = type('config', (), {
 })
 
 BASE_SCHEMA = {
+    'STATICFOLDER': {'type': 'string'},
+    'DISABLERESOLVE': {'type': 'boolean'},
     'DEBUG': {'type': 'boolean'},
     'SSLVERIFY': {'type': 'boolean'},
     'PROXIES': {
@@ -99,7 +103,7 @@ class ConfigParser:
                     raise ValueError(f"Incomplete env variable {key}")
                 fields = hierarchy[1:]
                 tlkey = fields[0]
-                if tlkey in ['SSLVERIFY', 'DEBUG']:
+                if tlkey in ['SSLVERIFY', 'DEBUG', 'DISABLERESOLVE']:
                     if value.lower() == 'true':
                         value = True
                     elif value.lower() == 'false':

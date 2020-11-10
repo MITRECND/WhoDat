@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from flask import Flask, send_from_directory, render_template
+from flask import Flask, send_from_directory
 from pydat.core.config_parser import ConfigParser, DEFAULT_CONFIG
 from pydat.core.es import ElasticsearchHandler
 from pydat.core.preferences import UserPreferenceManager
@@ -29,6 +29,10 @@ def create_app(config=None):
     else:
         app.logger.setLevel(logging.INFO)
 
+    static_folder = app.config.get('STATICFOLDER', '')
+    if static_folder != '':
+        app.static_folder = static_folder
+
     # Initialize Plugins
     elasticsearch_handler.init_app(app)
 
@@ -54,6 +58,7 @@ def create_app(config=None):
     # Register Plugin Blueprints and JSfiles
     # add error handling
     included_jsfiles = []
+    installed_plugins = []
     with app.app_context():
         try:
             plugin_manager.gather_plugins()
@@ -62,9 +67,17 @@ def create_app(config=None):
             sys.exit(1)
 
         for plugin in plugin_manager.plugins:
+            installed_plugins.append(plugin.name)
             url_prefix = os.path.join(plugin.prefix, plugin.name)
             app.register_blueprint(plugin.blueprint, url_prefix=url_prefix)
             included_jsfiles.extend(plugin.jsfiles)
+
+    app.config['PYDAT_PLUGINS'] = installed_plugins
+
+    # Remove default 'static' endpoint and mapping
+    # which interferes with routing frontend components
+    for rule in app.url_map.iter_rules('static'):
+        app.url_map._rules.remove(rule)
 
     # Catch invalid backend calls
     @app.route("/api", defaults={"path": ""})
@@ -77,9 +90,12 @@ def create_app(config=None):
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve(path):
+        if app.config.get('STATICFOLDER', None) is None:
+            raise exceptions.ClientError("No static assets/ui configured", 404)
+
         if path != "" and os.path.exists(app.static_folder + '/' + path):
             return send_from_directory(app.static_folder, path)
         else:
-            return render_template('index.html', jsfiles=included_jsfiles)
+            return send_from_directory(app.static_folder, 'index.html')
 
     return app

@@ -34,6 +34,20 @@ def valid_size_offset(chunk_size, offset):
         raise ClientError(error)
 
 
+@whoisv2_bp.route("/config")
+def config():
+    """Retrieves and returns configuration information about the server
+    """
+
+    results = {
+        'plugins': current_app.config.get('PYDAT_PLUGINS', []),
+        'active_resolution': not (
+            current_app.config.get('DISABLERESOLVE', False))
+    }
+
+    return results
+
+
 # Metadata
 @whoisv2_bp.route("/metadata")
 @whoisv2_bp.route("/metadata/<version>")
@@ -48,7 +62,7 @@ def metadata(version=None):
         dict: Details for application metadata
     """
     results = whois.metadata(version)
-    return results
+    return {'metadata': results}
 
 
 # Resolve
@@ -67,6 +81,9 @@ def resolve(domain):
         dict: Hostnames and IPs for domain
     """
     domain = parse.unquote(domain)
+
+    if current_app.config.get("DISABLERESOLVE", False):
+        raise ClientError("Active resolution disabled", status_code=400)
 
     try:
         hostname, aliaslist, iplist = socket.gethostbyname_ex(domain)
@@ -279,3 +296,41 @@ def query():
         "chunk_size": chunk_size,
         "offset": offset,
     }
+
+
+@whoisv2_bp.route("/stats", methods=["GET"])
+def stats():
+    """Get cluster stats
+    """
+
+    try:
+        cstats = es_handler.cluster_stats()
+    except ESConnectionError:
+        raise ServerError("Unable to connect to search engine")
+    except ESQueryError:
+        raise ServerError("Unexpected issue when requesting search")
+
+    return {
+        "stats": cstats
+    }
+
+
+@whoisv2_bp.route('/info', methods=["GET"])
+def info():
+    """Get cluster info
+    """
+
+    cluster_info = {}
+
+    try:
+        cluster_info['records'] = es_handler.record_count()
+        cluster_info['health'] = es_handler.cluster_health()
+        cluster_info['last'] = es_handler.last_version()
+    except ESConnectionError:
+        raise ServerError("Unable to connect to search engine")
+    except ESQueryError:
+        raise ServerError("Unexpected issue when requesting search")
+    except RuntimeError:
+        raise ServerError("Failed to process results")
+
+    return cluster_info
