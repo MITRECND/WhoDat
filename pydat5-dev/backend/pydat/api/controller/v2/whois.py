@@ -281,11 +281,17 @@ def query():
     except ValueError:
         raise ClientError(f"Invalid search query {query}")
     except ESConnectionError:
+        current_app.logger.exception("ESConnectionError")
         raise ServerError("Unable to connect to search engine")
     except ESQueryError:
+        current_app.logger.exception("ESQueryError")
         raise ServerError("Unexpected issue when requesting search")
     except RuntimeError:
+        current_app.logger.exception("RuntimeError")
         raise ServerError("Failed to process results")
+    except Exception:
+        current_app.exception("Unhandled Exception")
+        raise ServerError("Unexpected issue handling query")
 
     if skip > 0 and skip >= search_results["total"]:
         raise ClientError(f"Offset {offset} is too high")

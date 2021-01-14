@@ -1056,12 +1056,13 @@ class ElasticsearchHandler:
                 query string
         """
         try:
-            try:
-                q = parseQuery(query)
-            except (KeyError, ValueError) as e:
-                raise ValueError(
-                    "The following error occured while trying to parse "
-                    f"query string: {repr(e)}")
+            q = parseQuery(query)
+        except (KeyError, ValueError) as e:
+            raise ValueError(
+                "The following error occured while trying to parse "
+                f"query string: {repr(e)}")
+
+        try:
             if not unique:
                 if sort is not None and len(sort) > 0:
                     sortParams = list()
