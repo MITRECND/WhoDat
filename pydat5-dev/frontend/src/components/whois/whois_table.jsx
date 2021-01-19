@@ -1,8 +1,8 @@
 import React, {useState, useEffect, useContext, useMemo} from 'react'
-import { useHistory } from 'react-router-dom';
 import update from 'immutability-helper'
 import DataTable from 'react-data-table-component'
 import qs from 'qs'
+import {Link as RouterLink} from 'react-router-dom'
 
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import IconButton from '@material-ui/core/IconButton'
@@ -28,8 +28,8 @@ const createSearchString = (query) => {
 }
 
 const DomainNameCell = ({row}) => {
-    let history = useHistory()
     const menu_plugins = PluginManagers.menu.plugins.tld
+    const search_string = createSearchString(`dn:"${row.domainName}"`)
 
     return (
         <DropDownCell
@@ -37,10 +37,8 @@ const DomainNameCell = ({row}) => {
              value={row.domainName}
         >
             <MenuItem
-                onClick={() => history.push({
-                    pathname: '/whois',
-                    search: createSearchString(`dn:"${row.domainName}"`)
-                })}
+                component={RouterLink}
+                to={`/whois${search_string}` }
             >
                 Pivot Search
             </MenuItem>
@@ -56,7 +54,7 @@ const DomainNameCell = ({row}) => {
 
 
 const RegistrantCell = ({row}) => {
-    let history = useHistory()
+    const search_string = createSearchString(`registrant_name:"${row.registrant_name}"`)
 
     if (row.registrant_name === null || row.registrant_name === "") {
         return (
@@ -72,10 +70,8 @@ const RegistrantCell = ({row}) => {
         >
 
             <MenuItem
-                onClick={() => history.push({
-                        pathname: '/whois',
-                        search: createSearchString(`registrant_name:"${row.registrant_name}"`)
-                    })}
+                component={RouterLink}
+                to={`/whois${search_string}`}
             >
                 Pivot Search
             </MenuItem>
@@ -84,7 +80,7 @@ const RegistrantCell = ({row}) => {
 }
 
 const EmailCell = ({row}) => {
-    let history = useHistory()
+    const search_string = createSearchString(`registrant_email:"${row.registrant_email}"`)
 
     if (row.registrant_email === null || row.registrant_email === "") {
         return (
@@ -98,10 +94,8 @@ const EmailCell = ({row}) => {
             value={row.registrant_email}
         >
             <MenuItem
-                onClick={() => history.push({
-                    pathname: '/whois',
-                    search: createSearchString(`registrant_email:"${row.registrant_email}"`)
-                })}
+                component={RouterLink}
+                to={`/whois${search_string}`}
             >
                 Pivot Search
             </MenuItem>
@@ -110,7 +104,7 @@ const EmailCell = ({row}) => {
 }
 
 const TelephoneCell = ({row}) => {
-    let history = useHistory()
+    const search_string = createSearchString(`registrant_telephone:"${row.registrant_telephone}"`)
 
     if (row.registrant_telephone === null || row.registrant_telephone === "") {
         return (
@@ -124,10 +118,8 @@ const TelephoneCell = ({row}) => {
             value={row.registrant_telephone}
         >
             <MenuItem
-                onClick={() => history.push({
-                    pathname: '/whois',
-                    search: createSearchString(`registrant_telephone:"${row.registrant_telephone}"`)
-                })}
+                component={RouterLink}
+                to={`/whois${search_string}`}
             >
                 Pivot Search
             </MenuItem>

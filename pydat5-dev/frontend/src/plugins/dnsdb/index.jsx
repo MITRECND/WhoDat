@@ -7,6 +7,7 @@ import ListItem from '@material-ui/core/ListItem';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import LanguageIcon from '@material-ui/icons/Language'
+import {Link as RouterLink} from 'react-router-dom'
 
 import {PluginManagers} from '../../components/plugins'
 
@@ -15,18 +16,15 @@ const DNSDB = React.lazy(() => import ('./dnsdb'))
 export const DNSDBPATH = "/passive/dnsdb"
 
 export const DNSDBTLDDomainMenu = React.forwardRef(({domainName}, ref) => {
-    let history = useHistory()
+    const search_string = '?' + qs.stringify({
+        type: 'domain',
+        value: `*.${domainName}`
+    })
 
     return (
-        <MenuItem onClick={() => {
-            let domain = `*.${domainName}`
-            history.push({
-                pathname: DNSDBPATH,
-                search: '?' + qs.stringify({
-                    type: 'domain',
-                    value: domain
-                })
-            })}}
+        <MenuItem
+            component={RouterLink}
+            to={`${DNSDBPATH}${search_string}`}
         >
             Search DNSDB
         </MenuItem>
@@ -34,18 +32,15 @@ export const DNSDBTLDDomainMenu = React.forwardRef(({domainName}, ref) => {
 })
 
 export const DNSDBDomainMenu = React.forwardRef(({domainName}, ref) => {
-    let history = useHistory()
+    const search_string = '?' + qs.stringify({
+        type: 'domain',
+        value: `*.${domainName}`
+    })
 
     return (
-        <MenuItem onClick={() => {
-            let domain = `*.${domainName}`
-            history.push({
-                pathname: DNSDBPATH,
-                search: '?' + qs.stringify({
-                    type: 'domain',
-                    value: domain
-                })
-            })}}
+        <MenuItem
+            component={RouterLink}
+            to={`${DNSDBPATH}${search_string}`}
         >
             Search DNSDB
         </MenuItem>
@@ -54,16 +49,15 @@ export const DNSDBDomainMenu = React.forwardRef(({domainName}, ref) => {
 
 export const DNSDBIPMenu = React.forwardRef(({ip}, ref) => {
     let history = useHistory()
+    const search_string = '?' + qs.stringify({
+        type: 'ip',
+        value: ip
+    })
 
     return (
-        <MenuItem onClick={() => {
-            history.push({
-                pathname: DNSDBPATH,
-                search: '?' + qs.stringify({
-                    type: 'ip',
-                    value: ip
-                })
-            })}}
+        <MenuItem
+            component={RouterLink}
+            to={`${DNSDBPATH}${search_string}`}
         >
             Search DNSDB
         </MenuItem>
