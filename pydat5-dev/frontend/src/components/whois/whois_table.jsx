@@ -1,14 +1,37 @@
-import React, {useState, useEffect, useContext, useMemo} from 'react'
+import React, {useState, useEffect, useContext, useMemo, useCallback} from 'react'
 import update from 'immutability-helper'
-import DataTable from 'react-data-table-component'
 import qs from 'qs'
 import {Link as RouterLink} from 'react-router-dom'
 
+import { makeStyles} from '@material-ui/core/styles';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import ArrowRightIcon from '@material-ui/icons/ArrowRight'
 import IconButton from '@material-ui/core/IconButton'
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
 import CircularProgress from '@material-ui/core/CircularProgress'
+import TableContainer from '@material-ui/core/TableContainer'
+import Table from '@material-ui/core/Table'
+import TableBody from '@material-ui/core/TableBody'
+import TableCell from '@material-ui/core/TableCell'
+import TableHead from '@material-ui/core/TableHead'
+import TableRow from '@material-ui/core/TableRow'
+import TableSortLabel from '@material-ui/core/TableSortLabel'
+import TableFooter from '@material-ui/core/TableFooter'
+import TablePagination from '@material-ui/core/TablePagination'
+import Backdrop from '@material-ui/core/Backdrop'
+import FirstPageIcon from '@material-ui/icons/FirstPage';
+import KeyboardArrowLeft from '@material-ui/icons/KeyboardArrowLeft';
+import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
+import LastPageIcon from '@material-ui/icons/LastPage';
+
+
+import {
+    // useSortBy,
+    useExpanded,
+    usePagination,
+    useTable,
+} from 'react-table'
 
 import {queryFetcher} from '../helpers/fetchers'
 import ExpandedEntryRow from './expandable'
@@ -27,14 +50,15 @@ const createSearchString = (query) => {
     )
 }
 
-const DomainNameCell = ({row}) => {
+const DomainNameCell = ({value: domainName, copyFriendly}) => {
     const menu_plugins = PluginManagers.menu.plugins.tld
-    const search_string = createSearchString(`dn:"${row.domainName}"`)
+    const search_string = createSearchString(`dn:"${domainName}"`)
 
     return (
         <DropDownCell
              friendly={"domain"}
-             value={row.domainName}
+             value={domainName}
+             copyFriendly={copyFriendly}
         >
             <MenuItem
                 component={RouterLink}
@@ -45,7 +69,7 @@ const DomainNameCell = ({row}) => {
             {Object.keys(menu_plugins).map((name, index) => {
                 let Component = menu_plugins[name]
                 return (
-                    <Component domainName={row.domainName} key={index} />
+                    <Component domainName={domainName} key={index} />
                 )
             })}
         </DropDownCell>
@@ -53,10 +77,10 @@ const DomainNameCell = ({row}) => {
 }
 
 
-const RegistrantCell = ({row}) => {
-    const search_string = createSearchString(`registrant_name:"${row.registrant_name}"`)
+const RegistrantCell = ({value: registrant_name, copyFriendly}) => {
+    const search_string = createSearchString(`registrant_name:"${registrant_name}"`)
 
-    if (row.registrant_name === null || row.registrant_name === "") {
+    if (registrant_name === null || registrant_name === "") {
         return (
             <React.Fragment></React.Fragment>
         )
@@ -66,7 +90,8 @@ const RegistrantCell = ({row}) => {
     return (
         <DropDownCell
             friendly={"registrantname"}
-            value={row.registrant_name}
+            value={registrant_name}
+            copyFriendly={copyFriendly}
         >
 
             <MenuItem
@@ -79,10 +104,10 @@ const RegistrantCell = ({row}) => {
     )
 }
 
-const EmailCell = ({row}) => {
-    const search_string = createSearchString(`registrant_email:"${row.registrant_email}"`)
+const EmailCell = ({value: registrant_email, copyFriendly}) => {
+    const search_string = createSearchString(`registrant_email:"${registrant_email}"`)
 
-    if (row.registrant_email === null || row.registrant_email === "") {
+    if (registrant_email === null || registrant_email === "") {
         return (
             <React.Fragment></React.Fragment>
         )
@@ -91,7 +116,8 @@ const EmailCell = ({row}) => {
     return (
         <DropDownCell
             friendly={"email"}
-            value={row.registrant_email}
+            value={registrant_email}
+            copyFriendly={copyFriendly}
         >
             <MenuItem
                 component={RouterLink}
@@ -103,10 +129,10 @@ const EmailCell = ({row}) => {
     )
 }
 
-const TelephoneCell = ({row}) => {
-    const search_string = createSearchString(`registrant_telephone:"${row.registrant_telephone}"`)
+const TelephoneCell = ({value: registrant_telephone, copyFriendly}) => {
+    const search_string = createSearchString(`registrant_telephone:"${registrant_telephone}"`)
 
-    if (row.registrant_telephone === null || row.registrant_telephone === "") {
+    if (registrant_telephone === null || registrant_telephone === "") {
         return (
             <React.Fragment></React.Fragment>
         )
@@ -115,7 +141,8 @@ const TelephoneCell = ({row}) => {
     return (
         <DropDownCell
             friendly={"telephone"}
-            value={row.registrant_telephone}
+            value={registrant_telephone}
+            copyFriendly={copyFriendly}
         >
             <MenuItem
                 component={RouterLink}
@@ -129,113 +156,400 @@ const TelephoneCell = ({row}) => {
 
 const TableColumns = () => { return [
     {
-        name: 'Domain Name',
-        selector: 'domainName',
-        cell: (row) => (
+        Header: () => null,
+        id: 'moreinfo',
+        Cell: ({row, copyFriendly}) => (
+            copyFriendly === false ?
+                <span {...row.getToggleRowExpandedProps()}>
+                    {row.isExpanded ? <ArrowDropDownIcon/> : <ArrowRightIcon/>}
+                </span>
+            : null
+        ),
+        className: 'expansion-cell',
+        style: {
+            padding: 'none'
+        }
+    },
+    {
+        Header: 'Domain Name',
+        accessor: 'domainName',
+        Cell: (props) => (
             <DomainNameCell
-                row={row}
+                value={props.value}
+                copyFriendly={props.copyFriendly}
             />
-        )
+        ),
+        className: 'dn-cell',
+        style: {}
     },
     {
-        name: 'Registrant',
-        selector: 'registrant_name',
-        cell: (row) => (
+        Header: 'Registrant',
+        accessor: 'registrant_name',
+        Cell: (props) => (
             <RegistrantCell
-                row={row}
+                value={props.value}
+                copyFriendly={props.copyFriendly}
             />
-        )
+        ),
+        className: 'rn-cell',
+        style: {}
     },
     {
-        name: 'Email',
-        selector: 'registrant_email',
-        cell: (row) => (
+        Header: 'Email',
+        accessor: 'registrant_email',
+        Cell: (props) => (
             <EmailCell
-                row={row}
+                value={props.value}
+                copyFriendly={props.copyFriendly}
             />
-        )
+        ),
+        className: 're-cell',
+        style: {}
     },
     {
-        name: 'Created',
-        selector: 'createdDate'
+        Header: 'Created',
+        accessor: 'createdDate',
+        className: 'cd-cell',
+        style: {}
+
     },
     {
-        name: 'Telephone',
-        selector: 'registrant_telephone',
-        cell: (row) => (
+        Header: 'Telephone',
+        accessor: 'registrant_telephone',
+        Cell: (props) => (
             <TelephoneCell
-                row={row}
+                value={props.value}
+                copyFriendly={props.copyFriendly}
             />
-        )
+        ),
+        className: 'rt-cell',
+        style: {}
     },
     {
-        name: 'Version',
-        selector: 'Version',
-        maxWidth: "5vh"
+        Header: 'Version',
+        accessor: 'Version',
+        className: 'version-cell',
+        style: {
+            maxWidth: "5vh",
+        }
     },
     {
-        name: 'Score',
-        selector: 'score',
-        maxWidth: "10vh",
-        cell: (row) => row.score.toFixed(3)
+        Header: 'Score',
+        accessor: 'score',
+        Cell: ({value}) => value.toFixed(3),
+        className: 'score-cell',
+        style: {
+            maxWidth: "10vh",
+        }
     }
 ]}
 
-const WhoisTable = (props) => {
-    const preferences = useContext(UserPreferencesContext)
+const usePaginationStyles = makeStyles((theme) => ({
+    root: {
+        flexShrink: 0,
+        marginLeft: theme.spacing(2.5),
+    }
+}))
 
+const TablePaginationActions = ({
+    pageCount,
+    gotoPage,
+    previousPage,
+    nextPage,
+    canNextPage,
+    canPreviousPage,
+    // paginationProps,
+}) => {
+
+    const classes = usePaginationStyles();
+
+    return (
+      <div className={classes.root}>
+        <IconButton
+          onClick={() => gotoPage(0)}
+          disabled={!canPreviousPage}
+          aria-label="first page"
+        >
+            <FirstPageIcon />
+        </IconButton>
+        <IconButton
+            onClick={() => previousPage()}
+            disabled={!canPreviousPage}
+            aria-label="previous page"
+        >
+            <KeyboardArrowLeft />
+        </IconButton>
+        <IconButton
+          onClick={() => nextPage()}
+          disabled={!canNextPage}
+          aria-label="next page"
+        >
+            <KeyboardArrowRight />
+        </IconButton>
+        <IconButton
+          onClick={() => gotoPage(pageCount - 1)}
+          disabled={!canNextPage}
+          aria-label="last page"
+        >
+            <LastPageIcon />
+        </IconButton>
+      </div>
+    );
+  }
+
+const Paginator = ({
+    gotoPage,
+    previousPage,
+    nextPage,
+    pageCount,
+    pageOptions,
+    setPageSize,
+    pageIndex,
+    pageSize,
+    canNextPage,
+    canPreviousPage,
+    columnLength,
+}) => {
+
+    const handleChangePage = (event, newPage) => {
+        gotoPage(newPage)
+      };
+
+    const handleChangeRowsPerPage = (event) => {
+        setPageSize(parseInt(event.target.value))
+    };
+
+    return (
+        <React.Fragment>
+            <TablePagination
+              rowsPerPageOptions={[50, 100, 1000, 2500]}
+              colSpan={columnLength}
+              count={-1}
+              rowsPerPage={pageSize}
+              page={pageIndex}
+              SelectProps={{
+                inputProps: { 'aria-label': 'rows per page' },
+                native: true,
+              }}
+              onChangePage={handleChangePage}
+              onChangeRowsPerPage={handleChangeRowsPerPage}
+              ActionsComponent={
+                  (props) => (
+                    <TablePaginationActions
+                        gotoPage={gotoPage}
+                        previousPage={previousPage}
+                        nextPage={nextPage}
+                        pageCount={pageCount}
+                        canNextPage={canNextPage}
+                        canPreviousPage={canPreviousPage}
+                        paginationProps={props}
+                    />
+                )}
+            />
+        </React.Fragment>
+    )
+}
+
+const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => {
+    return (
+        <MenuItem
+            selected={copyFriendly}
+            onClick={() => {toggleCopyFriendly(); handleClose()}}
+        >
+            Copy Friendly
+        </MenuItem>
+    )
+}
+
+const WhoisTableContainer = ({
+    columns,
+    data,
+    queryData,
+    pageCount: controlledPageCount,
+    fetchData,
+    loading
+}) => {
+
+    const preferences = useContext(UserPreferencesContext)
     const initialPageSize = preferences.getPref('whois', 'page_size', 50)
-    const [pending, setPending] = useState(true)
-    const [queryParams, setQueryParams] = useState({
-        query: props.queryData.query,
-        chunk_size: initialPageSize,
-        offset: 0
+    const [copyFriendly, setCopyFriendly] = useState(false)
+
+    const toggleCopyFriendly = useCallback(() => {
+        setCopyFriendly(!copyFriendly)
     })
 
-    const [queryResults, setQueryResults] = useState(null)
+    // const handleKeyPressEvent = (event) => {
+    //     console.log(event.keyCode)
+    //     if (event.keyCode === 67 ) {
+    //         toggleCopyFriendly()
+    //     }
+    // }
+
+    const {
+        getTableProps,
+        getTableBodyProps,
+        headerGroups,
+        prepareRow,
+        visibleColumns,
+        // Pagination
+        page,
+        canPreviousPage,
+        canNextPage,
+        pageOptions,
+        pageCount,
+        gotoPage,
+        nextPage,
+        previousPage,
+        setPageSize,
+        state: {pageIndex, pageSize, expanded}
+    } = useTable(
+        {
+            columns,
+            data,
+            initialState: {
+                pageSize: initialPageSize,
+                pageIndex: 0
+            },
+            manualPagination: true,
+            pageCount: controlledPageCount,
+        },
+        useExpanded,
+        // useFlexLayout,
+        usePagination,
+    )
+
+    useEffect(() => {
+        fetchData({pageIndex, pageSize})
+    }, [queryData, pageIndex, pageSize])
+
+    if (!Array.isArray(data) || !data.length) {
+        return (
+            <BackdropLoader/>
+        )
+    }
+
+    return (
+        <React.Fragment>
+            <div
+                // onKeyDown={handleKeyPressEvent}
+                // tabIndex={-1}
+            >
+                <Table {...getTableProps()}>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell colSpan={1}>
+                                <SearchTools data={data} defaultListField={'domainName'}>
+                                    <ToggleCopyMenuItem
+                                        copyFriendly={copyFriendly}
+                                        toggleCopyFriendly={toggleCopyFriendly}
+                                    />
+                                </SearchTools>
+                            </TableCell>
+                            <Paginator
+                                gotoPage={gotoPage}
+                                previousPage={previousPage}
+                                nextPage={nextPage}
+                                pageCount={pageCount}
+                                pageOptions={pageOptions}
+                                setPageSize={setPageSize}
+                                pageIndex={pageIndex}
+                                pageSize={pageSize}
+                                canNextPage={canNextPage}
+                                canPreviousPage={canPreviousPage}
+                                columnLength={visibleColumns.length - 1}
+                            />
+                        </TableRow>
+                        {headerGroups.map(headerGroup => (
+                            <TableRow {...headerGroup.getHeaderGroupProps()}>
+                                {headerGroup.headers.map(column => (
+                                    <TableCell {...column.getHeaderProps()}>
+                                        {column.render('Header')}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHead>
+                    <TableBody {...getTableBodyProps()}>
+                        {loading ?
+                        <TableRow>
+                            <TableCell colSpan={visibleColumns.length}>
+                                &nbsp;
+                            </TableCell>
+                        </TableRow>
+                        :
+                        page.map((row, i) => {
+                            prepareRow(row)
+                            return (
+                                <React.Fragment key={i}>
+                                    <TableRow {...row.getRowProps([{key: `data${i}`}])}>
+                                        {row.cells.map(cell => {
+                                            return (
+                                                <TableCell {...cell.getCellProps([
+                                                    {
+                                                        className: cell.column.className,
+                                                        style: cell.column.style
+                                                    }
+
+                                                ])}>
+                                                    {cell.render('Cell',
+                                                        {copyFriendly: copyFriendly})}
+                                                </TableCell>
+                                            )
+                                        })}
+                                    </TableRow>
+                                    {row.isExpanded ? (
+                                        <TableRow {...row.getRowProps([{key: `ex${i}`}])}>
+                                            <TableCell colSpan={visibleColumns.length}>
+                                                <ExpandedEntryRow data={row.original}/>
+                                            </TableCell>
+                                        </TableRow>
+                                    ): null}
+
+                                </React.Fragment>
+                            )
+                        })}
+                    </TableBody>
+                    <TableFooter>
+                        <TableRow>
+                            <Paginator
+                                gotoPage={gotoPage}
+                                previousPage={previousPage}
+                                nextPage={nextPage}
+                                pageCount={pageCount}
+                                pageOptions={pageOptions}
+                                setPageSize={setPageSize}
+                                pageIndex={pageIndex}
+                                pageSize={pageSize}
+                                canNextPage={canNextPage}
+                                canPreviousPage={canPreviousPage}
+                                columnLength={visibleColumns.length}
+                            />
+                        </TableRow>
+                    </TableFooter>
+                </Table>
+            </div>
+        </React.Fragment>
+    )
+}
+
+const WhoisTable = ({queryData}) => {
+    const [pending, setPending] = useState(true)
+
     const columns = useMemo(() => TableColumns(), [])
+    const [data, setData] = useState([])
+    const [pageCount, setPageCount] = useState(0)
 
-    useEffect(() => {
-        setQueryParams(update(queryParams, {
-            query: {$set: props.queryData.query},
-            chunk_size: {$set: initialPageSize},
-            offset: {$set: 0}
-        }))
-    }, [props.queryData])
-
-    useEffect(() => {
-        setPending(true)
-        fetchData()
-    }, [queryParams])
-
-    const handlePageChange = async (page) => {
-        setQueryParams(update(queryParams, {
-            offset: {$set: page - 1}
-        }))
-    }
-
-    const handleChunkChange = async (perPage, page) => {
-        setQueryParams(update(queryParams, {
-            chunk_size: {$set: perPage},
-            offset: {$set: page - 1}
-        }))
-        preferences.setPref('whois', 'page_size', perPage)
-    }
-
-    const fetchData = () => {
+    const fetchData = useCallback(({pageSize, pageIndex}) => {
         const asyncfetch = async () => {
             try {
                 let results = await queryFetcher({
-                    query: queryParams.query,
-                    chunk_size: queryParams.chunk_size,
-                    offset: queryParams.offset
+                    query: queryData.query,
+                    chunk_size: pageSize,
+                    offset: pageIndex
                 })
 
-                setQueryResults({
-                    total: results.total,
-                    page_size: queryParams.chunk_size,
-                    results: results.results
-                })
+                setPageCount(Math.ceil(results.total / pageSize))
+                setData(results.results)
                 setPending(false)
 
             } catch (err) {
@@ -243,43 +557,20 @@ const WhoisTable = (props) => {
             }
         }
 
+        setPending(true)
         asyncfetch()
-    }
-
-    if (queryResults === null) {
-        return (
-            <BackdropLoader />
-        )
-    }
+    })
 
     return (
-        <React.Fragment>
-            <DataTable
-                columns={columns}
-                data={queryResults.results}
-                // fixedHeader
-                pagination
-                paginationServer
-                paginationDefaultPage={1}
-                paginationPerPage={queryResults.page_size}
-                paginationRowsPerPageOptions={[50, 100, 1000, 10000]}
-                paginationTotalRows={queryResults.total}
-                progressPending={pending}
-                progressComponent={<CircularProgress color="secondary"/>}
-                striped
-                highlightOnHover
-                expandableRows
-                noHeader
-                expandableRowsComponent={<ExpandedEntryRow/>}
-                onChangeRowsPerPage={handleChunkChange}
-                onChangePage={handlePageChange}
-                subHeader
-                subHeaderAlign="right"
-                subHeaderComponent={
-                    <SearchTools data={queryResults.results} defaultListField={'domainName'} />
-                }
-            />
-        </React.Fragment>
+        <WhoisTableContainer
+            columns={columns}
+            queryData={queryData}
+            data={data}
+            fetchData={fetchData}
+            loading={pending}
+            pageCount={pageCount}
+        />
+
     )
 }
 
