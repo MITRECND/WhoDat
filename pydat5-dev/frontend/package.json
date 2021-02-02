@@ -16,7 +16,6 @@
     "notistack": "^1.0.1",
     "qs": "^6.9.4",
     "react": "^16.13.1",
-    "react-data-table-component": "^6.11.5",
     "react-dom": "^16.13.1",
     "react-hook-form": "^6.7.0",
     "react-router-dom": "^5.2.0",
