@@ -66,7 +66,7 @@ export const Paginator = ({
     previousPage,
     nextPage,
     pageCount,
-    pageOptions,
+    rowCount,
     setPageSize,
     pageIndex,
     pageSize,
@@ -88,7 +88,7 @@ export const Paginator = ({
             <TablePagination
               rowsPerPageOptions={[50, 100, 1000, 2500]}
               colSpan={columnLength}
-              count={-1}
+              count={rowCount}
               rowsPerPage={pageSize}
               page={pageIndex}
               SelectProps={{

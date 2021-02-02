@@ -114,7 +114,7 @@ const TypeColumnFilter = ({
                     input={<Input />}
                     MenuProps={MenuProps}
                 >
-                    <MenuItem value="">all</MenuItem>
+                    <MenuItem value="">&nbsp;</MenuItem>
                     {RRTypesList.map((rrtype, index) => {
                         return (
                         <MenuItem key={index} value={rrtype}>{rrtype}</MenuItem>
@@ -125,7 +125,6 @@ const TypeColumnFilter = ({
             {/* <Button type="button" onClick={e => {setFilter(undefined)}}>X</Button> */}
         </React.Fragment>
     )
-
 }
 
 const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => {
@@ -210,6 +209,7 @@ const DNSDBTableContainer = ({
                                 previousPage={previousPage}
                                 nextPage={nextPage}
                                 pageCount={pageCount}
+                                rowCount={data.length}
                                 pageOptions={pageOptions}
                                 setPageSize={setPageSize}
                                 pageIndex={pageIndex}
@@ -261,6 +261,7 @@ const DNSDBTableContainer = ({
                                 previousPage={previousPage}
                                 nextPage={nextPage}
                                 pageCount={pageCount}
+                                rowCount={data.length}
                                 pageOptions={pageOptions}
                                 setPageSize={setPageSize}
                                 pageIndex={pageIndex}
