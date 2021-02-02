@@ -1,15 +1,8 @@
 import React, {useState, useEffect, useContext, useMemo, useCallback} from 'react'
-import update from 'immutability-helper'
-import qs from 'qs'
-import {Link as RouterLink} from 'react-router-dom'
 
-import { makeStyles} from '@material-ui/core/styles';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowRightIcon from '@material-ui/icons/ArrowRight'
-import IconButton from '@material-ui/core/IconButton'
-import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
-import CircularProgress from '@material-ui/core/CircularProgress'
 import TableContainer from '@material-ui/core/TableContainer'
 import Table from '@material-ui/core/Table'
 import TableBody from '@material-ui/core/TableBody'
@@ -18,13 +11,6 @@ import TableHead from '@material-ui/core/TableHead'
 import TableRow from '@material-ui/core/TableRow'
 import TableSortLabel from '@material-ui/core/TableSortLabel'
 import TableFooter from '@material-ui/core/TableFooter'
-import TablePagination from '@material-ui/core/TablePagination'
-import Backdrop from '@material-ui/core/Backdrop'
-import FirstPageIcon from '@material-ui/icons/FirstPage';
-import KeyboardArrowLeft from '@material-ui/icons/KeyboardArrowLeft';
-import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
-import LastPageIcon from '@material-ui/icons/LastPage';
-
 
 import {
     // useSortBy,
@@ -38,121 +24,14 @@ import ExpandedEntryRow from './expandable'
 import {UserPreferencesContext} from '../helpers/preferences'
 import { BackdropLoader } from '../helpers/loaders';
 import SearchTools from '../helpers/search_tools'
-import DropDownCell from '../helpers/dropdown_cell'
-import {PluginManagers} from '../plugins'
+import {Paginator} from './table_pagination'
+import {
+    DomainNameCell,
+    RegistrantCell,
+    EmailCell,
+    TelephoneCell
+} from './table_cells'
 
-
-const createSearchString = (query) => {
-    return(
-        '?' + qs.stringify({
-            query: query
-        })
-    )
-}
-
-const DomainNameCell = ({value: domainName, copyFriendly}) => {
-    const menu_plugins = PluginManagers.menu.plugins.tld
-    const search_string = createSearchString(`dn:"${domainName}"`)
-
-    return (
-        <DropDownCell
-             friendly={"domain"}
-             value={domainName}
-             copyFriendly={copyFriendly}
-        >
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}` }
-            >
-                Pivot Search
-            </MenuItem>
-            {Object.keys(menu_plugins).map((name, index) => {
-                let Component = menu_plugins[name]
-                return (
-                    <Component domainName={domainName} key={index} />
-                )
-            })}
-        </DropDownCell>
-    )
-}
-
-
-const RegistrantCell = ({value: registrant_name, copyFriendly}) => {
-    const search_string = createSearchString(`registrant_name:"${registrant_name}"`)
-
-    if (registrant_name === null || registrant_name === "") {
-        return (
-            <React.Fragment></React.Fragment>
-        )
-    }
-
-
-    return (
-        <DropDownCell
-            friendly={"registrantname"}
-            value={registrant_name}
-            copyFriendly={copyFriendly}
-        >
-
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}`}
-            >
-                Pivot Search
-            </MenuItem>
-        </DropDownCell>
-    )
-}
-
-const EmailCell = ({value: registrant_email, copyFriendly}) => {
-    const search_string = createSearchString(`registrant_email:"${registrant_email}"`)
-
-    if (registrant_email === null || registrant_email === "") {
-        return (
-            <React.Fragment></React.Fragment>
-        )
-    }
-
-    return (
-        <DropDownCell
-            friendly={"email"}
-            value={registrant_email}
-            copyFriendly={copyFriendly}
-        >
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}`}
-            >
-                Pivot Search
-            </MenuItem>
-        </DropDownCell>
-    )
-}
-
-const TelephoneCell = ({value: registrant_telephone, copyFriendly}) => {
-    const search_string = createSearchString(`registrant_telephone:"${registrant_telephone}"`)
-
-    if (registrant_telephone === null || registrant_telephone === "") {
-        return (
-            <React.Fragment></React.Fragment>
-        )
-    }
-
-    return (
-        <DropDownCell
-            friendly={"telephone"}
-            value={registrant_telephone}
-            copyFriendly={copyFriendly}
-        >
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}`}
-            >
-                Pivot Search
-            </MenuItem>
-        </DropDownCell>
-    )
-}
 
 const TableColumns = () => { return [
     {
@@ -243,112 +122,6 @@ const TableColumns = () => { return [
         }
     }
 ]}
-
-const usePaginationStyles = makeStyles((theme) => ({
-    root: {
-        flexShrink: 0,
-        marginLeft: theme.spacing(2.5),
-    }
-}))
-
-const TablePaginationActions = ({
-    pageCount,
-    gotoPage,
-    previousPage,
-    nextPage,
-    canNextPage,
-    canPreviousPage,
-    // paginationProps,
-}) => {
-
-    const classes = usePaginationStyles();
-
-    return (
-      <div className={classes.root}>
-        <IconButton
-          onClick={() => gotoPage(0)}
-          disabled={!canPreviousPage}
-          aria-label="first page"
-        >
-            <FirstPageIcon />
-        </IconButton>
-        <IconButton
-            onClick={() => previousPage()}
-            disabled={!canPreviousPage}
-            aria-label="previous page"
-        >
-            <KeyboardArrowLeft />
-        </IconButton>
-        <IconButton
-          onClick={() => nextPage()}
-          disabled={!canNextPage}
-          aria-label="next page"
-        >
-            <KeyboardArrowRight />
-        </IconButton>
-        <IconButton
-          onClick={() => gotoPage(pageCount - 1)}
-          disabled={!canNextPage}
-          aria-label="last page"
-        >
-            <LastPageIcon />
-        </IconButton>
-      </div>
-    );
-  }
-
-const Paginator = ({
-    gotoPage,
-    previousPage,
-    nextPage,
-    pageCount,
-    pageOptions,
-    setPageSize,
-    pageIndex,
-    pageSize,
-    canNextPage,
-    canPreviousPage,
-    columnLength,
-}) => {
-
-    const handleChangePage = (event, newPage) => {
-        gotoPage(newPage)
-      };
-
-    const handleChangeRowsPerPage = (event) => {
-        setPageSize(parseInt(event.target.value))
-    };
-
-    return (
-        <React.Fragment>
-            <TablePagination
-              rowsPerPageOptions={[50, 100, 1000, 2500]}
-              colSpan={columnLength}
-              count={-1}
-              rowsPerPage={pageSize}
-              page={pageIndex}
-              SelectProps={{
-                inputProps: { 'aria-label': 'rows per page' },
-                native: true,
-              }}
-              onChangePage={handleChangePage}
-              onChangeRowsPerPage={handleChangeRowsPerPage}
-              ActionsComponent={
-                  (props) => (
-                    <TablePaginationActions
-                        gotoPage={gotoPage}
-                        previousPage={previousPage}
-                        nextPage={nextPage}
-                        pageCount={pageCount}
-                        canNextPage={canNextPage}
-                        canPreviousPage={canPreviousPage}
-                        paginationProps={props}
-                    />
-                )}
-            />
-        </React.Fragment>
-    )
-}
 
 const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => {
     return (
