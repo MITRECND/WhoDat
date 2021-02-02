@@ -21,7 +21,6 @@ import TableFooter from '@material-ui/core/TableFooter'
 import {
     useSortBy,
     useFilters,
-    useExpanded,
     usePagination,
     useTable,
 } from 'react-table'
@@ -110,7 +109,7 @@ const TypeColumnFilter = ({
 
                     //     return selected.join(', ')
                     // }}
-                    value={filterValue}
+                    value={filterValue || ''}
                     input={<Input />}
                     MenuProps={MenuProps}
                 >
@@ -125,6 +124,18 @@ const TypeColumnFilter = ({
             {/* <Button type="button" onClick={e => {setFilter(undefined)}}>X</Button> */}
         </React.Fragment>
     )
+}
+
+const TypeColumnFilterFn = (rows, columnIds, filterValue) => {
+    let postFiltered = []
+
+    rows.forEach((row) => {
+        if (row.original.rrtype.toLowerCase() == filterValue){
+            postFiltered.push(row)
+        }
+    })
+
+    return postFiltered
 }
 
 const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => {
@@ -157,6 +168,7 @@ const DNSDBTableContainer = ({
         prepareRow,
         allColumns,
         visibleColumns,
+        rows: filteredRows,
         // Pagination
         page,
         canPreviousPage,
@@ -209,7 +221,7 @@ const DNSDBTableContainer = ({
                                 previousPage={previousPage}
                                 nextPage={nextPage}
                                 pageCount={pageCount}
-                                rowCount={data.length}
+                                rowCount={filteredRows.length}
                                 pageOptions={pageOptions}
                                 setPageSize={setPageSize}
                                 pageIndex={pageIndex}
@@ -261,7 +273,7 @@ const DNSDBTableContainer = ({
                                 previousPage={previousPage}
                                 nextPage={nextPage}
                                 pageCount={pageCount}
-                                rowCount={data.length}
+                                rowCount={filteredRows.length}
                                 pageOptions={pageOptions}
                                 setPageSize={setPageSize}
                                 pageIndex={pageIndex}
@@ -303,6 +315,7 @@ const DNSDBWebHandler = (props) => {
             accessor: 'rrtype',
             maxWidth: '5vw',
             Filter: TypeColumnFilter,
+            filter: TypeColumnFilterFn,
             className: 'rrtype-cell',
             style: {}
         },
