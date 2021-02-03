@@ -44,32 +44,39 @@ export const SearchTools = ({data, children, defaultListField}) => {
                 >
                     Export JSON
                 </MenuItem>
-                <JSONExporter
-                    data={data}
-                    open={openJSONDialog}
-                    onClose={() => {setOpenJSONDialog(false)}}
-                />
+
+                {openJSONDialog &&
+                    <JSONExporter
+                        data={data}
+                        open={openJSONDialog}
+                        onClose={() => {setOpenJSONDialog(false)}}
+                    />
+                }
                 <MenuItem
                     onClick={() => {setOpenCSVDialog(true); handleClose()}}
                 >
                     Export CSV
                 </MenuItem>
-                <CSVExporter
-                    data={data}
-                    open={openCSVDialog}
-                    onClose={() => {setOpenCSVDialog(false)}}
-                />
+                {openCSVDialog &&
+                    <CSVExporter
+                        data={data}
+                        open={openCSVDialog}
+                        onClose={() => {setOpenCSVDialog(false)}}
+                    />
+                }
                 <MenuItem
                     onClick={() => {setOpenListDialog(true); handleClose()}}
                 >
                     Export List
                 </MenuItem>
-                <ListExporter
-                    field={defaultListField}
-                    data={data}
-                    open={openListDialog}
-                    onClose={() => {setOpenListDialog(false)}}
-                />
+                {openListDialog &&
+                    <ListExporter
+                        field={defaultListField}
+                        data={data}
+                        open={openListDialog}
+                        onClose={() => {setOpenListDialog(false)}}
+                    />
+                }
                 {React.Children.map(children, (child) => {
                     const props = {
                         data: data,
