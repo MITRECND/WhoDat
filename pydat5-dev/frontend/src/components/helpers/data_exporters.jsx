@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react'
+import React, {useState, useEffect, useMemo} from 'react'
 import Grid from '@material-ui/core/Grid'
 import MenuItem from '@material-ui/core/MenuItem'
 import Paper from '@material-ui/core/Paper'
@@ -12,13 +12,30 @@ import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import Checkbox from '@material-ui/core/Checkbox';
 import Button from '@material-ui/core/Button';
+import FormControl from '@material-ui/core/FormControl'
+import Input from '@material-ui/core/Input'
 
 import { Parser as CSVParser } from 'json2csv'
 
 import {FullScreenDialog} from '../layout/dialogs'
 
+// TODO XXX FIXME Check whether preprocessor is function, add other error checking
 
-export const JSONExporter = ({data, open, onClose}) => {
+export const JSONExporter = ({
+    data,
+    open,
+    onClose,
+    dataControl = null,
+    preprocessor = null
+}) => {
+
+    const processedData = useMemo(() => {
+        if (preprocessor !== null) {
+            return preprocessor(data)
+        } else {
+            return data
+        }
+    }, [data])
 
     return (
         <FullScreenDialog
@@ -27,20 +44,22 @@ export const JSONExporter = ({data, open, onClose}) => {
             title="JSON Exporter"
         >
             {open &&
-            <Grid container spacing={2} style={{padding: '1rem'}}>
-                {data.map((entry, index) => {
-                    return (
-                        <Grid item xs={12} key={index}>
-                            <Typography>
-                                {JSON.stringify(entry, null, 1)}
-                            </Typography>
+                <React.Fragment>
+                    {dataControl}
+                    <Grid container spacing={2} style={{padding: '1rem'}}>
+                        {processedData.map((entry, index) => {
+                            return (
+                                <Grid item xs={12} key={index}>
+                                    <Typography>
+                                        {JSON.stringify(entry, null, 1)}
+                                    </Typography>
 
-                        </Grid>
-                    )
-                })}
-            </Grid>
+                                </Grid>
+                            )
+                        })}
+                    </Grid>
+                </React.Fragment>
             }
-
         </FullScreenDialog>
     )
 }
@@ -217,9 +236,25 @@ const CSVSelector = ({keys, selectedKeys, setSelectedKeys}) => {
     )
 }
 
-export const CSVExporter = ({data, open, onClose}) => {
-    const keys = data.length > 0 ? Object.keys(data[0]) : []
+export const CSVExporter = ({
+    data,
+    open,
+    onClose,
+    dataControl = null,
+    preprocessor = null
+}) => {
+
+    const processedData = useMemo(() => {
+        if (preprocessor !== null) {
+            return preprocessor(data)
+        } else {
+            return data
+        }
+    }, [data])
+
+    const keys = processedData.length > 0 ? Object.keys(processedData[0]) : []
     const [selectedKeys, setSelectedKeys] = useState(keys)
+
 
     let parser = new CSVParser({
         fields: selectedKeys,
@@ -227,7 +262,7 @@ export const CSVExporter = ({data, open, onClose}) => {
     let csv_data = []
 
     try {
-        csv_data = parser.parse(data).split('\n')
+        csv_data = parser.parse(processedData).split('\n')
     } catch (err) {
         console.error(err)
     }
@@ -241,6 +276,7 @@ export const CSVExporter = ({data, open, onClose}) => {
         >
             {open &&
             <React.Fragment>
+                {dataControl}
                 <Grid container spacing={2} style={{padding: '1rem'}}>
                     <Grid item>
                       <CSVSelector
@@ -288,9 +324,25 @@ const ListSelector = ({keys, selectedKey, setSelectedKey}) => {
     )
 }
 
-export const ListExporter = ({field, data, open, onClose}) => {
+export const ListExporter = ({
+    field,
+    data,
+    open,
+    onClose,
+    dataControl = null,
+    preprocessor = null
+}) => {
+
+    const processedData = useMemo(() => {
+        if (preprocessor !== null) {
+            return preprocessor(data)
+        } else {
+            return data
+        }
+    }, [data])
+
     const [selectedKey, setSelectedKey] = useState(field)
-    const keys = data.length > 0 ? Object.keys(data[0]) : [field]
+    const keys = processedData.length > 0 ? Object.keys(processedData[0]) : [field]
 
     return (
         <FullScreenDialog
@@ -300,6 +352,7 @@ export const ListExporter = ({field, data, open, onClose}) => {
         >
             {open &&
             <React.Fragment>
+                {dataControl}
                 <Grid container spacing={2} style={{padding: '1rem'}}>
                     <Grid item xs={2}>
                         <ListSelector
@@ -310,7 +363,7 @@ export const ListExporter = ({field, data, open, onClose}) => {
                     </Grid>
                 </Grid>
                 <Grid container spacing={2} style={{padding: '1rem'}}>
-                    {data.map((entry, index) => {
+                    {processedData.map((entry, index) => {
                         return (
                             <Grid item xs={12} key={index}>
                                 {entry[selectedKey]}

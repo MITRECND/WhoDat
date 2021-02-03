@@ -126,7 +126,7 @@ const TypeColumnFilter = ({
     )
 }
 
-const TypeColumnFilterFn = (rows, columnIds, filterValue) => {
+const typeColumnFilterFn = (rows, columnIds, filterValue) => {
     let postFiltered = []
 
     rows.forEach((row) => {
@@ -146,6 +146,42 @@ const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => 
         >
             Copy Friendly
         </MenuItem>
+    )
+}
+
+const csvPreprocessor = (data) => {
+    let dataout = []
+    data.forEach((row) => {
+        if (row.hasOwnProperty('rdata')) {
+            row.rdata = row.rdata.join(';')
+        }
+        dataout.push(row)
+    })
+    return dataout
+}
+
+const ExportDataControl = ({exportSize, setExportSize}) => {
+    return (
+        <React.Fragment>
+            <Grid container>
+                <Grid item>
+                <FormControl>
+                    <InputLabel>Size</InputLabel>
+                    <Select
+                        label="Size"
+                        name="size"
+                        displayEmpty
+                        onChange={e => {setExportSize(e.target.value)}}
+                        value={exportSize}
+                    >
+                    {[50, 100, 1000, 2500].map((value, index) => (
+                        <MenuItem key={index} value={value}>{value}</MenuItem>
+                    ))}
+                    </Select>
+                </FormControl>
+                </Grid>
+            </Grid>
+        </React.Fragment>
     )
 }
 
@@ -202,6 +238,13 @@ const DNSDBTableContainer = ({
         return data
     }, [filteredRows])
 
+    const [exportSize, setExportSize] = useState(50)
+    const exporterData = useMemo(
+        () => (
+            filteredData.slice(0, exportSize)
+        ),[exportSize]
+    )
+
     return (
         <React.Fragment>
             <div
@@ -218,8 +261,15 @@ const DNSDBTableContainer = ({
                         <TableRow>
                             <TableCell colSpan={1}>
                                 <SearchTools
-                                     data={filteredData}
-                                     defaultListField={'rrName'}
+                                    data={exporterData}
+                                    dataControl={
+                                        <ExportDataControl
+                                            exportSize={exportSize}
+                                            setExportSize={setExportSize}
+                                        />
+                                    }
+                                    defaultListField={'rrname'}
+                                    csvPreprocessor={csvPreprocessor}
                                 >
                                     <ToggleCopyMenuItem
                                         copyFriendly={copyFriendly}
@@ -324,7 +374,7 @@ const DNSDBWebHandler = (props) => {
             accessor: 'rrtype',
             maxWidth: '5vw',
             Filter: TypeColumnFilter,
-            filter: TypeColumnFilterFn,
+            filter: typeColumnFilterFn,
             className: 'rrtype-cell',
             style: {}
         },

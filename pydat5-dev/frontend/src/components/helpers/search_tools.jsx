@@ -11,7 +11,15 @@ import {
     ListExporter
 } from './data_exporters'
 
-export const SearchTools = ({data, children, defaultListField}) => {
+export const SearchTools = ({
+    data,
+    children,
+    defaultListField,
+    dataControl = null,
+    jsonPreprocessor = null,
+    csvPreprocessor = null,
+    listPreprocessor = null
+}) => {
     const [anchorEl, setAnchorEl] = useState(null)
     const [openJSONDialog, setOpenJSONDialog] = useState(false)
     const [openCSVDialog, setOpenCSVDialog] = useState(false)
@@ -48,7 +56,9 @@ export const SearchTools = ({data, children, defaultListField}) => {
                 {openJSONDialog &&
                     <JSONExporter
                         data={data}
+                        dataControl={dataControl}
                         open={openJSONDialog}
+                        preprocessor={jsonPreprocessor}
                         onClose={() => {setOpenJSONDialog(false)}}
                     />
                 }
@@ -60,7 +70,9 @@ export const SearchTools = ({data, children, defaultListField}) => {
                 {openCSVDialog &&
                     <CSVExporter
                         data={data}
+                        dataControl={dataControl}
                         open={openCSVDialog}
+                        preprocessor={csvPreprocessor}
                         onClose={() => {setOpenCSVDialog(false)}}
                     />
                 }
@@ -73,7 +85,9 @@ export const SearchTools = ({data, children, defaultListField}) => {
                     <ListExporter
                         field={defaultListField}
                         data={data}
+                        dataControl={dataControl}
                         open={openListDialog}
+                        preprocessor={listPreprocessor}
                         onClose={() => {setOpenListDialog(false)}}
                     />
                 }
