@@ -3,6 +3,7 @@ import React, {useState, useEffect, useMemo, useCallback} from 'react'
 import { makeStyles} from '@material-ui/core/styles';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import IconButton from '@material-ui/core/IconButton'
+import Typography from '@material-ui/core/Typography'
 import FormControl from '@material-ui/core/FormControl'
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
@@ -188,6 +189,7 @@ const ExportDataControl = ({exportSize, setExportSize}) => {
 const DNSDBTableContainer = ({
     columns,
     data,
+    rateInfo
 }) => {
 
     const initialPageSize = 100
@@ -254,8 +256,20 @@ const DNSDBTableContainer = ({
                 <Table {...getTableProps()}>
                     <TableHead>
                         <TableRow>
-                            <TableCell colSpan={visibleColumns.length}>
+                            <TableCell
+                                colSpan={2}
+                                padding='none'
+                            >
                                 {allColumns[0].render("Filter")}
+                            </TableCell>
+                            <TableCell
+                                colSpan={visibleColumns.length - 2}
+                                align='right'
+
+                            >
+                                <Typography>
+                                    Rate Limit: {rateInfo.remaining}/{rateInfo.limit}
+                                </Typography>
                             </TableCell>
                         </TableRow>
                         <TableRow>
@@ -446,6 +460,7 @@ const DNSDBWebHandler = (props) => {
             <DNSDBTableContainer
                 columns={columns}
                 data={data}
+                rateInfo={props.queryResults.rate}
             />
 
         </React.Fragment>
