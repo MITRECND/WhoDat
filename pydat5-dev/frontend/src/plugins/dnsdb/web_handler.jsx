@@ -194,6 +194,14 @@ const DNSDBTableContainer = ({
         usePagination,
     )
 
+    const filteredData = useMemo(() => {
+        let data = []
+        filteredRows.forEach((row) => {
+            data.push(row.original)
+        })
+        return data
+    }, [filteredRows])
+
     return (
         <React.Fragment>
             <div
@@ -209,7 +217,10 @@ const DNSDBTableContainer = ({
                         </TableRow>
                         <TableRow>
                             <TableCell colSpan={1}>
-                                <SearchTools data={data} defaultListField={'rrName'}>
+                                <SearchTools
+                                     data={filteredData}
+                                     defaultListField={'rrName'}
+                                >
                                     <ToggleCopyMenuItem
                                         copyFriendly={copyFriendly}
                                         toggleCopyFriendly={toggleCopyFriendly}
@@ -245,24 +256,22 @@ const DNSDBTableContainer = ({
                         {page.map((row, i) => {
                             prepareRow(row)
                             return (
-                                <React.Fragment key={i}>
-                                    <TableRow {...row.getRowProps([{key: `data${i}`}])}>
-                                        {row.cells.map(cell => {
-                                            return (
-                                                <TableCell {...cell.getCellProps([
-                                                    {
-                                                        className: cell.column.className,
-                                                        style: cell.column.style
-                                                    }
+                                <TableRow {...row.getRowProps([{key: `data${i}`}])}>
+                                    {row.cells.map(cell => {
+                                        return (
+                                            <TableCell {...cell.getCellProps([
+                                                {
+                                                    className: cell.column.className,
+                                                    style: cell.column.style
+                                                }
 
-                                                ])}>
-                                                    {cell.render('Cell',
-                                                        {copyFriendly: copyFriendly})}
-                                                </TableCell>
-                                            )
-                                        })}
-                                    </TableRow>
-                                </React.Fragment>
+                                            ])}>
+                                                {cell.render('Cell',
+                                                    {copyFriendly: copyFriendly})}
+                                            </TableCell>
+                                        )
+                                    })}
+                                </TableRow>
                             )
                         })}
                     </TableBody>

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 
 import Grid from '@material-ui/core/Grid'
 import DropDownCell from '../../components/helpers/dropdown_cell'
@@ -56,46 +56,60 @@ const IPMenu = ({value, copyFriendly}) => {
 
 export const RRNameCell = ({row, copyFriendly}) => {
     return (
-        <Grid item xs={12}>
-            <DomainMenu
-                row={row}
-                value={row.rrname}
-                copyFriendly={copyFriendly}
-            />
-        </Grid>
+        <DomainMenu
+            row={row}
+            value={row.rrname}
+            copyFriendly={copyFriendly}
+        />
     )
 }
 
 
 export const RDataCell = ({row, copyFriendly}) => {
-    return (
-        <Grid container>
-            {row.rdata.map((value, index) => {
-                let data = cleanData(value)
-                if (['ns', 'cname', 'mx'].includes(row.rrtype.toLowerCase())) {
-                    data = (
-                        <DomainMenu
-                            row={row}
-                            value={data}
-                            copyFriendly={copyFriendly}
-                        />
-                    )
-                } else if (['a', 'aaaa'].includes(row.rrtype.toLowerCase())) {
-                    data = (
-                        <IPMenu
-                            row={row}
-                            value={data}
-                            copyFriendly={copyFriendly}
-                        />
-                    )
-                }
+    const cleanedData = useMemo(() => {
+        let data = []
+        row.rdata.forEach((value) => {
+            data.push(cleanData(value))
+        })
+        return data
+    }, [row])
 
-                return (
-                    <Grid item xs={12} key={index}>
-                        {data}
-                    </Grid>
-                )
-            })}
-        </Grid>
-    )
+    if (!copyFriendly) {
+        return (
+            <Grid container>
+                {cleanedData.map((value, index) => {
+                    let data = value
+                    if (['ns', 'cname', 'mx'].includes(row.rrtype.toLowerCase())) {
+                        data = (
+                            <DomainMenu
+                                row={row}
+                                value={value}
+                                copyFriendly={copyFriendly}
+                            />
+                        )
+                    } else if (['a', 'aaaa'].includes(row.rrtype.toLowerCase())) {
+                        data = (
+                            <IPMenu
+                                row={row}
+                                value={value}
+                                copyFriendly={copyFriendly}
+                            />
+                        )
+                    }
+
+                    return (
+                        <Grid item xs={12} key={index}>
+                            {data}
+                        </Grid>
+                    )
+                })}
+            </Grid>
+        )
+    } else {
+        return (
+            <React.Fragment>
+                {cleanedData.join()}
+            </React.Fragment>
+        )
+    }
 }
