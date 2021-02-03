@@ -37,11 +37,14 @@ import { InputLabel } from '@material-ui/core';
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
-    let year = date.getFullYear()
-    let month = `0${date.getMonth() + 1}`.slice(-2)
-    let day = `0${date.getDay() + 1}`.slice(-2)
+    let year = date.getUTCFullYear()
+    let month = `0${date.getUTCMonth() + 1}`.slice(-2)
+    let day = `0${date.getUTCDate() + 1}`.slice(-2)
+    let hours = `0${date.getUTCHours()}`.slice(-2)
+    let minutes = `0${date.getUTCMinutes()}`.slice(-2)
+    let seconds = `0${date.getUTCSeconds()}`.slice(-2)
 
-    let timestring = `${year}-${month}-${day}`
+    let timestring = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
 
     return timestring
 }
