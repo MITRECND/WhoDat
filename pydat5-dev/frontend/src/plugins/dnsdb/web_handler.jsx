@@ -154,10 +154,11 @@ const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => 
 const csvPreprocessor = (data) => {
     let dataout = []
     data.forEach((row) => {
-        if (row.hasOwnProperty('rdata')) {
-            row.rdata = row.rdata.join(';')
+        let newrow = {...row}
+        if (newrow.hasOwnProperty('rdata') && Array.isArray(newrow.rdata)) {
+            newrow.rdata = newrow.rdata.join(';')
         }
-        dataout.push(row)
+        dataout.push(newrow)
     })
     return dataout
 }
