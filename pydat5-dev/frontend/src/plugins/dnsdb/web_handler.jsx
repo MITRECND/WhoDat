@@ -1,9 +1,6 @@
 import React, {useState, useEffect, useMemo, useCallback} from 'react'
 
 import { makeStyles} from '@material-ui/core/styles';
-import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
-import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp'
-import IconButton from '@material-ui/core/IconButton'
 import Typography from '@material-ui/core/Typography'
 import FormControl from '@material-ui/core/FormControl'
 import Menu from '@material-ui/core/Menu';
@@ -317,19 +314,24 @@ const DNSDBTableContainer = ({
                                         ...column.getHeaderProps(
                                             column.getSortByToggleProps())
                                     }>
-                                        <span style={{
-                                            display:'flex',
-                                            flexWrap: 'wrap'
-                                        }}>
-                                            {column.render('Header')}
-                                            {column.isSorted ?
-                                                column.isSortedDesc ?
-                                                    <ArrowDropDownIcon/> :
-                                                    <ArrowDropUpIcon/>
-                                                :
-                                                ''
-                                            }
-                                        </span>
+                                        {column.canSort
+                                        ?
+                                            <TableSortLabel
+                                                active={column.isSorted}
+                                                direction={
+                                                    column.isSortedDesc
+                                                    ?
+                                                        'desc'
+                                                    :
+                                                        'asc'
+                                                }
+                                                hideSortIcon={column.isSorted}
+                                            >
+                                                {column.render('Header')}
+                                            </TableSortLabel>
+                                        :
+                                            column.render('Header')
+                                        }
                                     </TableCell>
                                 ))}
                             </TableRow>
