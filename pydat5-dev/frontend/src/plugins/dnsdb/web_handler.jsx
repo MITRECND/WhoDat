@@ -2,6 +2,7 @@ import React, {useState, useEffect, useMemo, useCallback} from 'react'
 
 import { makeStyles} from '@material-ui/core/styles';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp'
 import IconButton from '@material-ui/core/IconButton'
 import Typography from '@material-ui/core/Typography'
 import FormControl from '@material-ui/core/FormControl'
@@ -312,8 +313,23 @@ const DNSDBTableContainer = ({
                         {headerGroups.map(headerGroup => (
                             <TableRow {...headerGroup.getHeaderGroupProps()}>
                                 {headerGroup.headers.map(column => (
-                                    <TableCell {...column.getHeaderProps()}>
-                                        {column.render('Header')}
+                                    <TableCell {
+                                        ...column.getHeaderProps(
+                                            column.getSortByToggleProps())
+                                    }>
+                                        <span style={{
+                                            display:'flex',
+                                            flexWrap: 'wrap'
+                                        }}>
+                                            {column.render('Header')}
+                                            {column.isSorted ?
+                                                column.isSortedDesc ?
+                                                    <ArrowDropDownIcon/> :
+                                                    <ArrowDropUpIcon/>
+                                                :
+                                                ''
+                                            }
+                                        </span>
                                     </TableCell>
                                 ))}
                             </TableRow>
@@ -390,6 +406,7 @@ const DNSDBWebHandler = (props) => {
             Header: 'Type',
             accessor: 'rrtype',
             maxWidth: '5vw',
+            disableSortBy: true,
             Filter: TypeColumnFilter,
             filter: typeColumnFilterFn,
             className: 'rrtype-cell',
@@ -425,7 +442,6 @@ const DNSDBWebHandler = (props) => {
             Header: 'First Seen',
             accessor: 'time_first',
             maxWidth: '10vw',
-            sortable: true,
             Cell: (props) => (
                 convertTimestampToDate(props.value)
             ),
@@ -436,7 +452,6 @@ const DNSDBWebHandler = (props) => {
             Header: 'Last Seen',
             accessor: 'time_last',
             maxWidth: '10vw',
-            sortable: true,
             Cell: (props) => (
                 convertTimestampToDate(props.value)
             ),
@@ -448,6 +463,7 @@ const DNSDBWebHandler = (props) => {
             accessor: 'count',
             maxWidth: '10vw',
             canFilter: false,
+            disableSortBy: true,
             className: 'cnt-cell',
             style: {}
         },
