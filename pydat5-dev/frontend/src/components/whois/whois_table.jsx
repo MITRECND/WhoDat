@@ -87,7 +87,7 @@ const TableColumns = () => { return [
     },
     {
         Header: 'Created',
-        accessor: 'createdDate',
+        accessor: 'standardRegCreatedDate',
         className: 'cd-cell',
         style: {}
 

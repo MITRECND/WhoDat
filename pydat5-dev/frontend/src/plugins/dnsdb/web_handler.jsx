@@ -45,7 +45,7 @@ const convertTimestampToDate = (timestamp) => {
     let minutes = `0${date.getUTCMinutes()}`.slice(-2)
     let seconds = `0${date.getUTCSeconds()}`.slice(-2)
 
-    let timestring = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+    let timestring = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`
 
     return timestring
 }
