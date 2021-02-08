@@ -163,25 +163,29 @@ const csvPreprocessor = (data) => {
     return dataout
 }
 
-const ExportDataControl = ({exportSize, setExportSize}) => {
+const ExportDataControl = ({
+    exportSize,
+    setExportSize,
+    validPageSizes = [50, 100, 1000, 2500]
+}) => {
     return (
         <React.Fragment>
-            <Grid container>
+            <Grid container spacing={2} style={{padding: '1rem'}}>
                 <Grid item>
-                <FormControl>
-                    <InputLabel>Size</InputLabel>
-                    <Select
-                        label="Size"
-                        name="size"
-                        displayEmpty
-                        onChange={e => {setExportSize(e.target.value)}}
-                        value={exportSize}
-                    >
-                    {[50, 100, 1000, 2500].map((value, index) => (
-                        <MenuItem key={index} value={value}>{value}</MenuItem>
-                    ))}
-                    </Select>
-                </FormControl>
+                    <FormControl>
+                        <InputLabel>Size</InputLabel>
+                        <Select
+                            label="Size"
+                            name="size"
+                            displayEmpty
+                            onChange={e => {setExportSize(e.target.value)}}
+                            value={exportSize}
+                        >
+                        {validPageSizes.map((value, index) => (
+                            <MenuItem key={index} value={value}>{value}</MenuItem>
+                        ))}
+                        </Select>
+                    </FormControl>
                 </Grid>
             </Grid>
         </React.Fragment>
@@ -195,6 +199,7 @@ const DNSDBTableContainer = ({
 }) => {
 
     const initialPageSize = 100
+    const validPageSizes = [50, 100, 500, 1000, 2500]
     const [copyFriendly, setCopyFriendly] = useState(false)
 
     const toggleCopyFriendly = useCallback(() => {
@@ -219,7 +224,7 @@ const DNSDBTableContainer = ({
         nextPage,
         previousPage,
         setPageSize,
-        state: {pageIndex, pageSize, expanded}
+        state: {pageIndex, pageSize}
     } = useTable(
         {
             columns,
@@ -282,6 +287,7 @@ const DNSDBTableContainer = ({
                                         <ExportDataControl
                                             exportSize={exportSize}
                                             setExportSize={setExportSize}
+                                            validPageSizes={validPageSizes}
                                         />
                                     }
                                     defaultListField={'rrname'}
@@ -306,6 +312,7 @@ const DNSDBTableContainer = ({
                                 canNextPage={canNextPage}
                                 canPreviousPage={canPreviousPage}
                                 columnLength={visibleColumns.length - 1}
+                                validPageSizes={validPageSizes}
                             />
                         </TableRow>
                         {headerGroups.map(headerGroup => (
@@ -376,6 +383,7 @@ const DNSDBTableContainer = ({
                                 canNextPage={canNextPage}
                                 canPreviousPage={canPreviousPage}
                                 columnLength={visibleColumns.length}
+                                validPageSizes={validPageSizes}
                             />
                         </TableRow>
                     </TableFooter>

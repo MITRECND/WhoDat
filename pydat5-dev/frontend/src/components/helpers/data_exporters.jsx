@@ -73,7 +73,7 @@ const useTransferListStyles = makeStyles((theme) => ({
     paper: {
         minWidth: 200,
     //   width: 200,
-      height: 230,
+      height: 150,
       overflow: 'auto',
     },
     button: {

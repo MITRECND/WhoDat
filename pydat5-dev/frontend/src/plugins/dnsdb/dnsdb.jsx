@@ -14,7 +14,8 @@ import Input from '@material-ui/core/Input'
 import Typography from '@material-ui/core/Typography'
 import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
-import { makeStyles } from '@material-ui/core'
+import { Divider, InputAdornment, ListSubheader, makeStyles } from '@material-ui/core'
+import SettingsIcon from '@material-ui/icons/Settings';
 
 import DNSDBWebHandler from './web_handler'
 import { BackdropLoader } from '../../components/helpers/loaders'
@@ -30,14 +31,25 @@ const dnsdbFetcher = async ({
     tfb,
     tfa,
     tlb,
-    tla
+    tla,
+    domainsearchtype,
 }) => {
 
     let url;
     let data = {}
     if (type === 'domain') {
         url = '/api/plugin/passive/dnsdb/forward'
-        data['domain'] = value
+
+        switch (domainsearchtype) {
+            case 'prefix-wildcard':
+                data['domain'] = `*.${value}`
+                break;
+            case 'suffix-wildcard':
+                data['domain'] = `${value}.*`
+                break;
+            default:
+                data['domain'] = value
+        }
     } else {
         url = '/api/plugin/passive/dnsdb/reverse'
         data['type'] = type
@@ -234,6 +246,25 @@ const DNSDBGeneralOptions = ({formData, setFormData}) => {
                     </Select>
                     </FormControl>
             </Grid>
+            {formData.type == 'domain' &&
+                <Grid item xs={2}>
+                    <FormControl>
+                    <InputLabel id="domainsearchtype-label">Search Type</InputLabel>
+                        <Select
+                            name="domainsearchtype"
+                            labelId="domainsearchtype-label"
+                            id="domainsearchtype-select"
+                            onChange={handleOnChange}
+                            value={formData.domainsearchtype}
+                        >
+                            <MenuItem value={'prefix-wildcard'}>Prefix Wildcard</MenuItem>
+                            <MenuItem value={'suffix-wildcard'}>Suffix Wildcard</MenuItem>
+                            <MenuItem value={'absolute'}>Absolute</MenuItem>
+                        </Select>
+                        </FormControl>
+                </Grid>
+            }
+
 
         </React.Fragment>
     )
@@ -263,7 +294,8 @@ const DNSDBResults = (props) => {
                     tfb: props.queryData.tfb,
                     tfa: props.queryData.tfa,
                     tlb: props.queryData.tlb,
-                    tla: props.queryData.tla
+                    tla: props.queryData.tla,
+                    domainsearchtype: props.queryData.domainsearchtype
                 })
 
                 let queryResults = {
@@ -325,7 +357,8 @@ const DNSDB = () => {
         tla: "",
         tlb: "",
         tfa: "",
-        tfb: ""
+        tfb: "",
+        domainsearchtype: "prefix-wildcard"
     })
 
     const [queryData, setQueryData] = useState({
@@ -391,56 +424,78 @@ const DNSDB = () => {
     }
 
     const handleOnChangeType = (e) => {
-        setFormData(update(formData,{
-            type: {$set: e.target.value}
-        }))
+        if (e.target.value) {
+            setFormData(update(formData,{
+                type: {$set: e.target.value},
+                value: {$set: ""}
+            }))
+        }
     }
+
+    const typeSelect = (
+        <React.Fragment>
+            <FormControl>
+                {/* <InputLabel id="passive-type-label">Type</InputLabel> */}
+                <Select
+                    name="type"
+                    // labelId="passive-type-label"
+                    id="passive-type-select"
+                    onChange={handleOnChangeType}
+                    value={formData.type}
+                >
+                    <ListSubheader>Forward</ListSubheader>
+                    {Object.keys(forwardQueryTypes).map((name, index) => {
+                        return (
+                            <MenuItem value={name} key={index}>
+                                {forwardQueryTypes[name]}
+                            </MenuItem>
+                        )
+                    })}
+                    <ListSubheader>Reverse</ListSubheader>
+                    {Object.keys(reverseQueryTypes).map((name, index) => {
+                        return (
+                            <MenuItem value={name} key={index}>
+                                {reverseQueryTypes[name]}
+                            </MenuItem>
+                        )
+                    })}
+                </Select>
+            </FormControl>
+        </React.Fragment>
+    )
 
     return (
         <React.Fragment>
             <Container className={classes.searchContainer} maxWidth="xl">
                 <Paper className={classes.searchPaper}>
                     <form onSubmit={handleOnSubmit}>
-                        <Grid container spacing={1} justify="center" alignItems="flex-end">
-                            <Grid container justify="center" alignItems="flex-end" item xs={11}>
-                                <Grid item xs={1}>
-                                    <InputLabel id="passive-type-label">Type</InputLabel>
-                                    <Select
-                                        name="type"
-                                        labelId="passive-type-label"
-                                        id="passive-type-select"
-                                        onChange={handleOnChangeType}
-                                        value={formData.type}
-                                    >
-                                        {Object.keys(forwardQueryTypes).map((name, index) => {
-                                            return (
-                                                <MenuItem value={name} key={index}>
-                                                    {forwardQueryTypes[name]}
-                                                </MenuItem>
-                                            )
-                                        })}
-                                        {Object.keys(reverseQueryTypes).map((name, index) => {
-                                            return (
-                                                <MenuItem value={name} key={index}>
-                                                    {reverseQueryTypes[name]}
-                                                </MenuItem>
-                                            )
-                                        })}
-                                    </Select>
-                                </Grid>
+                        <Grid container spacing={1} direction="row" justify="center" alignItems="flex-end">
                                 <Grid item xs={11}>
                                     <TextField
-                                        label={allQueryTypes[formData.type]}
+                                        label={`Search ${allQueryTypes[formData.type]} Records`}
                                         variant="outlined"
                                         name="value"
                                         value={formData.value}
                                         onChange={handleOnChangeValue}
                                         fullWidth
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment
+                                                    position="start"
+                                                >
+                                                    {typeSelect}
+                                                </InputAdornment>
+                                            )
+                                        }}
+
                                     />
                                 </Grid>
-                            </Grid>
                             <Grid item xs={1}>
-                                <Button variant="outlined" type="submit" fullWidth>
+                                <Button
+                                    variant="outlined"
+                                    type="submit"
+                                    fullWidth
+                                >
                                     Search
                                 </Button>
                             </Grid>

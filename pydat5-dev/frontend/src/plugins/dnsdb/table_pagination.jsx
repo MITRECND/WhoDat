@@ -73,6 +73,7 @@ export const Paginator = ({
     canNextPage,
     canPreviousPage,
     columnLength,
+    validPageSizes = [50, 100, 1000, 2500]
 }) => {
 
     const handleChangePage = (event, newPage) => {
@@ -86,7 +87,7 @@ export const Paginator = ({
     return (
         <React.Fragment>
             <TablePagination
-              rowsPerPageOptions={[50, 100, 1000, 2500]}
+              rowsPerPageOptions={validPageSizes}
               colSpan={columnLength}
               count={rowCount}
               rowsPerPage={pageSize}
