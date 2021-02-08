@@ -1476,7 +1476,7 @@ def main():
     # Setup template
     data_template = None
     base_path = os.path.dirname(os.path.realpath(__file__))
-    template_path = os.path.join(base_path, "..", "configuration", "es.data.template")
+    template_path = os.path.join(base_path, "..", "configuration", f"es{major}.data.template")
 
     if not os.path.exists(template_path):
         myLogger.error("Unable to find template at %s" % (template_path))
