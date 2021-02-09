@@ -75,24 +75,33 @@ const TypeColumnFilter = ({
 }) => {
 
     const classes = useTypeFilterStyles()
-    const RRTypesList = [
-        'a',
-        'aaaa',
-        'cname',
-        'mx',
-        'ns',
-        'ptr',
-        'soa',
-        'txt',
-        // DNSSEC Types
-        'ds',
-        'rrsig',
-        'nsec',
-        'dnskey',
-        'nsec3',
-        'nsec3param',
-        'dlv'
-    ]
+    // TODO XXX Validate RRTypes?
+    // const RRTypesList = [
+    //     'a',
+    //     'aaaa',
+    //     'cname',
+    //     'mx',
+    //     'ns',
+    //     'ptr',
+    //     'soa',
+    //     'txt',
+    //     // DNSSEC Types
+    //     'ds',
+    //     'rrsig',
+    //     'nsec',
+    //     'dnskey',
+    //     'nsec3',
+    //     'nsec3param',
+    //     'dlv'
+    // ]
+
+    const RRTypesList = useMemo(() => {
+        let tl = new Set()
+        preFilteredRows.forEach((row) => {
+            tl.add(row.original.rrtype.toLowerCase())
+        })
+        return Array.from(tl)
+    }, [preFilteredRows])
 
     return (
         <React.Fragment>
