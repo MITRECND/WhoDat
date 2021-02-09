@@ -13,7 +13,7 @@ import TableSortLabel from '@material-ui/core/TableSortLabel'
 import TableFooter from '@material-ui/core/TableFooter'
 
 import {
-    // useSortBy,
+    useSortBy,
     useExpanded,
     usePagination,
     useTable,
@@ -47,7 +47,9 @@ const TableColumns = () => { return [
         className: 'expansion-cell',
         style: {
             padding: 'none'
-        }
+        },
+        disableSortBy: true,
+        defaultCanSort: false,
     },
     {
         Header: 'Domain Name',
@@ -90,7 +92,6 @@ const TableColumns = () => { return [
         accessor: 'standardRegCreatedDate',
         className: 'cd-cell',
         style: {}
-
     },
     {
         Header: 'Telephone',
@@ -174,7 +175,7 @@ const WhoisTableContainer = ({
         nextPage,
         previousPage,
         setPageSize,
-        state: {pageIndex, pageSize, expanded}
+        state: {pageIndex, pageSize, sortBy},
     } = useTable(
         {
             columns,
@@ -185,15 +186,17 @@ const WhoisTableContainer = ({
             },
             manualPagination: true,
             pageCount: controlledPageCount,
+            manualSortBy: true,
         },
+        useSortBy,
         useExpanded,
-        // useFlexLayout,
         usePagination,
     )
 
     useEffect(() => {
-        fetchData({pageIndex, pageSize})
-    }, [queryData, pageIndex, pageSize])
+        fetchData({pageIndex, pageSize, sortBy})
+    }, [queryData, pageIndex, pageSize, sortBy])
+
 
     if (!Array.isArray(data) || !data.length) {
         return (
@@ -235,8 +238,28 @@ const WhoisTableContainer = ({
                         {headerGroups.map(headerGroup => (
                             <TableRow {...headerGroup.getHeaderGroupProps()}>
                                 {headerGroup.headers.map(column => (
-                                    <TableCell {...column.getHeaderProps()}>
-                                        {column.render('Header')}
+                                    <TableCell {
+                                        ...column.getHeaderProps(
+                                            column.getSortByToggleProps())
+                                    }>
+                                        {column.canSort
+                                        ?
+                                            <TableSortLabel
+                                                active={column.isSorted}
+                                                direction={
+                                                    column.isSortedDesc
+                                                    ?
+                                                        'desc'
+                                                    :
+                                                        'asc'
+                                                }
+                                                hideSortIcon={column.isSorted}
+                                            >
+                                                {column.render('Header')}
+                                            </TableSortLabel>
+                                        :
+                                            column.render('Header')
+                                        }
                                     </TableCell>
                                 ))}
                             </TableRow>
@@ -312,13 +335,26 @@ const WhoisTable = ({queryData}) => {
     const [data, setData] = useState([])
     const [pageCount, setPageCount] = useState(0)
 
-    const fetchData = useCallback(({pageSize, pageIndex}) => {
+    const fetchData = useCallback(({pageSize, pageIndex, sortBy=[]}) => {
         const asyncfetch = async () => {
+            let sort_keys = []
+            sortBy.forEach((sortData) => {
+                let direction = "asc"
+                if (sortData.desc) {
+                    direction = "desc"
+                }
+                sort_keys.push({
+                    name: sortData.id,
+                    dir: direction
+                })
+            })
+
             try {
                 let results = await queryFetcher({
                     query: queryData.query,
                     chunk_size: pageSize,
-                    offset: pageIndex
+                    offset: pageIndex,
+                    sort_keys: sort_keys
                 })
 
                 setPageCount(Math.ceil(results.total / pageSize))

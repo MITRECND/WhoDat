@@ -1,13 +1,18 @@
 export const queryFetcher = async ({
     query,
     chunk_size,
-    offset}
+    offset,
+    sort_keys={}}
 ) => {
 
     let data = {
         'query': query,
         'chunk_size': chunk_size,
         'offset': offset
+    }
+
+    if (Object.keys(sort_keys).length > 0) {
+        data['sort_keys'] = sort_keys
     }
 
     let response = await fetch (
