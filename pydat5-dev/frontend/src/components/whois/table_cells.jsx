@@ -68,10 +68,10 @@ export const RegistrantCell = ({value: registrant_name, copyFriendly}) => {
     )
 }
 
-export const EmailCell = ({value: registrant_email, copyFriendly}) => {
-    const search_string = createSearchString(`registrant_email:"${registrant_email}"`)
+export const EmailCell = ({value: contactEmail, copyFriendly}) => {
+    const search_string = createSearchString(`contactEmail:"${contactEmail}"`)
 
-    if (registrant_email === null || registrant_email === "") {
+    if (contactEmail === null || contactEmail === "") {
         return (
             <React.Fragment></React.Fragment>
         )
@@ -80,7 +80,7 @@ export const EmailCell = ({value: registrant_email, copyFriendly}) => {
     return (
         <DropDownCell
             friendly={"email"}
-            value={registrant_email}
+            value={contactEmail}
             copyFriendly={copyFriendly}
         >
             <MenuItem

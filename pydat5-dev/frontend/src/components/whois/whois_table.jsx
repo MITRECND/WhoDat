@@ -77,7 +77,7 @@ const TableColumns = () => { return [
     },
     {
         Header: 'Email',
-        accessor: 'registrant_email',
+        accessor: 'contactEmail',
         Cell: (props) => (
             <EmailCell
                 value={props.value}

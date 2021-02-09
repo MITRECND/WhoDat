@@ -365,7 +365,7 @@ const HistoricalTab = (props) => {
                 <TableRow key={index}>
                     <TableCell>{entry.Version}</TableCell>
                     <TableCell>{entry.registrant_name}</TableCell>
-                    <TableCell>{entry.registrant_email}</TableCell>
+                    <TableCell>{entry.contactEmail}</TableCell>
                     <TableCell>{entry.createdDate}</TableCell>
                     <TableCell>{entry.registrant_telephone}</TableCell>
                     <TableCell> <FullDetailsDialog data={entry} /> </TableCell>
