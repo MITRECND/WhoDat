@@ -1,80 +1,61 @@
 import React from 'react'
-import {useHistory} from 'react-router-dom'
 import qs from 'qs'
 
-import MenuItem from '@material-ui/core/MenuItem'
-import ListItem from '@material-ui/core/ListItem';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import ListItemText from '@material-ui/core/ListItemText';
-import LanguageIcon from '@material-ui/icons/Language'
-import {Link as RouterLink} from 'react-router-dom'
+import { PluginManagers } from '../../components/plugins'
 
-import {PluginManagers} from '../../components/plugins'
+import {
+    MenuElement,
+    RouteElement,
+    NavigationElement
+} from '../../components/layout'
 
 const DNSDB = React.lazy(() => import ('./dnsdb'))
 
 export const DNSDBPATH = "/passive/dnsdb"
 
-export const DNSDBTLDDomainMenu = React.forwardRef(({domainName}, ref) => {
-    const search_string = '?' + qs.stringify({
-        type: 'domain',
-        value: `*.${domainName}`
-    })
+const DNSDBDomainMenu = new MenuElement({
+    type: "tld",
+    path: (domainName) => {
+            const search_string = '?' + qs.stringify({
+                type: 'domain',
+                value: domainName
+            })
 
-    return (
-        <MenuItem
-            component={RouterLink}
-            to={`${DNSDBPATH}${search_string}`}
-        >
-            Search DNSDB
-        </MenuItem>
-    )
+            return `${DNSDBPATH}${search_string}`
+    },
+    text: "Search DNSDB"
 })
 
-export const DNSDBDomainMenu = React.forwardRef(({domainName}, ref) => {
-    const search_string = '?' + qs.stringify({
-        type: 'domain',
-        value: `*.${domainName}`
-    })
+const DNSDBIPMenu = new MenuElement({
+    type: "ip",
+    path: (ip) => {
+            const search_string = '?' + qs.stringify({
+                type: 'ip',
+                value: ip
+            })
 
-    return (
-        <MenuItem
-            component={RouterLink}
-            to={`${DNSDBPATH}${search_string}`}
-        >
-            Search DNSDB
-        </MenuItem>
-    )
+            return `${DNSDBPATH}${search_string}`
+    },
+    text: "Search DNSDB"
 })
 
-export const DNSDBIPMenu = React.forwardRef(({ip}, ref) => {
-    let history = useHistory()
-    const search_string = '?' + qs.stringify({
-        type: 'ip',
-        value: ip
-    })
-
-    return (
-        <MenuItem
-            component={RouterLink}
-            to={`${DNSDBPATH}${search_string}`}
-        >
-            Search DNSDB
-        </MenuItem>
-    )
-})
-
-const DNSDBDrawer = ({handleRedirect}) => {
-    return (
-        <ListItem button onClick={() => {handleRedirect(DNSDBPATH)}}>
-            <ListItemIcon> <LanguageIcon /> </ListItemIcon>
-            <ListItemText primary="DNSDB - Passive" />
-        </ListItem>
-    )
-}
-
-PluginManagers.menu.addPlugin('dnsdb_tld', 'tld', DNSDBTLDDomainMenu)
+PluginManagers.menu.addPlugin('dnsdb_tld', 'tld', DNSDBDomainMenu)
 PluginManagers.menu.addPlugin('dnsdb_domain', 'domain', DNSDBDomainMenu)
 PluginManagers.menu.addPlugin('dnsdb_ip', 'ip', DNSDBIPMenu)
-PluginManagers.routes.addPlugin('dnsdb', DNSDBPATH, 'DNSDB Passive DNS', <DNSDB />)
-PluginManagers.drawer.addPlugin('dnsdb', <DNSDBDrawer />)
+PluginManagers.routes.addPlugin(
+    'dnsdb',
+    new RouteElement({
+        path: DNSDBPATH,
+        title: 'DNSDB Passive DNS',
+        component: <DNSDB />
+    })
+)
+
+PluginManagers.nav.addPlugin(
+    'dnsdb',
+    new NavigationElement({
+        title: 'DNSDB',
+        path: DNSDBPATH,
+        text: "Passive DNS"
+    })
+)

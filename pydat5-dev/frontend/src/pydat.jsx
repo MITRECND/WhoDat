@@ -39,14 +39,8 @@ const Pydat = () => {
                                     <Route exact path="/">
                                         <Redirect to="/whois" />
                                     </Route>
-                                    <Route path="/whois">
+                                    <Route exact path="/whois">
                                         <WhoisHandler/>
-                                    </Route>
-                                    <Route path="/help">
-
-                                    </Route>
-                                    <Route path="/stats">
-
                                     </Route>
                                     {Object.keys(routes.plugins).map((name, index) => {
                                         return (

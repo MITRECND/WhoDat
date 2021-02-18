@@ -11,10 +11,35 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
 import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
+import HelpIcon from '@material-ui/icons/Help';
 
 import WhoisTable from './whois_table'
 import {UserPreferencesContext} from '../helpers/preferences'
 import {SearchSettings} from '../layout/dialogs'
+import {
+    OptionElement,
+    RouteElement,
+    NavigationElement
+} from '../layout'
+
+export const whoisRoute = new RouteElement({
+    path: "/whois",
+    title: "Whois",
+    component: null,
+    options: [
+      new OptionElement({
+        icon: <HelpIcon />,
+        text: "Help",
+        handleClick: () => {console.log("Clicked")}
+      })
+    ]
+  })
+
+export const whoisNavigation = new NavigationElement({
+    title: 'WhoIs',
+    path: '/whois',
+    text: "Whois Search"
+  })
 
 export const GeneralOptions = ({ formData, setFormData }) => {
     const [fangStatus, setFangStatus] = useState(formData.fang)
@@ -47,30 +72,6 @@ export const GeneralOptions = ({ formData, setFormData }) => {
                     labelPlacement="end"
                 />
             </FormControl>
-        </Grid>
-    )
-}
-
-const WhoisResults = (props) => {
-    const [queryResults, setQueryResults] = useState(
-        <React.Fragment> </React.Fragment>
-    )
-
-    useEffect(() => {
-        console.log(props)
-        setQueryResults(
-            <React.Fragment>
-                <WhoisTable
-                    queryData={props.queryData}
-                />
-            </React.Fragment>
-        )
-    }, [props.queryData])
-
-
-    return (
-        <Grid item xs={12}>
-                {queryResults}
         </Grid>
     )
 }

@@ -1,11 +1,10 @@
 import React from 'react'
 import qs from 'qs'
-import {Link as RouterLink} from 'react-router-dom'
 
-import MenuItem from '@material-ui/core/MenuItem'
 import DropDownCell from '../helpers/dropdown_cell'
 import {PluginManagers} from '../plugins'
 
+import {MenuElement} from '../layout'
 
 const createSearchString = (query) => {
     return(
@@ -15,9 +14,44 @@ const createSearchString = (query) => {
     )
 }
 
+const whoisDomainMenuElement = new MenuElement({
+    type: "tld",
+    path: (domainName) => {
+        const search_string = createSearchString(`dn:"${domainName}"`)
+        return `/whois${search_string}`
+    },
+    text: "Pivot Search",
+})
+
+const whoisRegistrantMenuElement = new MenuElement({
+    type: "registrant",
+    path: (registrant) => {
+        const search_string = createSearchString(`registrant_name:"${registrant}"`)
+        return `/whois${search_string}`
+    },
+    text: "Pivot Search"
+})
+
+const whoisEmailMenuElement = new MenuElement({
+    type: "email",
+    path: (email) => {
+        const search_string = createSearchString(`contactEmail:"${email}"`)
+        return `/whois${search_string}`
+    },
+    text: "Pivot Search"
+})
+
+const whoisTelephoneMenuElement = new MenuElement({
+    type: "telephone",
+    path: (telephone) => {
+        const search_string = createSearchString(`registrant_telephone:"${telephone}"`)
+        return `/whois${search_string}`
+    },
+    text: "Pivot Search"
+})
+
 export const DomainNameCell = ({value: domainName, copyFriendly}) => {
-    const menu_plugins = PluginManagers.menu.plugins.tld
-    const search_string = createSearchString(`dn:"${domainName}"`)
+    const plugins = PluginManagers.menu.plugins.tld
 
     return (
         <DropDownCell
@@ -25,24 +59,16 @@ export const DomainNameCell = ({value: domainName, copyFriendly}) => {
              value={domainName}
              copyFriendly={copyFriendly}
         >
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}` }
-            >
-                Pivot Search
-            </MenuItem>
-            {Object.keys(menu_plugins).map((name, index) => {
-                let Component = menu_plugins[name]
-                return (
-                    <Component domainName={domainName} key={index} />
-                )
-            })}
+            {whoisDomainMenuElement.getComponent(domainName)}
+            {Object.keys(plugins).map((name, index) => (
+                plugins[name].getComponent(domainName, index)
+            ))}
         </DropDownCell>
     )
 }
 
 export const RegistrantCell = ({value: registrant_name, copyFriendly}) => {
-    const search_string = createSearchString(`registrant_name:"${registrant_name}"`)
+    const plugins = PluginManagers.menu.plugins.registrant
 
     if (registrant_name === null || registrant_name === "") {
         return (
@@ -57,20 +83,16 @@ export const RegistrantCell = ({value: registrant_name, copyFriendly}) => {
             value={registrant_name}
             copyFriendly={copyFriendly}
         >
-
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}`}
-            >
-                Pivot Search
-            </MenuItem>
+            {whoisRegistrantMenuElement.getComponent(registrant_name)}
+            {Object.keys(plugins).map((name, index) => (
+                plugins[name].getComponent(registrant_name, index)
+            ))}
         </DropDownCell>
     )
 }
 
 export const EmailCell = ({value: contactEmail, copyFriendly}) => {
-    const search_string = createSearchString(`contactEmail:"${contactEmail}"`)
-
+    const plugins = PluginManagers.menu.plugins.email
     if (contactEmail === null || contactEmail === "") {
         return (
             <React.Fragment></React.Fragment>
@@ -83,19 +105,16 @@ export const EmailCell = ({value: contactEmail, copyFriendly}) => {
             value={contactEmail}
             copyFriendly={copyFriendly}
         >
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}`}
-            >
-                Pivot Search
-            </MenuItem>
+            {whoisEmailMenuElement.getComponent(contactEmail)}
+            {Object.keys(plugins).map((name, index) => (
+                plugins[name].getComponent(contactEmail, index)
+            ))}
         </DropDownCell>
     )
 }
 
 export const TelephoneCell = ({value: registrant_telephone, copyFriendly}) => {
-    const search_string = createSearchString(`registrant_telephone:"${registrant_telephone}"`)
-
+    const plugins = PluginManagers.menu.plugins.telephone
     if (registrant_telephone === null || registrant_telephone === "") {
         return (
             <React.Fragment></React.Fragment>
@@ -108,12 +127,10 @@ export const TelephoneCell = ({value: registrant_telephone, copyFriendly}) => {
             value={registrant_telephone}
             copyFriendly={copyFriendly}
         >
-            <MenuItem
-                component={RouterLink}
-                to={`/whois${search_string}`}
-            >
-                Pivot Search
-            </MenuItem>
+           {whoisTelephoneMenuElement.getComponent(registrant_telephone)}
+           {Object.keys(plugins).map((name, index) => (
+                plugins[name].getComponent(registrant_telephone, index)
+            ))}
         </DropDownCell>
     )
 }

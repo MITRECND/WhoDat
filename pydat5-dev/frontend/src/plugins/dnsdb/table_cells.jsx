@@ -18,7 +18,7 @@ const cleanEntry = (entry) => {
 }
 
 const DomainMenu = ({value, copyFriendly}) => {
-    let menu_plugins = PluginManagers.menu.plugins.domain
+    let plugins = PluginManagers.menu.plugins.domain
     const cleanValue = cleanData(value)
 
     return (
@@ -27,17 +27,16 @@ const DomainMenu = ({value, copyFriendly}) => {
             value={cleanValue}
             copyFriendly={copyFriendly}
         >
-        {Object.keys(menu_plugins).map((name, index) => {
-            let Component = menu_plugins[name]
-            return (<Component domainName={cleanValue} key={index} />)
-        })}
+        {Object.keys(plugins).map((name, index) => (
+            plugins[name].getComponent(cleanValue, index)
+        ))}
         </DropDownCell>
 
     )
 }
 
 const IPMenu = ({value, copyFriendly}) => {
-    let menu_plugins = PluginManagers.menu.plugins.ip
+    let plugins = PluginManagers.menu.plugins.ip
 
     return (
         <DropDownCell
@@ -45,10 +44,9 @@ const IPMenu = ({value, copyFriendly}) => {
             value={value}
             copyFriendly={copyFriendly}
         >
-            {Object.keys(menu_plugins).map((name, index) => {
-            let Component = menu_plugins[name]
-            return (<Component ip={value} key={index} />)
-        })}
+            {Object.keys(plugins).map((name, index) => (
+                plugins[name].getComponent(value, index)
+            ))}
         </DropDownCell>
 
     )
