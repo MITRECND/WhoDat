@@ -2,7 +2,7 @@
 
 import sys
 import os
-import unicodecsv
+import csv
 import time
 import argparse
 import getpass
@@ -58,6 +58,9 @@ class MainStatTracker(Thread):
         self._stat_queue = mpQueue()
         self._shutdown = False
         self._changed = dict()
+
+    def get_tracker(self):
+        return StatTracker(self._stat_queue)
 
     @property
     def total(self):
@@ -249,7 +252,7 @@ class mpLogger(Thread):
         self.name = name
         self.logQueue = jmpQueue()
         self._logger = None
-        self._stop = False
+        self._stop_processing = False
 
     @property
     def logger(self):
@@ -263,7 +266,7 @@ class mpLogger(Thread):
                                debug=self._debug)
 
     def stop(self):
-        self._stop = True
+        self._stop_processing = True
 
     def join(self):
         self.logQueue.join()
@@ -317,7 +320,7 @@ class mpLogger(Thread):
             except EOFError:
                 break
             except queue.Empty:
-                if self._stop:
+                if self._stop_processing:
                     break
 
 
@@ -346,9 +349,8 @@ class FileReader(Thread):
                 self.datafile_queue.put(self.options.file)
             else:
                 LOGGER.error("File or Directory required")
-        except Exception as e:
-            LOGGER.error("Unknown exception in File Reader")
-            LOGGER.error(repr(e))
+        except Exception:
+            LOGGER.exception("Unknown exception in File Reader")
         finally:
             self.datafile_queue.join()
             LOGGER.debug("Setting FileReaderDone event")
@@ -359,7 +361,7 @@ class FileReader(Thread):
             fp = os.path.join(directory, path)
 
             if os.path.isdir(fp):
-                    self.scan_directory(fp)
+                self.scan_directory(fp)
             elif os.path.isfile(fp):
                 if self._shutdown:
                     return
@@ -407,11 +409,11 @@ class DataReader(Thread):
                     self.parse_csv(datafile)
                 finally:
                     self.datafile_queue.task_done()
-            except queue.Empty as e:
+            except queue.Empty:
                 if self.eventTracker.fileReaderDone:
                     LOGGER.debug("FileReaderDone Event seen")
                     break
-            except Exception as e:
+            except Exception:
                 LOGGER.exception("Unhandled Exception")
         LOGGER.debug("Reader exiting")
 
@@ -427,12 +429,12 @@ class DataReader(Thread):
             return
 
         try:
-            csvfile = open(filename, 'rb')
+            csvfile = open(filename, newline='')
             s = os.stat(filename)
             if s.st_size == 0:
                 LOGGER.warning("File %s empty" % (filename))
                 return
-        except Exception as e:
+        except Exception:
             LOGGER.warning("Unable to stat file %s, skiping" % (filename))
             return
 
@@ -440,23 +442,22 @@ class DataReader(Thread):
             LOGGER.info("Processing file: %s" % filename)
 
         try:
-            dnsreader = unicodecsv.reader(csvfile, strict=True,
-                                          skipinitialspace=True)
-        except Exception as e:
+            dnsreader = csv.reader(csvfile, strict=True, skipinitialspace=True)
+        except Exception:
             LOGGER.exception("Unable to setup csv reader for file %s"
                              % (filename))
             return
 
         try:
             header = next(dnsreader)
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unable to iterate through csv file %s"
                              % (filename))
             return
 
         try:
             if not self.check_header(header):
-                raise unicodecsv.Error('CSV header not found')
+                raise csv.Error('CSV header not found')
 
             for row in dnsreader:
                 while self._pause:
@@ -472,11 +473,11 @@ class DataReader(Thread):
                                    % (filename))
                     continue
                 self.data_queue.put({'header': header, 'row': row})
-        except unicodecsv.Error as e:
+        except csv.Error:
             LOGGER.exception("CSV Parse Error in file %s - line %i\n"
                              % (os.path.basename(filename),
                                 dnsreader.line_num))
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unable to process file %s" % (filename))
 
 
@@ -512,7 +513,7 @@ class DataFetcher(Thread):
             while not self._shutdown:
                 try:
                     work = self.data_queue.get_nowait()
-                except queue.Empty as e:
+                except queue.Empty:
                     if self._finish:
                         if len(fetch) > 0:
                             data = self.handle_fetch(fetch)
@@ -521,7 +522,7 @@ class DataFetcher(Thread):
                         break
                     time.sleep(.01)
                     continue
-                except Exception as e:
+                except Exception:
                     LOGGER.exception("Unhandled Exception")
                     continue
 
@@ -542,17 +543,16 @@ class DataFetcher(Thread):
                     fetch.append((doc_id, entry))
 
                     if len(fetch) >= self.options.bulk_fetch_size:
-                        start = time.time()
                         data = self.handle_fetch(fetch)
                         for item in data:
                             self.work_queue.put(item)
                         fetch = list()
-                except Exception as e:
+                except Exception:
                     LOGGER.exception("Unhandled Exception")
                 finally:
                     self.data_queue.task_done()
 
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unhandled Exception")
 
     def parse_entry(self, input_entry, header):
@@ -598,13 +598,13 @@ class DataFetcher(Thread):
                               '_type': DOC_TYPE,
                               '_id': doc_id}
                     docs.append(getdoc)
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unable to generate doc list")
             return results
 
         try:
             result = self.es.mget(body={"docs": docs})
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unable to create mget request")
             return results
 
@@ -627,7 +627,7 @@ class DataFetcher(Thread):
                     results.append((fetch_list[doc_count][1], None))
 
             return results
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unhandled Exception")
 
 
@@ -661,12 +661,12 @@ class DataWorker(Thread):
             while not self._shutdown:
                 try:
                     (entry, current_entry_raw) = self.work_queue.get_nowait()
-                except queue.Empty as e:
+                except queue.Empty:
                     if self._finish:
                         break
                     time.sleep(.0001)
                     continue
-                except Exception as e:
+                except Exception:
                     LOGGER.exception("Unhandled Exception")
 
                 try:
@@ -681,7 +681,7 @@ class DataWorker(Thread):
                 finally:
                     self.work_queue.task_done()
 
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unhandled Exception")
 
     def update_required(self, current_entry):
@@ -726,7 +726,7 @@ class DataWorker(Thread):
                 for include in self.options.include:
                     try:  # TODO
                         details_copy[include] = details[include]
-                    except Exception as e:
+                    except Exception:
                         pass
 
                 changed = (set(details_copy.items()) -
@@ -888,13 +888,13 @@ class DataShipper(Thread):
                                            chunk_size=self.options.bulk_size):
                 resp = response[list(response)[0]]
                 if not ok and resp['status'] not in [404, 409]:
-                        if not self.eventTracker.bulkError:
-                            self.eventTracker.setBulkError()
-                        LOGGER.debug("Response: %s" % (str(resp)))
-                        LOGGER.error(("Error making bulk request, received "
-                                      "error reason: %s")
-                                     % (resp['error']['reason']))
-        except Exception as e:
+                    if not self.eventTracker.bulkError:
+                        self.eventTracker.setBulkError()
+                    LOGGER.debug("Response: %s" % (str(resp)))
+                    LOGGER.error(("Error making bulk request, received "
+                                  "error reason: %s")
+                                 % (resp['error']['reason']))
+        except Exception:
             LOGGER.exception("Unexpected error processing bulk commands")
             if not self.eventTracker.bulkError:
                 self.eventTracker.setBulkError
@@ -952,7 +952,7 @@ class DataProcessor(Process):
                 self.reader_thread.pause()
                 self.finish()
                 self._paused.value = True
-            except Exception as e:
+            except Exception:
                 LOGGER.exception("Unable to pause reader thread")
         else:
             LOGGER.debug("Pause requested when reader thread not alive")
@@ -961,7 +961,7 @@ class DataProcessor(Process):
         if self.reader_thread.isAlive():
             try:
                 self.reader_thread.unpause()
-            except Exception as e:
+            except Exception:
                 LOGGER.exception("Unable to unpause reader thread")
             self.update_index_list()
             self.startup_rest()
@@ -1086,7 +1086,7 @@ class DataProcessor(Process):
 
         try:
             self.es = elasticsearch.Elasticsearch(**self.options.es_args)
-        except elasticsearch.exceptions.TransportError as e:
+        except elasticsearch.exceptions.TransportError:
             LOGGER.critical("Unable to establish elastic connection")
             return
 
@@ -1127,7 +1127,7 @@ def parse_domain(domainName):
     parts = domainName.rsplit('.', 1)
     try:
         return (parts[0], parts[1])
-    except IndexError as e:
+    except IndexError:
         LOGGER.exception("Unable to parse domain '%s'" % (domainName))
         raise
 
@@ -1159,9 +1159,9 @@ def rolloverRequired(es, options):
     try:
         doc_count = int(es.cat.count(index=options.indexNames.orig_write,
                                      h="count"))
-    except elasticsearch.exceptions.NotFoundError as e:
+    except elasticsearch.exceptions.NotFoundError:
         LOGGER.warning("Unable to find required index\n")
-    except Exception as e:
+    except Exception:
         LOGGER.exception("Unexpected exception\n")
 
     if doc_count > options.rollover_docs:
@@ -1170,9 +1170,9 @@ def rolloverRequired(es, options):
     try:
         doc_count = int(es.cat.count(index=options.indexNames.delta_write,
                                      h="count"))
-    except elasticsearch.exceptions.NotFoundError as e:
+    except elasticsearch.exceptions.NotFoundError:
         LOGGER.warning("Unable to find required index\n")
-    except Exception as e:
+    except Exception:
         LOGGER.exception("Unexpected exception\n")
 
     if doc_count > options.rollover_docs:
@@ -1211,19 +1211,20 @@ def rolloverIndex(roll, es, options, pipelines):
 
         try:
             orig_name = es.indices.get_alias(name=write_alias).keys()[0]
-        except Exception as e:
+        except Exception:
             LOGGER.error("Unable to get/resolve index alias")
 
         try:
-            result = es.indices.rollover(alias=write_alias,
-                                         body={"aliases": {
-                                                    search_alias: {}}})
-        except Exception as e:
+            es.indices.rollover(alias=write_alias,
+                                body={"aliases": {search_alias: {}}
+                                      }
+                                )
+        except Exception:
             LOGGER.exception("Unable to issue rollover command: %s")
 
         try:
             es.indices.refresh(index=orig_name)
-        except Exception as e:
+        except Exception:
             LOGGER.exception("Unable to refresh rolled over index")
 
         # Index rolled over, restart processing
@@ -1390,7 +1391,7 @@ def main():
     if options.es_ask_pass:
         try:
             options.es_pass = getpass.getpass("Enter ElasticSearch Password: ")
-        except Exception as e:
+        except Exception:
             print("Unable to get password")
             sys.exit(1)
 
@@ -1446,7 +1447,7 @@ def main():
     # Verify connectivity and version(s) of cluster
     try:
         es = elasticsearch.Elasticsearch(**options.es_args)
-    except elasticsearch.exceptions.TransportError as e:
+    except elasticsearch.exceptions.TransportError:
         myLogger.exception("Unable to connect to ElasticSearch")
         sys.exit(1)
 
@@ -1454,7 +1455,7 @@ def main():
         es_versions = []
         for version in es.cat.nodes(h='version').strip().split('\n'):
             es_versions.append([int(i) for i in version.split('.')])
-    except Exception as e:
+    except Exception:
         myLogger.exception(("Unable to retrieve destination ElasticSearch "
                             "version"))
         sys.exit(1)
@@ -1485,7 +1486,7 @@ def main():
     with open(template_path, 'r') as dtemplate:
         try:
             data_template = json.loads(dtemplate.read())
-        except Exception as e:
+        except Exception:
             myLogger.exception("Unable to read template file")
             sys.exit(1)
 
@@ -1562,7 +1563,7 @@ def main():
             else:
                 myLogger.error("Metadata index found but contains no data!!")
                 sys.exit(1)
-        except Exception as e:
+        except Exception:
             myLogger.exception("Error fetching metadata from index")
             sys.exit(1)
 
@@ -1620,7 +1621,7 @@ def main():
             previous_record = es.get(index=indexNames.meta,
                                      doc_type=DOC_TYPE,
                                      id=version_identifier)['_source']
-        except Exception as e:
+        except Exception:
             myLogger.exception(("Unable to retrieve information "
                                 "for last import"))
             sys.exit(1)
@@ -1703,8 +1704,8 @@ def main():
     reader_thread.start()
 
     for pipeline_id in range(options.procs):
-        p = DataProcessor(pipeline_id, datafile_queue, StatTracker(statTracker._stat_queue), logger.getLogger(name=f'{pipeline_id}'),
-                          eventTracker, options)
+        p = DataProcessor(pipeline_id, datafile_queue, statTracker.get_tracker(),
+                          logger.getLogger(name=f'{pipeline_id}'), eventTracker, options)
         p.start()
         pipelines.append(p)
 
@@ -1777,14 +1778,14 @@ def main():
                                         'duplicates': statTracker.duplicates,
                                         'changed_stats':
                                         statTracker.changed_stats}})
-            except Exception as e:
+            except Exception:
                 myLogger.exception("Error attempting to update stats")
         except KeyboardInterrupt:
             myLogger.info("Please wait for processing to complete ...")
 
         try:
             datafile_queue.close()
-        except Exception as e:
+        except Exception:
             myLogger.debug("Exception closing queues", exc_info=True)
 
         if options.verbose:
@@ -1801,7 +1802,7 @@ def main():
 
         # Ensure logger processes all messages
         logger.join()
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         myLogger.warning(("Cleaning Up ... Please Wait ...\nWarning!! "
                           "Forcefully killing this might leave Elasticsearch "
                           "in an inconsistent state!"))
@@ -1855,14 +1856,14 @@ def main():
                                     'duplicates': statTracker.duplicates,
                                     'changed_stats':
                                     statTracker.changed_stats}})
-        except Exception as e:
+        except Exception:
             myLogger.warning(("Unable to finalize stats, data may be out of "
                               "sync"), exc_info=True)
 
         myLogger.info("Finalizing settings")
         try:
             datafile_queue.close()
-        except Exception as e:
+        except Exception:
             myLogger.debug("Exception closing queues", exc_info=True)
 
         myLogger.info("... Done")
