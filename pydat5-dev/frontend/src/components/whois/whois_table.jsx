@@ -11,6 +11,10 @@ import TableHead from '@material-ui/core/TableHead'
 import TableRow from '@material-ui/core/TableRow'
 import TableSortLabel from '@material-ui/core/TableSortLabel'
 import TableFooter from '@material-ui/core/TableFooter'
+import Grid from '@material-ui/core/Grid'
+import FormControl from '@material-ui/core/FormControl'
+import InputLabel from '@material-ui/core/InputLabel'
+import Select from '@material-ui/core/Select'
 
 import {
     useSortBy,
@@ -124,6 +128,35 @@ const TableColumns = () => { return [
     }
 ]}
 
+const ExportDataControl = ({
+    pageSize,
+    setPageSize,
+    validPageSizes = [50, 100, 1000, 2500]
+}) => {
+    return (
+        <React.Fragment>
+            <Grid container spacing={2} style={{padding: '1rem'}}>
+                <Grid item>
+                    <FormControl>
+                        <InputLabel>Size</InputLabel>
+                        <Select
+                            label="Size"
+                            name="size"
+                            displayEmpty
+                            onChange={e => {setPageSize(e.target.value)}}
+                            value={pageSize}
+                        >
+                        {validPageSizes.map((value, index) => (
+                            <MenuItem key={index} value={value}>{value}</MenuItem>
+                        ))}
+                        </Select>
+                    </FormControl>
+                </Grid>
+            </Grid>
+        </React.Fragment>
+    )
+}
+
 const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => {
     return (
         <MenuItem
@@ -147,6 +180,7 @@ const WhoisTableContainer = ({
     const preferences = useContext(UserPreferencesContext)
     const initialPageSize = preferences.getPref('whois', 'page_size', 50)
     const [copyFriendly, setCopyFriendly] = useState(false)
+    const validPageSizes = [50, 100, 1000, 2500]
 
     const toggleCopyFriendly = useCallback(() => {
         setCopyFriendly(!copyFriendly)
@@ -214,7 +248,17 @@ const WhoisTableContainer = ({
                     <TableHead>
                         <TableRow>
                             <TableCell colSpan={1}>
-                                <SearchTools data={data} defaultListField={'domainName'}>
+                                <SearchTools
+                                    data={data}
+                                    defaultListField={'domainName'}
+                                    dataControl={
+                                        <ExportDataControl
+                                            pageSize={pageSize}
+                                            setPageSize={setPageSize}
+                                            validPageSizes={validPageSizes}
+                                        />
+                                    }
+                                >
                                     <ToggleCopyMenuItem
                                         copyFriendly={copyFriendly}
                                         toggleCopyFriendly={toggleCopyFriendly}
@@ -233,6 +277,7 @@ const WhoisTableContainer = ({
                                 canNextPage={canNextPage}
                                 canPreviousPage={canPreviousPage}
                                 columnLength={visibleColumns.length - 1}
+                                validPageSizes={validPageSizes}
                             />
                         </TableRow>
                         {headerGroups.map(headerGroup => (
@@ -319,6 +364,7 @@ const WhoisTableContainer = ({
                                 canNextPage={canNextPage}
                                 canPreviousPage={canPreviousPage}
                                 columnLength={visibleColumns.length}
+                                validPageSizes={validPageSizes}
                             />
                         </TableRow>
                     </TableFooter>
