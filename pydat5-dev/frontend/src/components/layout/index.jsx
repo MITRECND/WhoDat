@@ -1,5 +1,5 @@
 import React, {createContext} from 'react'
-import {Link as RouterLink, useRouteMatch} from 'react-router-dom'
+import {Link as RouterLink, matchPath} from 'react-router-dom'
 
 import MenuItem from '@material-ui/core/MenuItem'
 import Link from '@material-ui/core/Link'
@@ -68,8 +68,12 @@ export class RouteElement {
         this.options = options
     }
 
-    matchRoute() {
-        return useRouteMatch({path: this.path, exact: true})
+    matchRoute(current_path) {
+        return matchPath(current_path,
+            {
+                path: this.path,
+                exact: true
+            })
     }
 }
 

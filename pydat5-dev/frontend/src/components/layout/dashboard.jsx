@@ -12,7 +12,7 @@ import MenuItem from '@material-ui/core/MenuItem';
 import Menu from '@material-ui/core/Menu';
 import MoreIcon from '@material-ui/icons/MoreVert';
 import ListItem from '@material-ui/core/ListItem'
-import {Link as RouterLink} from 'react-router-dom'
+import {Link as RouterLink, useLocation} from 'react-router-dom'
 import ListItemText from '@material-ui/core/ListItemText';
 
 import {PluginManagers} from '../plugins'
@@ -156,6 +156,7 @@ const Options = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const isMenuOpen = Boolean(anchorEl)
   const optionsContext = useContext(OptionsContext)
+  const location = useLocation()
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget)
@@ -165,16 +166,14 @@ const Options = () => {
     setAnchorEl(null)
   }
 
-  const routes = useMemo(() => (
-    {
+  const routes = {
       ...PluginManagers.routes.plugins,
       whois: whoisRoute
     }
-  ), [])
 
   let match = []
   for (const name in routes) {
-    if (routes[name].matchRoute()) {
+    if (routes[name].matchRoute(location.pathname)) {
       match = routes[name].options
       break
     }
