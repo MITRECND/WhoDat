@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 
 import { makeStyles} from '@material-ui/core/styles';
@@ -17,6 +17,7 @@ import ListItemText from '@material-ui/core/ListItemText';
 
 import {PluginManagers} from '../plugins'
 import {whoisRoute, whoisNavigation} from '../whois'
+import {OptionsContext} from '../layout'
 
 
 // https://material-ui.com/components/app-bar/#app-bar-with-a-primary-search-field
@@ -154,6 +155,7 @@ const Options = () => {
 
   const [anchorEl, setAnchorEl] = useState(null);
   const isMenuOpen = Boolean(anchorEl)
+  const optionsContext = useContext(OptionsContext)
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget)
@@ -190,7 +192,10 @@ const Options = () => {
       onClose={handleMenuClose}
     >
       {match.map((option_element, index) => (
-        option_element.getMobileElement(index)
+        option_element.getMobileElement({
+          optionsContext: optionsContext,
+          index: index
+        })
       ))}
 
     </Menu>
@@ -200,7 +205,10 @@ const Options = () => {
     <React.Fragment>
       <div className={classes.layoutDesktop}>
         {match.map((option_element, index) => (
-          option_element.getDesktopElement(index)
+          option_element.getDesktopElement({
+            optionsContext: optionsContext,
+            index: index
+          })
         ))}
       </div>
       <div className={classes.layoutMobile}>
@@ -216,30 +224,36 @@ const Options = () => {
         </IconButton>}
         {mobileMenu}
       </div>
-
     </React.Fragment>
   )
 }
 
 const Dashboard = (props) => {
   const classes = useStyles();
+  const [optionsState, setOptionsState] = useState({})
 
   return (
     <div>
       <CssBaseline />
-      <div className={classes.grow}>
-        <AppBar position="static">
-          <Toolbar variant="dense">
-            <Navigation />
-            <div className={classes.grow} />
-            <Options />
-          </Toolbar>
-        </AppBar>
+      <OptionsContext.Provider value={{
+          optionsState: optionsState,
+          setOptionsState: setOptionsState
+        }}
+      >
+        <div className={classes.grow}>
+          <AppBar position="static">
+            <Toolbar variant="dense">
+              <Navigation />
+              <div className={classes.grow} />
+              <Options />
+            </Toolbar>
+          </AppBar>
 
-        <main className={classes.content}>
-            {props.children}
-        </main>
-      </div>
+          <main className={classes.content}>
+              {props.children}
+          </main>
+        </div>
+      </OptionsContext.Provider>
     </div>
 
   );

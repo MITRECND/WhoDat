@@ -21,17 +21,27 @@ import {
     RouteElement,
     NavigationElement
 } from '../layout'
+import {OptionsContext} from '../layout'
+import HelpPage from './help'
+import StatsPage from './stats'
+import ClusterStatus from './status'
 
 export const whoisRoute = new RouteElement({
     path: "/whois",
     title: "Whois",
     component: null,
     options: [
+
       new OptionElement({
         icon: <HelpIcon />,
         text: "Help",
-        handleClick: () => {console.log("Clicked")}
-      })
+        handleClick: ({optionsContext}) => {
+            optionsContext.setOptionsState(
+                update(optionsContext.optionsState, {
+                    helpOpen: {$set: true}
+            }))
+        }
+      }),
     ]
   })
 
@@ -90,6 +100,16 @@ const WhoisHandler = ({}) => {
     const [queryData, setQueryData] = useState({
         ...formData
     })
+
+    const optionsContext = useContext(OptionsContext)
+
+    useEffect(() => {
+        optionsContext.setOptionsState(
+            update(optionsContext.optionsState, {
+                helpOpen: {$set: false},
+                statsOpen: {$set: false}
+        }))
+    }, [])
 
     const location = useLocation()
     let history = useHistory()
@@ -157,6 +177,7 @@ const WhoisHandler = ({}) => {
     return (
         <React.Fragment>
             <Container style={{paddingBottom: '1rem'}}>
+                <ClusterStatus />
                 <form onSubmit={handleOnSubmit}>
                     <Grid container spacing={1} justify="center" alignItems="flex-end">
                         <Grid container item xs={11} justify="center" alignItems="flex-end">
@@ -188,6 +209,7 @@ const WhoisHandler = ({}) => {
                 </form>
             </Container>
             {wtable}
+            <HelpPage />
         </React.Fragment>
     )
 }

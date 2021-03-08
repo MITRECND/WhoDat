@@ -1,4 +1,4 @@
-import React from 'react'
+import React, {createContext} from 'react'
 import {Link as RouterLink, useRouteMatch} from 'react-router-dom'
 
 import MenuItem from '@material-ui/core/MenuItem'
@@ -14,11 +14,15 @@ export class OptionElement {
         this.tooltip = tooltip
     }
 
-    getDesktopElement(index = null) {
+    getDesktopElement({optionsContext, index = null}) {
         const button = (
             <IconButton
                 key={index}
-                onClick={this.handleClick}
+                onClick={() => {
+                    this.handleClick({
+                        optionsContext: optionsContext
+                    })
+                }}
                 color="inherit"
             >
                 {this.icon}
@@ -36,11 +40,15 @@ export class OptionElement {
         }
     }
 
-    getMobileElement(index = null) {
+    getMobileElement({optionsContext, index = null}) {
         return (
             <MenuItem
                 key={index}
-                onClick={this.handleClick}
+                onClick={() => {
+                    this.handleClick({
+                        optionsContext
+                    })
+                }}
             >
                 <IconButton color="inherit">
                     {this.icon}
@@ -110,3 +118,5 @@ export class MenuElement {
         )
     }
 }
+
+export const OptionsContext = createContext()

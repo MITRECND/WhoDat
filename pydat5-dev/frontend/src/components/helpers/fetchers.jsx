@@ -63,3 +63,21 @@ export const domainFetcher = async ({
     }
 }
 
+
+export const statusFetcher = async () => {
+    let response = await fetch (
+        '/api/v2/info', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+
+            },
+    })
+
+    if (response.status === 200) {
+        let jresp = await response.json()
+        return jresp
+    } else {
+        throw response
+    }
+}
