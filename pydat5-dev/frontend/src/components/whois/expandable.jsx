@@ -19,6 +19,9 @@ import MuiDialogTitle from '@material-ui/core/DialogTitle';
 import { withStyles } from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
 import { Container, makeStyles } from '@material-ui/core'
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import FormControl from '@material-ui/core/FormControl';
+import CheckBox from '@material-ui/core/Checkbox'
 
 
 import {domainFetcher} from '../helpers/fetchers'
@@ -53,6 +56,7 @@ const DialogTitle = withStyles(detailsDialogStyles)((props) => {
 
 const FullDetailsDialog = ({data}) => {
     const [open, setOpen] = useState(false)
+    const [addColon, setAddColon] = useState(false)
 
     const handleClickOpen = () => {
         setOpen(true)
@@ -60,6 +64,10 @@ const FullDetailsDialog = ({data}) => {
 
     const handleClose = () => {
         setOpen(false)
+    }
+
+    const toggleAddColon = () => {
+        setAddColon(!addColon)
     }
 
     return (
@@ -75,6 +83,23 @@ const FullDetailsDialog = ({data}) => {
             >
                 <DialogTitle onClose={handleClose}>{`Domain "${data.domainName}"`}</DialogTitle>
                 <DialogContent>
+                    <Grid container>
+                        <Grid item>
+                            <FormControl component="fieldset">
+                                <FormControlLabel
+                                    value="colon"
+                                    control={
+                                        <CheckBox
+                                            color="primary"
+                                            checked={addColon}
+                                            onClick={toggleAddColon}
+                                        />}
+                                    label="Add Colon to Names"
+                                    labelPlacement="end"
+                                />
+                            </FormControl>
+                        </Grid>
+                    </Grid>
                     <Table>
                         <TableHead>
                             <TableRow>
@@ -86,7 +111,7 @@ const FullDetailsDialog = ({data}) => {
                             {Object.keys(data).sort().map((name, index) => {
                                 return (
                                     <TableRow key={index}>
-                                        <TableCell>{`${name}`}</TableCell>
+                                        <TableCell>{`${name}${addColon ? ':' : ''}`}</TableCell>
                                         <TableCell>{data[name]}</TableCell>
                                     </TableRow>
                                 )
