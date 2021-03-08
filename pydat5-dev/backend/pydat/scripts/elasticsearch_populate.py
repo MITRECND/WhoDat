@@ -107,7 +107,7 @@ class MainStatTracker(Thread):
 
             if typ == 'stat':
                 if field not in self._stats:
-                    LOGGER.error("Unknown field %s" % (field))
+                    LOGGER.error("Unknown field %s" % field)
 
                 self._stats[field] += 1
             elif typ == 'chn':
@@ -177,7 +177,7 @@ class _mpLoggerClient(object):
     facilities
     """
 
-    def __init__(self, name, logQueue, debug, **kwargs):
+    def __init__(self, name, logQueue, debug):
         self.name = name
         self.logQueue = logQueue
         self._logger = logging.getLogger()
@@ -268,7 +268,7 @@ class mpLogger(Thread):
     def stop(self):
         self._stop_processing = True
 
-    def join(self):
+    def join(self, **kwargs):
         self.logQueue.join()
 
     def run(self):
@@ -287,7 +287,7 @@ class mpLogger(Thread):
             log_format = ("%(levelname) -10s %(asctime)s %(funcName) "
                           "-20s %(lineno) -5d: %(message)s")
         else:
-            log_format = ("%(message)s")
+            log_format = "%(message)s"
 
         logFormatter = logging.Formatter(log_format)
 
@@ -371,7 +371,7 @@ class FileReader(Thread):
                         continue
                 self.datafile_queue.put(fp)
             else:
-                LOGGER.warning("%s is neither a file nor directory" % (fp))
+                LOGGER.warning("%s is neither a file nor directory" % fp)
 
 
 class DataReader(Thread):
@@ -432,10 +432,10 @@ class DataReader(Thread):
             csvfile = open(filename, newline='')
             s = os.stat(filename)
             if s.st_size == 0:
-                LOGGER.warning("File %s empty" % (filename))
+                LOGGER.warning("File %s empty" % filename)
                 return
         except Exception:
-            LOGGER.warning("Unable to stat file %s, skiping" % (filename))
+            LOGGER.warning("Unable to stat file %s, skiping" % filename)
             return
 
         if self.options.verbose:
@@ -444,15 +444,13 @@ class DataReader(Thread):
         try:
             dnsreader = csv.reader(csvfile, strict=True, skipinitialspace=True)
         except Exception:
-            LOGGER.exception("Unable to setup csv reader for file %s"
-                             % (filename))
+            LOGGER.exception("Unable to setup csv reader for file %s" % filename)
             return
 
         try:
             header = next(dnsreader)
         except Exception:
-            LOGGER.exception("Unable to iterate through csv file %s"
-                             % (filename))
+            LOGGER.exception("Unable to iterate through csv file %s" % filename)
             return
 
         try:
@@ -469,8 +467,7 @@ class DataReader(Thread):
                     LOGGER.debug("Shutdown received")
                     break
                 if row is None or not row:
-                    LOGGER.warning("Skipping empty row in file %s"
-                                   % (filename))
+                    LOGGER.warning("Skipping empty row in file %s" % filename)
                     continue
                 self.data_queue.put({'header': header, 'row': row})
         except csv.Error:
@@ -478,7 +475,7 @@ class DataReader(Thread):
                              % (os.path.basename(filename),
                                 dnsreader.line_num))
         except Exception:
-            LOGGER.exception("Unable to process file %s" % (filename))
+            LOGGER.exception("Unable to process file %s" % filename)
 
 
 class DataFetcher(Thread):
@@ -758,7 +755,7 @@ class DataWorker(Thread):
                 doc_id = "%s#%d.%d" % (current_id, current_entry[VERSION_KEY],
                                        current_entry.get(UPDATE_KEY, 0))
                 if self.options.vverbose:
-                    LOGGER.info("doc_id: %s" % (doc_id))
+                    LOGGER.info("doc_id: %s" % doc_id)
                 api_commands.append(
                     self.process_command('create',
                                          self.options.indexNames.delta_write,
@@ -1075,7 +1072,7 @@ class DataProcessor(Process):
         os.setpgrp()
         global LOGGER
         LOGGER = self.logger
-        LOGGER.prefix = "(Pipeline %d) " % (self.myid)
+        LOGGER.prefix = "(Pipeline %d) " % self.myid
 
         # Queue for individual csv entries
         self.data_queue = queue.Queue(maxsize=10000)
@@ -1126,9 +1123,9 @@ class DataProcessor(Process):
 def parse_domain(domainName):
     parts = domainName.rsplit('.', 1)
     try:
-        return (parts[0], parts[1])
+        return parts[0], parts[1]
     except IndexError:
-        LOGGER.exception("Unable to parse domain '%s'" % (domainName))
+        LOGGER.exception("Unable to parse domain '%s'" % domainName)
         raise
 
 
@@ -1317,7 +1314,7 @@ def main():
                               "is enabled"))
     parser.add_argument("--es-ask-pass", action="store_true",
                         dest="es_ask_pass", default=False,
-                        help=("Prompt for ElasticSearch password"))
+                        help="Prompt for ElasticSearch password")
     parser.add_argument("--es-enable-ssl", action="store",
                         dest="es_cacert", default=None,
                         help=("The path, on disk to the cacert of the "
@@ -1475,12 +1472,11 @@ def main():
         sys.exit(1)
 
     # Setup template
-    data_template = None
     base_path = os.path.dirname(os.path.realpath(__file__))
     template_path = os.path.join(base_path, "..", "configuration", f"es{major}.data.template")
 
     if not os.path.exists(template_path):
-        myLogger.error("Unable to find template at %s" % (template_path))
+        myLogger.error("Unable to find template at %s" % template_path)
         sys.exit(1)
 
     with open(template_path, 'r') as dtemplate:
@@ -1494,8 +1490,6 @@ def main():
         configTemplate(es, major, data_template, options)
         sys.exit(0)
 
-    metadata = None
-    version_identifier = 0
     previousVersion = 0
 
     # Create the stats tracker thread
@@ -1543,13 +1537,13 @@ def main():
                   body=metadata)
 
         # Create the first whois rollover index
-        index_name = "%s-000001" % (options.index_prefix)
+        index_name = "%s-000001" % options.index_prefix
         es.indices.create(index=index_name,
                           body={"aliases": {indexNames.orig_write: {},
                                             indexNames.orig_search: {}}})
 
         # Create the first whois delta rollover index
-        delta_name = "%s-delta-000001" % (options.index_prefix)
+        delta_name = "%s-delta-000001" % options.index_prefix
         es.indices.create(index=delta_name,
                           body={"aliases": {indexNames.delta_write: {},
                                             indexNames.delta_search: {}}})
