@@ -173,6 +173,7 @@ const WhoisTableContainer = ({
     data,
     queryData,
     pageCount: controlledPageCount,
+    totalRecords,
     fetchData,
     loading
 }) => {
@@ -270,6 +271,7 @@ const WhoisTableContainer = ({
                                 previousPage={previousPage}
                                 nextPage={nextPage}
                                 pageCount={pageCount}
+                                totalRecords={totalRecords}
                                 pageOptions={pageOptions}
                                 setPageSize={setPageSize}
                                 pageIndex={pageIndex}
@@ -357,6 +359,7 @@ const WhoisTableContainer = ({
                                 previousPage={previousPage}
                                 nextPage={nextPage}
                                 pageCount={pageCount}
+                                totalRecords={totalRecords}
                                 pageOptions={pageOptions}
                                 setPageSize={setPageSize}
                                 pageIndex={pageIndex}
@@ -379,7 +382,10 @@ const WhoisTable = ({queryData}) => {
 
     const columns = useMemo(() => TableColumns(), [])
     const [data, setData] = useState([])
-    const [pageCount, setPageCount] = useState(0)
+    const [resultMeta, setResultMeta] = useState({
+        page_count: 0,
+        total_records: 0
+    })
 
     const fetchData = useCallback(({pageSize, pageIndex, sortBy=[]}) => {
         const asyncfetch = async () => {
@@ -403,7 +409,10 @@ const WhoisTable = ({queryData}) => {
                     sort_keys: sort_keys
                 })
 
-                setPageCount(Math.ceil(results.total / pageSize))
+                setResultMeta({
+                    page_count: Math.ceil(results.total / pageSize),
+                    total_records: results.total
+                })
                 setData(results.results)
                 setPending(false)
 
@@ -423,7 +432,8 @@ const WhoisTable = ({queryData}) => {
             data={data}
             fetchData={fetchData}
             loading={pending}
-            pageCount={pageCount}
+            pageCount={resultMeta.page_count}
+            totalRecords={resultMeta.total_records}
         />
 
     )
