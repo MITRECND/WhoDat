@@ -32,6 +32,7 @@ import {
     RDataCell
 } from './table_cells'
 import { InputLabel } from '@material-ui/core';
+import { useUserPreferences } from '../../components/helpers/preferences';
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
@@ -206,8 +207,8 @@ const DNSDBTableContainer = ({
     data,
     rateInfo
 }) => {
-
-    const initialPageSize = 100
+    const preferences = useUserPreferences('dnsdb')
+    const initialPageSize = preferences.getPref("remember_page_size") ? preferences.getPref('page_size') : 100
     const validPageSizes = [50, 100, 500, 1000, 2500]
     const [copyFriendly, setCopyFriendly] = useState(false)
 

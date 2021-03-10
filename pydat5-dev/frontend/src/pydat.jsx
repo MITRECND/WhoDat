@@ -1,4 +1,4 @@
-import React, {Suspense} from 'react'
+import React, {Suspense, useEffect, useState} from 'react'
 import {
     BrowserRouter as Router,
     Switch,
@@ -12,15 +12,15 @@ import useMediaQuery from '@material-ui/core/useMediaQuery'
 import './plugins'
 
 import {PluginManagers} from './components/plugins'
-import {UserPreferences, UserPreferencesContext} from './components/helpers/preferences'
+import {userPreferencesContainer} from './components/helpers/preferences'
 import Dashboard from './components/layout/dashboard'
 import NotFound from './components/layout/notfound'
 import {BackdropLoader} from './components/helpers/loaders'
 import { defaultTheme, darkTheme } from './components/layout/themes'
 
-
-
 const WhoisHandler = React.lazy(() => import('./components/whois'))
+
+userPreferencesContainer._initializePreferences()
 
 const Pydat = () => {
     const routes = PluginManagers.routes
@@ -30,7 +30,6 @@ const Pydat = () => {
 
     return (
         <React.Fragment>
-            <UserPreferencesContext.Provider value={UserPreferences}>
                 <ThemeProvider theme={theme}>
                     <Router>
                         <Dashboard>
@@ -60,7 +59,6 @@ const Pydat = () => {
                         </Dashboard>
                     </Router>
                 </ThemeProvider>
-            </UserPreferencesContext.Provider>
         </React.Fragment>
     )
 }

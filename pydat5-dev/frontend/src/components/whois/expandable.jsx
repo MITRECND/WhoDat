@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react'
-
+import clsx from 'clsx';
 
 import Paper from '@material-ui/core/Paper'
 import Tab from '@material-ui/core/Tab'
@@ -25,7 +25,7 @@ import CheckBox from '@material-ui/core/Checkbox'
 
 
 import {domainFetcher} from '../helpers/fetchers'
-import clsx from 'clsx';
+import { useUserPreferences } from '../helpers/preferences';
 
 const detailsDialogStyles = (theme) => ({
     root: {
@@ -55,8 +55,9 @@ const DialogTitle = withStyles(detailsDialogStyles)((props) => {
   });
 
 const FullDetailsDialog = ({data}) => {
+    const preferences = useUserPreferences('whois')
     const [open, setOpen] = useState(false)
-    const [addColon, setAddColon] = useState(false)
+    const [addColon, setAddColon] = useState(preferences.getPref('details_colon'))
 
     const handleClickOpen = () => {
         setOpen(true)
@@ -67,7 +68,9 @@ const FullDetailsDialog = ({data}) => {
     }
 
     const toggleAddColon = () => {
-        setAddColon(!addColon)
+        let newvalue = !addColon
+        preferences.setPref('details_colon', newvalue)
+        setAddColon(newvalue)
     }
 
     return (

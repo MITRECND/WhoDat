@@ -25,7 +25,7 @@ import {
 
 import {queryFetcher} from '../helpers/fetchers'
 import ExpandedEntryRow from './expandable'
-import {UserPreferencesContext} from '../helpers/preferences'
+import {useUserPreferences} from '../helpers/preferences'
 import { BackdropLoader } from '../helpers/loaders';
 import SearchTools from '../helpers/search_tools'
 import {Paginator} from './table_pagination'
@@ -178,8 +178,8 @@ const WhoisTableContainer = ({
     loading
 }) => {
 
-    const preferences = useContext(UserPreferencesContext)
-    const initialPageSize = preferences.getPref('whois', 'page_size', 50)
+    const preferences = useUserPreferences('whois')
+    const initialPageSize = preferences.getPref("remember_page_size") ? preferences.getPref('page_size') : 100
     const [copyFriendly, setCopyFriendly] = useState(false)
     const validPageSizes = [50, 100, 1000, 2500]
 

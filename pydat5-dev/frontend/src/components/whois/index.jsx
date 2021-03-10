@@ -12,9 +12,15 @@ import FormControl from '@material-ui/core/FormControl';
 import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
 import HelpIcon from '@material-ui/icons/Help';
+// import EqualizerIcon from '@material-ui/icons/Equalizer';
 
 import WhoisTable from './whois_table'
-import {UserPreferencesContext} from '../helpers/preferences'
+import {
+    useUserPreferences,
+    userPreferencesManager,
+    UserPreferenceNamespace,
+    UserPreference,
+} from '../helpers/preferences'
 import {SearchSettings} from '../layout/dialogs'
 import {
     OptionElement,
@@ -23,24 +29,62 @@ import {
 } from '../layout'
 import {OptionsContext} from '../layout'
 import HelpPage from './help'
-import StatsPage from './stats'
+// import StatsPage from './stats'
 import ClusterStatus from './status'
+
+const whoisPreferencesNamespace = new UserPreferenceNamespace({
+    name: "whois",
+    title: "Whois Search Preferences",
+    description: "Preferences for Whois Search"
+})
+userPreferencesManager.registerNamespace(whoisPreferencesNamespace)
+userPreferencesManager.registerPrefs(
+    whoisPreferencesNamespace, [
+        new UserPreference({
+            name: 'fang',
+            type: "boolean",
+            title: "De-fang Queries",
+            description: "Automatically replace [.] with . in search queries",
+            default_value: true
+        }),
+        new UserPreference({
+            name: 'page_size',
+            type: "number",
+            title: "Results Page Size",
+            description: "Default Page Size to use for result pagination",
+            default_value: 50,
+        }),
+        new UserPreference({
+            name: "remember_page_size",
+            type: "boolean",
+            title: "Remember Results Page Size",
+            description: "Remember last used page size when displaying results",
+            default_value: true,
+        }),
+        new UserPreference({
+            name: 'details_colon',
+            type: "boolean",
+            title: "Full Details Colon Suffix",
+            description: "Append a colon (:) to the names in the Full Details dialog",
+            default_value: false
+        })
+    ]
+)
 
 export const whoisRoute = new RouteElement({
     path: "/whois",
     title: "Whois",
     component: null,
     options: [
-
+    //   new OptionElement({
+    //     icon: <EqualizerIcon />,
+    //     text: "Stats",
+    //     childComponent: <StatsPage />
+    //   }),
       new OptionElement({
         icon: <HelpIcon />,
         text: "Help",
-        handleClick: ({optionsContext}) => {
-            optionsContext.setOptionsState(
-                update(optionsContext.optionsState, {
-                    helpOpen: {$set: true}
-            }))
-        }
+        childComponent: <HelpPage />
       }),
     ]
   })
@@ -51,20 +95,13 @@ export const whoisNavigation = new NavigationElement({
     text: "Whois Search"
   })
 
-export const GeneralOptions = ({ formData, setFormData }) => {
-    const [fangStatus, setFangStatus] = useState(formData.fang)
-    const preferences = useContext(UserPreferencesContext)
-
-    useEffect(() => {
-        setFangStatus(formData.fang)
-    }, [formData.fang])
+const GeneralOptions = ({}) => {
+    const preferences = useUserPreferences('whois')
+    const [fangStatus, setFangStatus] = useState(preferences.getPref('fang'))
 
     const toggleFangOption = () => {
+        preferences.setPref('fang', !fangStatus)
         setFangStatus(!fangStatus)
-        setFormData(update(formData, {
-            fang: {$set: !fangStatus}
-        }))
-        preferences.setPref('whois', 'fang', !fangStatus)
     }
 
     return (
@@ -87,10 +124,8 @@ export const GeneralOptions = ({ formData, setFormData }) => {
 }
 
 const WhoisHandler = ({}) => {
-    const preferences = useContext(UserPreferencesContext)
-    const formPrefs = preferences.getPrefs('whois', {
-        fang: true,
-    })
+    const preferences = useUserPreferences('whois')
+    const formPrefs = preferences.getPrefs()
 
     const [formData, setFormData] = useState({
         query: "",
@@ -137,7 +172,7 @@ const WhoisHandler = ({}) => {
 
         console.log(formData)
 
-        if (formData.fang) {
+        if (preferences.getPref('fang')) {
             let refanged = formData.query.replace('[.]', '.')
             if (refanged !== formData.query) {
                 updated = update(formData, {
@@ -209,7 +244,6 @@ const WhoisHandler = ({}) => {
                 </form>
             </Container>
             {wtable}
-            <HelpPage />
         </React.Fragment>
     )
 }

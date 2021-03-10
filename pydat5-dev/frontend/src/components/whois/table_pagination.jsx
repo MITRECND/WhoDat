@@ -8,6 +8,8 @@ import KeyboardArrowLeft from '@material-ui/icons/KeyboardArrowLeft';
 import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
 import LastPageIcon from '@material-ui/icons/LastPage';
 
+import {useUserPreferences} from '../helpers/preferences'
+
 const usePaginationStyles = makeStyles((theme) => ({
     root: {
         flexShrink: 0,
@@ -76,13 +78,16 @@ export const Paginator = ({
     columnLength,
     validPageSizes,
 }) => {
-
+    const preferences = useUserPreferences('whois')
     const handleChangePage = (event, newPage) => {
         gotoPage(newPage)
       };
 
     const handleChangeRowsPerPage = (event) => {
-        setPageSize(parseInt(event.target.value))
+      if (preferences.getPref("remember_page_size")) {
+        preferences.setPref("page_size", parseInt(event.target.value))
+      }
+      setPageSize(parseInt(event.target.value))
     };
 
     return (

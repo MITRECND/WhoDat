@@ -1,4 +1,4 @@
-import React, {createContext} from 'react'
+import React, {createContext, useState} from 'react'
 import {Link as RouterLink, matchPath} from 'react-router-dom'
 
 import MenuItem from '@material-ui/core/MenuItem'
@@ -6,56 +6,133 @@ import Link from '@material-ui/core/Link'
 import IconButton from '@material-ui/core/IconButton'
 import Tooltip from '@material-ui/core/Tooltip'
 
+
+const DesktopOption = ({
+    icon,
+    optionsContext,
+    handleClick = null,
+    childComponent = null,
+    tooltip = null,
+}) => {
+    const [anchorEl, setAnchorEl] = useState(null)
+    const [open, setOpen] = useState(false)
+    const onClose = () => {
+        setAnchorEl(null)
+        setOpen(false)
+    }
+
+    let iconProps = {}
+    if (handleClick !== null) {
+        iconProps.onClick = (e) => {
+            setAnchorEl(e.currentTarget)
+            handleClick({
+                optionsContext: optionsContext
+            })
+        }
+    }
+
+    if (childComponent !== null) {
+        iconProps.onClick = () => {
+            setOpen(true)
+        }
+    }
+
+    const button = (
+        <React.Fragment>
+            <IconButton
+                color="inherit"
+                {...iconProps}
+            >
+                {icon}
+            </IconButton>
+            {childComponent && (
+                React.cloneElement(childComponent, {
+                    open: open,
+                    onClose: onClose,
+                    anchorEl: anchorEl
+                }))
+            }
+        </React.Fragment>
+    )
+
+    if (tooltip !== null) {
+        return (
+            <Tooltip title={tooltip} placement="bottom">
+                {button}
+            </Tooltip>
+        )
+    } else {
+        return button
+    }
+}
+
+const MobileOption = ({
+    icon,
+    text,
+    optionsContext,
+    handleClick = null,
+    childComponent = null,
+}) => {
+    return (
+        <span
+            onClick={() => {
+                handleClick({
+                    optionsContext
+                })
+            }}
+        >
+            <IconButton color="inherit">
+                {icon}
+            </IconButton>
+            {text}
+        </span>
+    )
+}
 export class OptionElement {
-    constructor({icon, text, handleClick, tooltip=null}) {
+    constructor({
+        icon,
+        text,
+        handleClick = null,
+        tooltip=null,
+        childComponent=null
+    }) {
         this.icon = icon
         this.text = text
         this.handleClick = handleClick
         this.tooltip = tooltip
+        this.childComponent = childComponent
+
+        if (childComponent !== null) {
+            if (!(React.isValidElement(childComponent))) {
+                throw TypeError("childComponent must be a valid React Component")
+            }
+        }
     }
 
     getDesktopElement({optionsContext, index = null}) {
-        const button = (
-            <IconButton
+        return (
+            <DesktopOption
                 key={index}
-                onClick={() => {
-                    this.handleClick({
-                        optionsContext: optionsContext
-                    })
-                }}
-                color="inherit"
-            >
-                {this.icon}
-            </IconButton>
+                icon={this.icon}
+                handleClick={this.handleClick}
+                childComponent={this.childComponent}
+                optionsContext={optionsContext}
+            />
         )
-
-        if (this.tooltip !== null) {
-            return (
-                <Tooltip title={this.tooltip} placement="bottom">
-                    {button}
-                </Tooltip>
-            )
-        } else {
-            return button
-        }
     }
 
     getMobileElement({optionsContext, index = null}) {
         return (
-            <MenuItem
+            <MobileOption
                 key={index}
-                onClick={() => {
-                    this.handleClick({
-                        optionsContext
-                    })
-                }}
-            >
-                <IconButton color="inherit">
-                    {this.icon}
-                </IconButton>
-                {this.text}
-            </MenuItem>
+                icon={this.icon}
+                text={this.text}
+                handleClick={this.handleClick}
+                childComponent={this.childComponent}
+                optionsContext={optionsContext}
+            />
         )
+
     }
 
 }

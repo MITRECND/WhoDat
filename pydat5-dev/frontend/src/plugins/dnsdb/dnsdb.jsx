@@ -19,7 +19,7 @@ import SettingsIcon from '@material-ui/icons/Settings';
 
 import DNSDBWebHandler from './web_handler'
 import { BackdropLoader } from '../../components/helpers/loaders'
-import {UserPreferencesContext} from '../../components/helpers/preferences'
+import {useUserPreferences} from '../../components/helpers/preferences'
 
 
 
@@ -125,7 +125,7 @@ const MenuProps = {
 
 
 const DNSDBGeneralOptions = ({formData, setFormData}) => {
-    const preferences = useContext(UserPreferencesContext)
+    const preferences = useUserPreferences('dnsdb')
     const AllRRTypesList = [
         'any',
         'a',
@@ -154,6 +154,10 @@ const DNSDBGeneralOptions = ({formData, setFormData}) => {
     ]
 
     const handleOnChange = (e) => {
+        if (e.target.name == "domainsearchtype" && preferences.getPref("remember_domain_search_type")) {
+            preferences.setPref("domain_search_type", e.target.value)
+        }
+
         console.log(e.target)
         setFormData(update(formData, {
             [e.target.name]: {$set: e.target.value}
@@ -348,6 +352,7 @@ const useStyles = makeStyles((theme) => ({
 }))
 
 const DNSDB = () => {
+    const preferences = useUserPreferences('dnsdb')
     const [formData, setFormData] = useState({
         value: "",
         limit: 10000,
@@ -358,7 +363,7 @@ const DNSDB = () => {
         tlb: "",
         tfa: "",
         tfb: "",
-        domainsearchtype: "prefix-wildcard"
+        domainsearchtype: preferences.getPref("remember_domain_search_type") ? preferences.getPref("domain_search_type") : "prefix-wildcard"
     })
 
     const [queryData, setQueryData] = useState({

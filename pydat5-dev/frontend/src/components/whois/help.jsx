@@ -373,22 +373,8 @@ The above queries will all return different data, with the last one being the
 most generic and probably returning the most data.
 `
 
-const HelpPage = ({}) => {
+const HelpPage = ({open, onClose}) => {
     const optionsContext = useContext(OptionsContext)
-    const [open, setOpen] = useState(false)
-
-    const onClose = () => {
-        optionsContext.setOptionsState(
-            update(optionsContext.optionsState, {
-                helpOpen: {$set: false}
-        }))
-    }
-
-    useEffect(() => {
-        if (optionsContext.optionsState.hasOwnProperty('helpOpen')){
-            setOpen(optionsContext.optionsState.helpOpen)
-        }
-    }, [optionsContext.optionsState.helpOpen])
 
     return (
         <React.Fragment>

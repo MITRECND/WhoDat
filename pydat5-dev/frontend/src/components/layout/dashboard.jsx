@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState, useRef } from 'react';
 import clsx from 'clsx';
 
 import { makeStyles} from '@material-ui/core/styles';
@@ -18,6 +18,7 @@ import ListItemText from '@material-ui/core/ListItemText';
 import {PluginManagers} from '../plugins'
 import {whoisRoute, whoisNavigation} from '../whois'
 import {OptionsContext} from '../layout'
+import { userPreferencesOption } from '../helpers/preferences';
 
 
 // https://material-ui.com/components/app-bar/#app-bar-with-a-primary-search-field
@@ -174,10 +175,11 @@ const Options = () => {
   let match = []
   for (const name in routes) {
     if (routes[name].matchRoute(location.pathname)) {
-      match = routes[name].options
+      match = [...routes[name].options]
       break
     }
   }
+  match.push(userPreferencesOption)
 
   const menuId = 'mobile-options-menu'
   const mobileMenu = (
@@ -191,10 +193,12 @@ const Options = () => {
       onClose={handleMenuClose}
     >
       {match.map((option_element, index) => (
-        option_element.getMobileElement({
-          optionsContext: optionsContext,
-          index: index
-        })
+        <MenuItem key={index}>
+          {option_element.getMobileElement({
+            optionsContext: optionsContext
+          })}
+        </MenuItem>
+
       ))}
 
     </Menu>
