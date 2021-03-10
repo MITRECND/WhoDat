@@ -20,6 +20,7 @@ import SettingsIcon from '@material-ui/icons/Settings';
 import DNSDBWebHandler from './web_handler'
 import { BackdropLoader } from '../../components/helpers/loaders'
 import {useUserPreferences} from '../../components/helpers/preferences'
+import { useSnackbar } from 'notistack'
 
 
 
@@ -278,6 +279,7 @@ const DNSDBResults = (props) => {
     const [queryBlock, setQueryBlock] = useState(
         <React.Fragment> </React.Fragment>
     )
+    const {enqueueSnackbar} = useSnackbar()
 
     useEffect(() => {
         setQueryBlock(
@@ -323,6 +325,8 @@ const DNSDBResults = (props) => {
                         </Container>
 
                     )
+                } else {
+                    enqueueSnackbar("Unable to query DNSDB API", {variant: "error"})
                 }
                 console.log(err)
             }

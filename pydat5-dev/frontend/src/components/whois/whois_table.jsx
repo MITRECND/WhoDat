@@ -23,6 +23,8 @@ import {
     useTable,
 } from 'react-table'
 
+import {useSnackbar} from 'notistack'
+
 import {queryFetcher} from '../helpers/fetchers'
 import ExpandedEntryRow from './expandable'
 import {useUserPreferences} from '../helpers/preferences'
@@ -386,6 +388,7 @@ const WhoisTable = ({queryData}) => {
         page_count: 0,
         total_records: 0
     })
+    const {enqueueSnackbar} = useSnackbar()
 
     const fetchData = useCallback(({pageSize, pageIndex, sortBy=[]}) => {
         const asyncfetch = async () => {
@@ -417,6 +420,7 @@ const WhoisTable = ({queryData}) => {
                 setPending(false)
 
             } catch (err) {
+                enqueueSnackbar("Unable to fetch data from backend", {variant: 'error'})
                 console.log(err)
             }
         }

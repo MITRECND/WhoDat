@@ -23,6 +23,8 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
 import CheckBox from '@material-ui/core/Checkbox'
 
+import {useSnackbar} from 'notistack'
+
 
 import {domainFetcher} from '../helpers/fetchers'
 import { useUserPreferences } from '../helpers/preferences';
@@ -351,6 +353,7 @@ const RecordDetailsTab = (props) => {
 
 const HistoricalTab = (props) => {
     const [domainInfo, setDomainInfo] = useState(null)
+    const {enqueueSnackbar} = useSnackbar()
 
     useEffect(() => {
         if (props.index === props.value && domainInfo == null) {
@@ -368,6 +371,7 @@ const HistoricalTab = (props) => {
                 setDomainInfo(results.results)
 
             } catch (err) {
+                enqueueSnackbar("Unable to fetch history", {variant: "error"})
                 console.log(err)
             }
         }

@@ -8,6 +8,8 @@ import Badge from '@material-ui/core/Badge'
 import StorageIcon from '@material-ui/icons/Storage';
 import CircularProgress from '@material-ui/core/CircularProgress'
 
+import { useSnackbar } from 'notistack'
+
 import {statusFetcher} from '../helpers/fetchers'
 
 
@@ -32,6 +34,7 @@ const ClusterStatus = ({}) => {
     const [loaded, setLoaded] = useState(false)
     const [clusterStatus, setClusterStats] = useState({timestamp: 0})
     const timeout = 30 * 10000 // convert to ms
+    const {enqueueSnackbar} = useSnackbar()
 
     const fetchStatus = () => {
         const asyncfetch = async () => {
@@ -67,6 +70,7 @@ const ClusterStatus = ({}) => {
                 })
                 setLoaded(true)
             } catch (err) {
+                enqueueSnackbar("Unable to query Cluster Status", {variant: "warning"})
                 console.log(err)
             } finally {
                 setFetching(false)

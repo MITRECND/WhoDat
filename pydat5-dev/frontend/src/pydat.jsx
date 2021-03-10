@@ -17,6 +17,8 @@ import Dashboard from './components/layout/dashboard'
 import NotFound from './components/layout/notfound'
 import {BackdropLoader} from './components/helpers/loaders'
 import { defaultTheme, darkTheme } from './components/layout/themes'
+import Slide from '@material-ui/core/Slide'
+import {SnackbarProvider} from 'notistack'
 
 const WhoisHandler = React.lazy(() => import('./components/whois'))
 
@@ -32,31 +34,40 @@ const Pydat = () => {
         <React.Fragment>
                 <ThemeProvider theme={theme}>
                     <Router>
-                        <Dashboard>
-                            <Suspense fallback={<BackdropLoader/>}>
-                                <Switch>
-                                    <Route exact path="/">
-                                        <Redirect to="/whois" />
-                                    </Route>
-                                    <Route exact path="/whois">
-                                        <WhoisHandler/>
-                                    </Route>
-                                    {Object.keys(routes.plugins).map((name, index) => {
-                                        return (
-                                            <Route
-                                                key={index}
-                                                exact
-                                                path={routes.plugins[name].path}
-                                                {...routes.plugins[name].extra}
-                                            >
-                                                {React.cloneElement(routes.plugins[name].component)}
-                                            </Route>
-                                        )
-                                    })}
-                                    <Route component={NotFound} />
-                                </Switch>
-                            </Suspense>
-                        </Dashboard>
+                        <SnackbarProvider
+                            anchorOrigin={{
+                                vertical: "top",
+                                horizontal: "right"
+                            }}
+                            TransitionComponent={Slide}
+                            maxSnack={3}
+                        >
+                            <Dashboard>
+                                <Suspense fallback={<BackdropLoader/>}>
+                                    <Switch>
+                                        <Route exact path="/">
+                                            <Redirect to="/whois" />
+                                        </Route>
+                                        <Route exact path="/whois">
+                                            <WhoisHandler/>
+                                        </Route>
+                                        {Object.keys(routes.plugins).map((name, index) => {
+                                            return (
+                                                <Route
+                                                    key={index}
+                                                    exact
+                                                    path={routes.plugins[name].path}
+                                                    {...routes.plugins[name].extra}
+                                                >
+                                                    {React.cloneElement(routes.plugins[name].component)}
+                                                </Route>
+                                            )
+                                        })}
+                                        <Route component={NotFound} />
+                                    </Switch>
+                                </Suspense>
+                            </Dashboard>
+                        </SnackbarProvider>
                     </Router>
                 </ThemeProvider>
         </React.Fragment>
