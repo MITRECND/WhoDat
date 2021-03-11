@@ -24,25 +24,9 @@ import {RegularDialog} from './components/layout/dialogs'
 import {MenuElement} from './components/layout'
 import {PluginManagers} from './components/plugins'
 import {activeResolutionFetcher} from './components/helpers/fetchers'
+import {appSettings} from './settings'
 
 
-const generalPreferencesNamespace = new UserPreferenceNamespace({
-    name: "general",
-    title: "General PyDat Preferences",
-    description: "General Preferences across the PyDat Search"
-})
-userPreferencesManager.registerNamespace(generalPreferencesNamespace)
-userPreferencesManager.registerPrefs(
-    generalPreferencesNamespace, [
-        new UserPreference({
-            name: "ar_confirm",
-            type: "boolean",
-            title: "Prompt/Confirm before making Active queries",
-            description: "To prevent accidental dns queries, pydat will confirm before making requests. Toggle this to disable that confirmation",
-            default_value: true
-        })
-
-])
 
 const ActiveResolutionConfirmation = ({
     data,
@@ -167,10 +151,33 @@ const ActiveResolutionDialog = ({open, onClose, data}) => {
     )
 }
 
+const ARENABLED = appSettings.hasOwnProperty("enable_active_resolution") && appSettings.enable_active_resolution ? true : false
+
+const generalPreferencesNamespace = new UserPreferenceNamespace({
+    name: "general",
+    title: "General PyDat Preferences",
+    description: "General Preferences across the PyDat Search"
+})
+
 const ActiveResolutionMenu = new MenuElement({
     text: "Actively Resolve",
     RenderComponent: <ActiveResolutionDialog/>
 })
 
-PluginManagers.menu.addPlugin("active_resolution", "domain", ActiveResolutionMenu)
-PluginManagers.menu.addPlugin("active_resolution", "tld", ActiveResolutionMenu)
+if (ARENABLED) {
+    userPreferencesManager.registerNamespace(generalPreferencesNamespace)
+    userPreferencesManager.registerPrefs(
+        generalPreferencesNamespace, [
+            new UserPreference({
+                name: "ar_confirm",
+                type: "boolean",
+                title: "Prompt/Confirm before making Active queries",
+                description: "To prevent accidental dns queries, pydat will confirm before making requests. Toggle this to disable that confirmation",
+                default_value: true
+            })
+
+    ])
+
+    PluginManagers.menu.addPlugin("active_resolution", "domain", ActiveResolutionMenu)
+    PluginManagers.menu.addPlugin("active_resolution", "tld", ActiveResolutionMenu)
+}
