@@ -44,8 +44,10 @@ def create_app(config=None):
 
     # Register Framework Blueprints
     from pydat.api.controller.session import session_bp
+    from pydat.api.controller.settings import settings_bp
     from pydat.api.controller.v1.whois import whoisv1_bp
     from pydat.api.controller.v2.whois import whoisv2_bp
+    app.register_blueprint(settings_bp, url_prefix="/api/v2")
     app.register_blueprint(session_bp, url_prefix="/api/v2")
     app.register_blueprint(whoisv2_bp, url_prefix="/api/v2")
 
