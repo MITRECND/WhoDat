@@ -357,22 +357,20 @@ const useStyles = makeStyles((theme) => ({
 
 const DNSDB = () => {
     const preferences = useUserPreferences('dnsdb')
-    const [formData, setFormData] = useState({
+    const defaultFormFields = {
+        type: "domain",
         value: "",
         limit: 10000,
-        field: "RRName",
-        type: "domain",
         rrtypes: ['any'],
         tla: "",
         tlb: "",
         tfa: "",
         tfb: "",
         domainsearchtype: preferences.getPref("remember_domain_search_type") ? preferences.getPref("domain_search_type") : "prefix-wildcard"
-    })
+    }
 
-    const [queryData, setQueryData] = useState({
-        ...formData
-    })
+    const [formData, setFormData] = useState({...defaultFormFields})
+    const [queryData, setQueryData] = useState({...formData})
 
     const forwardQueryTypes = {
         'domain': "Domain",
@@ -390,6 +388,7 @@ const DNSDB = () => {
     }
 
     const classes = useStyles()
+    const {enqueueSnackbar} = useSnackbar()
 
     let location = useLocation()
     let history = useHistory()
@@ -399,15 +398,67 @@ const DNSDB = () => {
             ignoreQueryPrefix: true
         })
 
-        if (!!query_params) {
+        let updated = null
+        if (Object.keys(query_params).length > 0) {
             if ('type' in query_params && 'value' in query_params) {
-                let updated = update(formData, {
+                let temp = {...formData}
+                temp = update(temp, {
                     type: {$set: query_params.type},
                     value: {$set: query_params.value}
                 })
-                setFormData(updated)
-                setQueryData(updated)
+
+                for (let name in query_params) {
+                    if (name === "type" || name === "value") {
+                        continue
+                    }
+                    if (name in formData) {
+                        switch (name) {
+                            case "tla":
+                            case "tlb":
+                            case "tfa":
+                            case "tfb":
+                            case "domainsearchtype":
+                                temp = update(temp, {
+                                    [name]: {$set: query_params[name]}
+                                })
+                                break
+                            case "limit":
+                                try {
+                                    let limit = parseInt(query_params[name])
+                                    temp = update(temp, {
+                                        [name]: {$set: limit}
+                                    })
+                                } catch (err) {
+                                    enqueueSnackbar(`Unable to parse number from limit in arguments`, {variant: 'error'})
+                                }
+                                break
+                            case 'rrtypes':
+                                try {
+                                    let rrtypes = query_params[name].split(',')
+                                    temp = update(temp, {
+                                        [name]: {$set: rrtypes}
+                                    })
+                                } catch (err) {
+                                    enqueueSnackbar(`Unable to parse rrtypes from arguments`, {variant: 'error'})
+                                }
+                                break
+                            default:
+                                enqueueSnackbar(`Unexpected paramater ${name} in arguments`, {variant: 'warning'})
+
+                        }
+                    } else {
+                        enqueueSnackbar(`Unexpected paramater ${name} in arguments`, {variant: 'warning'})
+                    }
+                }
+                updated = temp
             }
+        } else {
+            updated = {...defaultFormFields}
+        }
+
+        if (updated !== null) {
+            setFormData(updated)
+            setQueryData(updated)
         }
     }, [location])
 
@@ -415,12 +466,31 @@ const DNSDB = () => {
     const handleOnSubmit = (e) => {
         e.preventDefault()
 
+        let search_params = []
+
+        for (let name in formData) {
+            switch(name){
+                case "rrtypes":
+                    let rrtypes = formData.rrtypes.join(',')
+                    search_params.push(
+                        `${name}=${encodeURIComponent(rrtypes)}`
+                    )
+                    break
+                default:
+                    if (!!formData[name]){
+                        search_params.push(
+                            `${name}=${encodeURIComponent(formData[name])}`
+                        )
+                    }
+
+            }
+        }
+
+        let search_string = `?${search_params.join('&')}`
+
         history.push({
             pathname: location.pathname,
-            search: (
-                `?type=${encodeURIComponent(formData.type)}&` +
-                `value=${encodeURIComponent(formData.value)}`
-            )
+            search: search_string
         })
 
         // setQueryData({...formData})

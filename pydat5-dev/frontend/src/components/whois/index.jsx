@@ -31,6 +31,7 @@ import {OptionsContext} from '../layout'
 import HelpPage from './help'
 // import StatsPage from './stats'
 import ClusterStatus from './status'
+import { useSnackbar } from 'notistack'
 
 const whoisPreferencesNamespace = new UserPreferenceNamespace({
     name: "whois",
@@ -125,50 +126,49 @@ const GeneralOptions = ({}) => {
 
 const WhoisHandler = ({}) => {
     const preferences = useUserPreferences('whois')
-    const formPrefs = preferences.getPrefs()
 
     const [formData, setFormData] = useState({
         query: "",
-        ...formPrefs
     })
 
     const [queryData, setQueryData] = useState({
         ...formData
     })
 
-    const optionsContext = useContext(OptionsContext)
-
-    useEffect(() => {
-        optionsContext.setOptionsState(
-            update(optionsContext.optionsState, {
-                helpOpen: {$set: false},
-                statsOpen: {$set: false}
-        }))
-    }, [])
-
+    const {enqueueSnackbar} = useSnackbar()
     const location = useLocation()
     let history = useHistory()
 
     useEffect(() => {
         console.log(location)
-        let query_param = qs.parse(location.search, {
-            ignoreQueryPrefix: true
-        }).query
-
-        if (!!query_param) {
-            let updated = update(formData, {
-                query: {$set: query_param}
-            })
-
-            setFormData(updated)
-            setQueryData(updated)
+        let query_string
+        try {
+            query_string = qs.parse(location.search, {
+                ignoreQueryPrefix: true
+            }).query
+        } catch (err) {
+            enqueueSnackbar("Unable to parse query from params", {variant: "error"})
         }
+
+        let updated
+        if (!!query_string) {
+            updated = update(formData, {
+                query: {$set: query_string}
+            })
+        } else {
+            updated = update(formData, {
+                query: {$set: ""}
+            })
+        }
+
+        setFormData(updated)
+        setQueryData(updated)
     }, [location])
 
     const handleOnSubmit = (e) => {
         e.preventDefault()
 
-        let updated = formData
+        let updated = {...formData}
 
         console.log(formData)
 
