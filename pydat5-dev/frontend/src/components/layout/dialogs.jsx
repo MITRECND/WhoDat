@@ -21,6 +21,10 @@ const useStyles = makeStyles((theme) => ({
     marginLeft: theme.spacing(2),
     flex: 1,
   },
+  regularDialog: {
+      marginTop: '1rem',
+      minHeight: '5vh'
+  }
 }));
 
 // const Transition = React.forwardRef(function Transition(props, ref) {
@@ -60,6 +64,39 @@ export const FullScreenDialog = ({open, onClose, title, children}) => {
     </React.Fragment>
   );
 }
+
+export const RegularDialog = ({open, onClose, title, children}) => {
+    const classes = useStyles();
+
+    const handleClose = () => {
+      onClose()
+    };
+
+    return (
+      <React.Fragment>
+          <Dialog
+              open={open}
+              onClose={handleClose}
+              maxWidth="md"
+              fullWidth
+          >
+              <AppBar className={classes.appBar}>
+                  <Toolbar variant="dense">
+                      <IconButton edge="start" color="inherit" onClick={handleClose} aria-label="close">
+                          <CloseIcon />
+                      </IconButton>
+                      <Typography variant="h6" className={classes.title}>
+                          {title}
+                      </Typography>
+                  </Toolbar>
+              </AppBar>
+              <Container className={classes.regularDialog}>
+                  {children}
+              </Container>
+          </Dialog>
+      </React.Fragment>
+    );
+  }
 
 
 export const SearchSettings = (props) => {

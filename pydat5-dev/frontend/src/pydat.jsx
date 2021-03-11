@@ -10,6 +10,7 @@ import { ThemeProvider } from '@material-ui/styles'
 import useMediaQuery from '@material-ui/core/useMediaQuery'
 
 import './plugins'
+import './active_resolution'
 
 import {PluginManagers} from './components/plugins'
 import {userPreferencesContainer} from './components/helpers/preferences'

@@ -162,14 +162,61 @@ export class NavigationElement {
     }
 }
 
-export class MenuElement {
-    constructor ({path, text, external = false}) {
-        this.path = path
-        this.text = text
-        this.external = external
+const MenuDialogWrapper = (props) => {
+    const [open, setOpen] = useState(false)
+
+    const onClose = () => {
+        setOpen(false)
     }
 
-    getComponent(data, key = null) {
+    const handleOnClick = (e) => {
+        e.preventDefault()
+        setOpen(true)
+    }
+
+    let menuProps = {...props}
+    delete menuProps.dialogProps
+
+    return (
+        <React.Fragment>
+            <MenuItem {...menuProps} onClick={handleOnClick}>
+                {props.dialogProps.text}
+            </MenuItem>
+            {open &&
+                React.cloneElement(props.dialogProps.RenderComponent, {
+                    data: props.dialogProps.data,
+                    open: open,
+                    onClose: onClose,
+            })}
+        </React.Fragment>
+    )
+}
+
+export class MenuElement {
+    constructor ({
+            text,
+            path = null,
+            RenderComponent = null,
+            external = false
+    }) {
+        this.text = text
+        this.RenderComponent = RenderComponent
+        this.path = path
+        this.external = external
+        this._getLinkComponent.bind(this)
+        this._getDialogComponent.bind(this)
+        this.getComponent.bind(this)
+
+        if (RenderComponent === null && path === null){
+            throw TypeError("Either 'path' or 'RenderComponent' must be defined")
+        }
+
+        if (RenderComponent !== null && !React.isValidElement(RenderComponent)) {
+            throw TypeError("RenderComponent must be a valid React element")
+        }
+    }
+
+    _getLinkComponent(data, key = null) {
         let link_props
 
         //https://stackoverflow.com/questions/5999998/check-if-a-variable-is-of-function-type
@@ -197,6 +244,28 @@ export class MenuElement {
                 {this.text}
             </MenuItem>
         )
+    }
+
+    _getDialogComponent(data, key = null) {
+        return (
+            <MenuDialogWrapper
+                dialogProps={{
+                    text: this.text,
+                    RenderComponent: this.RenderComponent,
+                    data: data
+                }}
+                key={key}
+            />
+        )
+    }
+
+    getComponent(data, key = null) {
+        if (this.path !== null) {
+            return this._getLinkComponent(data, key)
+        } else {
+            return this._getDialogComponent(data, key)
+        }
+
     }
 }
 

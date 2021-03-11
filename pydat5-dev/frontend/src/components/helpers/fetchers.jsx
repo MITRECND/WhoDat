@@ -81,3 +81,23 @@ export const statusFetcher = async () => {
         throw response
     }
 }
+
+export const activeResolutionFetcher = async ({
+    domainName
+}) => {
+    let response = await fetch (
+        `/api/v2/resolve/${encodeURIComponent(domainName)}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+
+            },
+    })
+
+    if (response.status === 200) {
+        let jresp = await response.json()
+        return jresp
+    } else {
+        throw response
+    }
+}
