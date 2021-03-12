@@ -444,13 +444,15 @@ class DataReader(Thread):
         try:
             dnsreader = csv.reader(csvfile, strict=True, skipinitialspace=True)
         except Exception:
-            LOGGER.exception("Unable to setup csv reader for file %s" % filename)
+            LOGGER.exception("Unable to setup csv reader for file %s"
+                             % filename)
             return
 
         try:
             header = next(dnsreader)
         except Exception:
-            LOGGER.exception("Unable to iterate through csv file %s" % filename)
+            LOGGER.exception("Unable to iterate through csv file %s"
+                             % filename)
             return
 
         try:
@@ -1473,7 +1475,8 @@ def main():
 
     # Setup template
     base_path = os.path.dirname(os.path.realpath(__file__))
-    template_path = os.path.join(base_path, "..", "configuration", f"es{major}.data.template")
+    template_path = os.path.join(base_path, "..", "configuration",
+                                 f"es{major}.data.template")
 
     if not os.path.exists(template_path):
         myLogger.error("Unable to find template at %s" % template_path)
@@ -1698,8 +1701,11 @@ def main():
     reader_thread.start()
 
     for pipeline_id in range(options.procs):
-        p = DataProcessor(pipeline_id, datafile_queue, statTracker.get_tracker(),
-                          logger.getLogger(name=f'{pipeline_id}'), eventTracker, options)
+        p = DataProcessor(pipeline_id,
+                          datafile_queue,
+                          statTracker.get_tracker(),
+                          logger.getLogger(name=f'{pipeline_id}'),
+                          eventTracker, options)
         p.start()
         pipelines.append(p)
 
