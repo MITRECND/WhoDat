@@ -161,20 +161,49 @@ def test_query(monkeypatch, config_app, es_handler):
     assert response.status_code == 400
     response = client.post("/api/v2/query", json={"query": "query"})
     assert response.status_code == 200
-    # valid sort key
+
+    # test valid sort keys
+    # Invalid syntax
     response = client.post(
         "/api/v2/query",
         json={"query": "query", "sort_keys": {"domainName": "swirl"}},
     )
     assert response.status_code == 400
+    # Missing 'dir'
     response = client.post(
         "/api/v2/query",
-        json={"query": "query", "sort_keys": {"fake_key": "desc"}},
+        json={"query": "query", "sort_keys": [{"name": "domainName"}]},
     )
     assert response.status_code == 400
+    # Invalid key name
     response = client.post(
         "/api/v2/query",
-        json={"query": "query", "sort_keys": {"domainName": "asc"}},
+        json={"query": "query",
+              "sort_keys": [{"name": "fake_key", "dir": "desc"}]},
+    )
+    assert response.status_code == 400
+    # Invalid direction
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query",
+              "sort_keys": [{"name": "domainName", "dir": "down"}]},
+    )
+    assert response.status_code == 400
+    # Valid sort key
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query",
+              "sort_keys": [{"name": "domainName", "dir": "asc"}]},
+    )
+    assert response.status_code == 200
+    # Multiple keys
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query",
+              "sort_keys": [
+                  {"name": "domainName", "dir": "asc"},
+                  {"name": "registrant_name", "dir": "asc"}
+              ]},
     )
     assert response.status_code == 200
     response = client.post(
