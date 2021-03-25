@@ -1,4 +1,4 @@
-import React, {Suspense} from 'react'
+import React from 'react'
 import {
     BrowserRouter as Router,
     Switch,
@@ -6,21 +6,24 @@ import {
     Redirect
 } from 'react-router-dom'
 
-import { ThemeProvider } from '@material-ui/styles'
+import ThemeProvider from '@material-ui/styles/ThemeProvider'
 import useMediaQuery from '@material-ui/core/useMediaQuery'
+import Slide from '@material-ui/core/Slide'
 
-import './plugins'
+import {SnackbarProvider} from 'notistack'
 
 import {PluginManagers} from './components/plugins'
-import {UserPreferences, UserPreferencesContext} from './components/helpers/preferences'
+import {userPreferencesContainer} from './components/helpers/preferences'
 import Dashboard from './components/layout/dashboard'
 import NotFound from './components/layout/notfound'
-import {BackdropLoader} from './components/helpers/loaders'
-import { defaultTheme, darkTheme } from './components/layout/themes'
+import {defaultTheme, darkTheme } from './components/layout/themes'
 
-
+import './plugins'
+import './active_resolution'
 
 const WhoisHandler = React.lazy(() => import('./components/whois'))
+
+userPreferencesContainer._initializePreferences()
 
 const Pydat = () => {
     const routes = PluginManagers.routes
@@ -30,43 +33,42 @@ const Pydat = () => {
 
     return (
         <React.Fragment>
-            <UserPreferencesContext.Provider value={UserPreferences}>
-                <ThemeProvider theme={theme}>
-                    <Router>
+            <ThemeProvider theme={theme}>
+                <Router>
+                    <SnackbarProvider
+                        anchorOrigin={{
+                            vertical: "top",
+                            horizontal: "right"
+                        }}
+                        TransitionComponent={Slide}
+                        maxSnack={3}
+                    >
                         <Dashboard>
-                            <Suspense fallback={<BackdropLoader/>}>
-                                <Switch>
-                                    <Route exact path="/">
-                                        <Redirect to="/whois" />
-                                    </Route>
-                                    <Route path="/whois">
-                                        <WhoisHandler/>
-                                    </Route>
-                                    <Route path="/help">
-
-                                    </Route>
-                                    <Route path="/stats">
-
-                                    </Route>
-                                    {Object.keys(routes.plugins).map((name, index) => {
-                                        return (
-                                            <Route
-                                                key={index}
-                                                exact
-                                                path={routes.plugins[name].path}
-                                                {...routes.plugins[name].extra}
-                                            >
-                                                {React.cloneElement(routes.plugins[name].component)}
-                                            </Route>
-                                        )
-                                    })}
-                                    <Route component={NotFound} />
-                                </Switch>
-                            </Suspense>
+                            <Switch>
+                                <Route exact path="/">
+                                    <Redirect to="/whois" />
+                                </Route>
+                                <Route exact path="/whois">
+                                    <WhoisHandler/>
+                                </Route>
+                                {Object.keys(routes.plugins).map((name, index) => {
+                                    return (
+                                        <Route
+                                            key={index}
+                                            exact
+                                            path={routes.plugins[name].path}
+                                            {...routes.plugins[name].extra}
+                                        >
+                                            {React.cloneElement(routes.plugins[name].component)}
+                                        </Route>
+                                    )
+                                })}
+                                <Route component={NotFound} />
+                            </Switch>
                         </Dashboard>
-                    </Router>
-                </ThemeProvider>
-            </UserPreferencesContext.Provider>
+                    </SnackbarProvider>
+                </Router>
+            </ThemeProvider>
         </React.Fragment>
     )
 }

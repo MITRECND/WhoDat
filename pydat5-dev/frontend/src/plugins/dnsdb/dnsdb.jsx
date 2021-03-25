@@ -14,11 +14,13 @@ import Input from '@material-ui/core/Input'
 import Typography from '@material-ui/core/Typography'
 import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
-import { makeStyles } from '@material-ui/core'
+import { Divider, InputAdornment, ListSubheader, makeStyles } from '@material-ui/core'
+import SettingsIcon from '@material-ui/icons/Settings';
 
 import DNSDBWebHandler from './web_handler'
 import { BackdropLoader } from '../../components/helpers/loaders'
-import {UserPreferencesContext} from '../../components/helpers/preferences'
+import {useUserPreferences} from '../../components/helpers/preferences'
+import { useSnackbar } from 'notistack'
 
 
 
@@ -30,14 +32,25 @@ const dnsdbFetcher = async ({
     tfb,
     tfa,
     tlb,
-    tla
+    tla,
+    domainsearchtype,
 }) => {
 
     let url;
     let data = {}
     if (type === 'domain') {
         url = '/api/plugin/passive/dnsdb/forward'
-        data['domain'] = value
+
+        switch (domainsearchtype) {
+            case 'prefix-wildcard':
+                data['domain'] = `*.${value}`
+                break;
+            case 'suffix-wildcard':
+                data['domain'] = `${value}.*`
+                break;
+            default:
+                data['domain'] = value
+        }
     } else {
         url = '/api/plugin/passive/dnsdb/reverse'
         data['type'] = type
@@ -113,7 +126,7 @@ const MenuProps = {
 
 
 const DNSDBGeneralOptions = ({formData, setFormData}) => {
-    const preferences = useContext(UserPreferencesContext)
+    const preferences = useUserPreferences('dnsdb')
     const AllRRTypesList = [
         'any',
         'a',
@@ -142,6 +155,10 @@ const DNSDBGeneralOptions = ({formData, setFormData}) => {
     ]
 
     const handleOnChange = (e) => {
+        if (e.target.name == "domainsearchtype" && preferences.getPref("remember_domain_search_type")) {
+            preferences.setPref("domain_search_type", e.target.value)
+        }
+
         console.log(e.target)
         setFormData(update(formData, {
             [e.target.name]: {$set: e.target.value}
@@ -234,6 +251,25 @@ const DNSDBGeneralOptions = ({formData, setFormData}) => {
                     </Select>
                     </FormControl>
             </Grid>
+            {formData.type == 'domain' &&
+                <Grid item xs={2}>
+                    <FormControl>
+                    <InputLabel id="domainsearchtype-label">Search Type</InputLabel>
+                        <Select
+                            name="domainsearchtype"
+                            labelId="domainsearchtype-label"
+                            id="domainsearchtype-select"
+                            onChange={handleOnChange}
+                            value={formData.domainsearchtype}
+                        >
+                            <MenuItem value={'prefix-wildcard'}>Prefix Wildcard</MenuItem>
+                            <MenuItem value={'suffix-wildcard'}>Suffix Wildcard</MenuItem>
+                            <MenuItem value={'absolute'}>Absolute</MenuItem>
+                        </Select>
+                        </FormControl>
+                </Grid>
+            }
+
 
         </React.Fragment>
     )
@@ -243,6 +279,7 @@ const DNSDBResults = (props) => {
     const [queryBlock, setQueryBlock] = useState(
         <React.Fragment> </React.Fragment>
     )
+    const {enqueueSnackbar} = useSnackbar()
 
     useEffect(() => {
         setQueryBlock(
@@ -263,7 +300,8 @@ const DNSDBResults = (props) => {
                     tfb: props.queryData.tfb,
                     tfa: props.queryData.tfa,
                     tlb: props.queryData.tlb,
-                    tla: props.queryData.tla
+                    tla: props.queryData.tla,
+                    domainsearchtype: props.queryData.domainsearchtype
                 })
 
                 let queryResults = {
@@ -287,6 +325,8 @@ const DNSDBResults = (props) => {
                         </Container>
 
                     )
+                } else {
+                    enqueueSnackbar("Unable to query DNSDB API", {variant: "error"})
                 }
                 console.log(err)
             }
@@ -316,21 +356,21 @@ const useStyles = makeStyles((theme) => ({
 }))
 
 const DNSDB = () => {
-    const [formData, setFormData] = useState({
+    const preferences = useUserPreferences('dnsdb')
+    const defaultFormFields = {
+        type: "domain",
         value: "",
         limit: 10000,
-        field: "RRName",
-        type: "domain",
         rrtypes: ['any'],
         tla: "",
         tlb: "",
         tfa: "",
-        tfb: ""
-    })
+        tfb: "",
+        domainsearchtype: preferences.getPref("remember_domain_search_type") ? preferences.getPref("domain_search_type") : "prefix-wildcard"
+    }
 
-    const [queryData, setQueryData] = useState({
-        ...formData
-    })
+    const [formData, setFormData] = useState({...defaultFormFields})
+    const [queryData, setQueryData] = useState({...formData})
 
     const forwardQueryTypes = {
         'domain': "Domain",
@@ -348,6 +388,7 @@ const DNSDB = () => {
     }
 
     const classes = useStyles()
+    const {enqueueSnackbar} = useSnackbar()
 
     let location = useLocation()
     let history = useHistory()
@@ -357,15 +398,67 @@ const DNSDB = () => {
             ignoreQueryPrefix: true
         })
 
-        if (!!query_params) {
+        let updated = null
+        if (Object.keys(query_params).length > 0) {
             if ('type' in query_params && 'value' in query_params) {
-                let updated = update(formData, {
+                let temp = {...formData}
+                temp = update(temp, {
                     type: {$set: query_params.type},
                     value: {$set: query_params.value}
                 })
-                setFormData(updated)
-                setQueryData(updated)
+
+                for (let name in query_params) {
+                    if (name === "type" || name === "value") {
+                        continue
+                    }
+                    if (name in formData) {
+                        switch (name) {
+                            case "tla":
+                            case "tlb":
+                            case "tfa":
+                            case "tfb":
+                            case "domainsearchtype":
+                                temp = update(temp, {
+                                    [name]: {$set: query_params[name]}
+                                })
+                                break
+                            case "limit":
+                                try {
+                                    let limit = parseInt(query_params[name])
+                                    temp = update(temp, {
+                                        [name]: {$set: limit}
+                                    })
+                                } catch (err) {
+                                    enqueueSnackbar(`Unable to parse number from limit in arguments`, {variant: 'error'})
+                                }
+                                break
+                            case 'rrtypes':
+                                try {
+                                    let rrtypes = query_params[name].split(',')
+                                    temp = update(temp, {
+                                        [name]: {$set: rrtypes}
+                                    })
+                                } catch (err) {
+                                    enqueueSnackbar(`Unable to parse rrtypes from arguments`, {variant: 'error'})
+                                }
+                                break
+                            default:
+                                enqueueSnackbar(`Unexpected paramater ${name} in arguments`, {variant: 'warning'})
+
+                        }
+                    } else {
+                        enqueueSnackbar(`Unexpected paramater ${name} in arguments`, {variant: 'warning'})
+                    }
+                }
+                updated = temp
             }
+        } else {
+            updated = {...defaultFormFields}
+        }
+
+        if (updated !== null) {
+            setFormData(updated)
+            setQueryData(updated)
         }
     }, [location])
 
@@ -373,12 +466,31 @@ const DNSDB = () => {
     const handleOnSubmit = (e) => {
         e.preventDefault()
 
+        let search_params = []
+
+        for (let name in formData) {
+            switch(name){
+                case "rrtypes":
+                    let rrtypes = formData.rrtypes.join(',')
+                    search_params.push(
+                        `${name}=${encodeURIComponent(rrtypes)}`
+                    )
+                    break
+                default:
+                    if (!!formData[name]){
+                        search_params.push(
+                            `${name}=${encodeURIComponent(formData[name])}`
+                        )
+                    }
+
+            }
+        }
+
+        let search_string = `?${search_params.join('&')}`
+
         history.push({
             pathname: location.pathname,
-            search: (
-                `?type=${encodeURIComponent(formData.type)}&` +
-                `value=${encodeURIComponent(formData.value)}`
-            )
+            search: search_string
         })
 
         // setQueryData({...formData})
@@ -391,56 +503,78 @@ const DNSDB = () => {
     }
 
     const handleOnChangeType = (e) => {
-        setFormData(update(formData,{
-            type: {$set: e.target.value}
-        }))
+        if (e.target.value) {
+            setFormData(update(formData,{
+                type: {$set: e.target.value},
+                value: {$set: ""}
+            }))
+        }
     }
+
+    const typeSelect = (
+        <React.Fragment>
+            <FormControl>
+                {/* <InputLabel id="passive-type-label">Type</InputLabel> */}
+                <Select
+                    name="type"
+                    // labelId="passive-type-label"
+                    id="passive-type-select"
+                    onChange={handleOnChangeType}
+                    value={formData.type}
+                >
+                    <ListSubheader>Forward</ListSubheader>
+                    {Object.keys(forwardQueryTypes).map((name, index) => {
+                        return (
+                            <MenuItem value={name} key={index}>
+                                {forwardQueryTypes[name]}
+                            </MenuItem>
+                        )
+                    })}
+                    <ListSubheader>Reverse</ListSubheader>
+                    {Object.keys(reverseQueryTypes).map((name, index) => {
+                        return (
+                            <MenuItem value={name} key={index}>
+                                {reverseQueryTypes[name]}
+                            </MenuItem>
+                        )
+                    })}
+                </Select>
+            </FormControl>
+        </React.Fragment>
+    )
 
     return (
         <React.Fragment>
             <Container className={classes.searchContainer} maxWidth="xl">
                 <Paper className={classes.searchPaper}>
                     <form onSubmit={handleOnSubmit}>
-                        <Grid container spacing={1} justify="center" alignItems="flex-end">
-                            <Grid container justify="center" alignItems="flex-end" item xs={11}>
-                                <Grid item xs={1}>
-                                    <InputLabel id="passive-type-label">Type</InputLabel>
-                                    <Select
-                                        name="type"
-                                        labelId="passive-type-label"
-                                        id="passive-type-select"
-                                        onChange={handleOnChangeType}
-                                        value={formData.type}
-                                    >
-                                        {Object.keys(forwardQueryTypes).map((name, index) => {
-                                            return (
-                                                <MenuItem value={name} key={index}>
-                                                    {forwardQueryTypes[name]}
-                                                </MenuItem>
-                                            )
-                                        })}
-                                        {Object.keys(reverseQueryTypes).map((name, index) => {
-                                            return (
-                                                <MenuItem value={name} key={index}>
-                                                    {reverseQueryTypes[name]}
-                                                </MenuItem>
-                                            )
-                                        })}
-                                    </Select>
-                                </Grid>
+                        <Grid container spacing={1} direction="row" justify="center" alignItems="flex-end">
                                 <Grid item xs={11}>
                                     <TextField
-                                        label={allQueryTypes[formData.type]}
+                                        label={`Search ${allQueryTypes[formData.type]} Records`}
                                         variant="outlined"
                                         name="value"
                                         value={formData.value}
                                         onChange={handleOnChangeValue}
                                         fullWidth
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment
+                                                    position="start"
+                                                >
+                                                    {typeSelect}
+                                                </InputAdornment>
+                                            )
+                                        }}
+
                                     />
                                 </Grid>
-                            </Grid>
                             <Grid item xs={1}>
-                                <Button variant="outlined" type="submit" fullWidth>
+                                <Button
+                                    variant="outlined"
+                                    type="submit"
+                                    fullWidth
+                                >
                                     Search
                                 </Button>
                             </Grid>

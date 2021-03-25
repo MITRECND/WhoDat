@@ -1,66 +1,61 @@
-import React, { useState } from 'react';
-import {useLocation} from 'react-router-dom'
+import React, { useContext, useEffect, useMemo, useState, useRef } from 'react';
 import clsx from 'clsx';
-import { makeStyles, useTheme } from '@material-ui/core/styles';
-import Drawer from '@material-ui/core/Drawer';
+
+import { makeStyles} from '@material-ui/core/styles';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
 import List from '@material-ui/core/List';
-import Typography from '@material-ui/core/Typography';
-import Divider from '@material-ui/core/Divider';
 import IconButton from '@material-ui/core/IconButton';
 import MenuIcon from '@material-ui/icons/Menu';
-import ChevronLeftIcon from '@material-ui/icons/ChevronLeft';
-import ChevronRightIcon from '@material-ui/icons/ChevronRight';
+import MenuItem from '@material-ui/core/MenuItem';
+import Menu from '@material-ui/core/Menu';
+import MoreIcon from '@material-ui/icons/MoreVert';
+import ListItem from '@material-ui/core/ListItem'
+import {Link as RouterLink, useLocation} from 'react-router-dom'
+import ListItemText from '@material-ui/core/ListItemText';
 
-import {MainListItems} from './dashboard_items'
 import {PluginManagers} from '../plugins'
+import {whoisRoute, whoisNavigation} from '../whois'
+import {OptionsContext} from '../layout'
+import { userPreferencesOption } from '../helpers/preferences';
 
 
-// https://material-ui.com/components/drawers/#persistent-drawer
-
-
-const drawerWidth = 240;
+// https://material-ui.com/components/app-bar/#app-bar-with-a-primary-search-field
+// https://ansonlowzf.com/how-to-build-a-material-ui-navbar/
 
 const useStyles = makeStyles((theme) => ({
-  root: {
-    display: 'flex',
-  },
-  appBar: {
-    transition: theme.transitions.create(['margin', 'width'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.leavingScreen,
-    }),
-  },
-  appBarShift: {
-    width: `calc(100% - ${drawerWidth}px)`,
-    marginLeft: drawerWidth,
-    transition: theme.transitions.create(['margin', 'width'], {
-      easing: theme.transitions.easing.easeOut,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
+  grow: {
+    flexGrow: 1,
   },
   menuButton: {
     marginRight: theme.spacing(2),
   },
-  hide: {
+  layoutDesktop: {
     display: 'none',
+    [theme.breakpoints.up('md')]: {
+      display: 'flex',
+    },
   },
-  drawer: {
-    width: drawerWidth,
-    flexShrink: 0,
-  },
-  drawerPaper: {
-    width: drawerWidth,
-  },
-  drawerHeader: {
+  layoutMobile: {
     display: 'flex',
-    alignItems: 'center',
-    padding: theme.spacing(0, 1),
-    // necessary for content to be below app bar
-    ...theme.mixins.toolbar,
-    justifyContent: 'flex-end',
+    [theme.breakpoints.up('md')]: {
+      display: 'none',
+    },
+  },
+
+  linkText: {
+    textDecoration: 'none',
+    textTransform: 'uppercase',
+    color: `${theme.palette.primary.contrastText}`
+  },
+  menuLinkText: {
+    textDecoration: 'none',
+    textTransform: 'uppercase',
+  },
+  desktopNav: {
+    justifyContent: 'space-between',
+    display: 'flex',
   },
   content: {
     flexGrow: 1,
@@ -69,107 +64,201 @@ const useStyles = makeStyles((theme) => ({
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
     }),
-    marginLeft: -drawerWidth,
-  },
-  contentShift: {
-    transition: theme.transitions.create('margin', {
-      easing: theme.transitions.easing.easeOut,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-    marginLeft: 0,
   },
 }));
 
-const Dashboard = (props) => {
-  const classes = useStyles();
-  const theme = useTheme();
-  const [open, setOpen] = useState(false);
-  const location = useLocation()
-  const title = React.useMemo(() => {
-    const local_path = location.pathname
-    const native_paths = {
-      '/whois': 'WhoIS',
-      '/stats': 'Stats',
-      '/help': 'Help'
-    }
 
-    if (local_path in native_paths) {
-      return native_paths[local_path]
-    }
+const Navigation = () => {
+  const classes = useStyles()
+  const [anchorEl, setAnchorEl] = useState(null);
+  const isMenuOpen = Boolean(anchorEl)
 
-    const route_plugins = PluginManagers.routes.plugins
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget)
+  }
 
-    for (const name in route_plugins) {
-      if(route_plugins[name].path === local_path) {
-        return route_plugins[name].title
-      }
-    }
+  const handleMenuClose = () => {
+    setAnchorEl(null)
+  }
 
-    return null
-  }, [location.pathname])
 
-  const handleDrawerOpen = () => {
-    setOpen(true);
-  };
+  const all_paths = useMemo(() => (
+    [
+      whoisNavigation,
+      ...Object.values(PluginManagers.nav.plugins)
+    ]
+  ), [])
 
-  const handleDrawerClose = () => {
-    setOpen(false);
-  };
-
-  console.log(title)
+  const menuId = 'mobile-navigation-menu'
+  const mobileMenu = (
+    <Menu
+      anchorEl={anchorEl}
+      anchorOrigin={{vertical: 'top', horizontal: 'left'}}
+      id={menuId}
+      keepMounted
+      transformOrigin={{vertical: 'top', horizontal: 'left'}}
+      open={isMenuOpen}
+      onClose={handleMenuClose}
+    >
+      {all_paths.map(({path, title}, index) => (
+        <MenuItem key={index}>
+        <RouterLink
+          to={path}
+          className={classes.menuLinkText}
+          onClick={handleMenuClose}
+        >
+          {title}
+        </RouterLink>
+      </MenuItem>
+      ))}
+    </Menu>
+  )
 
   return (
-    <div className={classes.root}>
+    <React.Fragment>
+      <div className={classes.layoutMobile}>
+        <IconButton
+          edge="start"
+          className={clsx(classes.menuButton)}
+          color="inherit"
+          aria-label="open drawer"
+          onClick={handleMenuOpen}
+        >
+          <MenuIcon />
+        </IconButton>
+        {mobileMenu}
+      </div>
+
+      <div className={classes.layoutDesktop}>
+        <List
+          component="nav"
+          className={clsx(classes.desktopNav)}
+        >
+          {all_paths.map(({path, title}, index) => (
+            <RouterLink
+              to={path}
+              key={index}
+              className={classes.linkText}
+            >
+              <ListItem button>
+                <ListItemText primary={title} />
+              </ListItem>
+            </RouterLink>
+          ))}
+        </List>
+      </div>
+    </React.Fragment>
+  )
+}
+
+const Options = () => {
+  const classes = useStyles()
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const isMenuOpen = Boolean(anchorEl)
+  const optionsContext = useContext(OptionsContext)
+  const location = useLocation()
+
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleMenuClose = () => {
+    setAnchorEl(null)
+  }
+
+  const routes = {
+      ...PluginManagers.routes.plugins,
+      whois: whoisRoute
+    }
+
+  let match = []
+  for (const name in routes) {
+    if (routes[name].matchRoute(location.pathname)) {
+      match = [...routes[name].options]
+      break
+    }
+  }
+  match.push(userPreferencesOption)
+
+  const menuId = 'mobile-options-menu'
+  const mobileMenu = (
+    <Menu
+      anchorEl={anchorEl}
+      anchorOrigin={{vertical: 'top', horizontal: 'right'}}
+      id={menuId}
+      keepMounted
+      transformOrigin={{vertical: 'top', horizontal: 'right'}}
+      open={isMenuOpen}
+      onClose={handleMenuClose}
+    >
+      {match.map((option_element, index) => (
+        <MenuItem key={index}>
+          {option_element.getMobileElement({
+            optionsContext: optionsContext
+          })}
+        </MenuItem>
+
+      ))}
+
+    </Menu>
+  )
+
+  return (
+    <React.Fragment>
+      <div className={classes.layoutDesktop}>
+        {match.map((option_element, index) => (
+          option_element.getDesktopElement({
+            optionsContext: optionsContext,
+            index: index
+          })
+        ))}
+      </div>
+      <div className={classes.layoutMobile}>
+        {match.length > 0 &&
+        <IconButton
+          aria-label="show more"
+          aria-controls={menuId}
+          aria-haspopup="true"
+          onClick={handleMenuOpen}
+          color="inherit"
+        >
+          <MoreIcon />
+        </IconButton>}
+        {mobileMenu}
+      </div>
+    </React.Fragment>
+  )
+}
+
+const Dashboard = (props) => {
+  const classes = useStyles();
+  const [optionsState, setOptionsState] = useState({})
+
+  return (
+    <div>
       <CssBaseline />
-      <AppBar
-        position="fixed"
-        className={clsx(classes.appBar, {
-          [classes.appBarShift]: open,
-        })}
-      >
-        <Toolbar variant="dense">
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            onClick={handleDrawerOpen}
-            edge="start"
-            className={clsx(classes.menuButton, open && classes.hide)}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap>
-            PyDat 5 {title !== null && `- ${title}`}
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      <Drawer
-        className={classes.drawer}
-        variant="persistent"
-        anchor="left"
-        open={open}
-        classes={{
-          paper: classes.drawerPaper,
+      <OptionsContext.Provider value={{
+          optionsState: optionsState,
+          setOptionsState: setOptionsState
         }}
       >
-        <div className={classes.drawerHeader}>
-          <IconButton onClick={handleDrawerClose}>
-            {theme.direction === 'ltr' ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-          </IconButton>
+        <div className={classes.grow}>
+          <AppBar position="static">
+            <Toolbar variant="dense">
+              <Navigation />
+              <div className={classes.grow} />
+              <Options />
+            </Toolbar>
+          </AppBar>
+
+          <main className={classes.content}>
+              {props.children}
+          </main>
         </div>
-        <Divider />
-        <List>
-            <MainListItems handleDrawerClose={handleDrawerClose} />
-        </List>
-      </Drawer>
-      <main
-        className={clsx(classes.content, {
-          [classes.contentShift]: open,
-        })}
-      >
-        <div className={classes.drawerHeader} />
-        {props.children}
-      </main>
+      </OptionsContext.Provider>
     </div>
+
   );
 }
 

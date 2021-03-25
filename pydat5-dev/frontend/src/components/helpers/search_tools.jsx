@@ -11,7 +11,15 @@ import {
     ListExporter
 } from './data_exporters'
 
-export const SearchTools = ({data, children, defaultListField}) => {
+export const SearchTools = ({
+    data,
+    children,
+    defaultListField,
+    dataControl = null,
+    jsonPreprocessor = null,
+    csvPreprocessor = null,
+    listPreprocessor = null
+}) => {
     const [anchorEl, setAnchorEl] = useState(null)
     const [openJSONDialog, setOpenJSONDialog] = useState(false)
     const [openCSVDialog, setOpenCSVDialog] = useState(false)
@@ -44,32 +52,45 @@ export const SearchTools = ({data, children, defaultListField}) => {
                 >
                     Export JSON
                 </MenuItem>
-                <JSONExporter
-                    data={data}
-                    open={openJSONDialog}
-                    onClose={() => {setOpenJSONDialog(false)}}
-                />
+
+                {openJSONDialog &&
+                    <JSONExporter
+                        data={data}
+                        dataControl={dataControl}
+                        open={openJSONDialog}
+                        preprocessor={jsonPreprocessor}
+                        onClose={() => {setOpenJSONDialog(false)}}
+                    />
+                }
                 <MenuItem
                     onClick={() => {setOpenCSVDialog(true); handleClose()}}
                 >
                     Export CSV
                 </MenuItem>
-                <CSVExporter
-                    data={data}
-                    open={openCSVDialog}
-                    onClose={() => {setOpenCSVDialog(false)}}
-                />
+                {openCSVDialog &&
+                    <CSVExporter
+                        data={data}
+                        dataControl={dataControl}
+                        open={openCSVDialog}
+                        preprocessor={csvPreprocessor}
+                        onClose={() => {setOpenCSVDialog(false)}}
+                    />
+                }
                 <MenuItem
                     onClick={() => {setOpenListDialog(true); handleClose()}}
                 >
                     Export List
                 </MenuItem>
-                <ListExporter
-                    field={defaultListField}
-                    data={data}
-                    open={openListDialog}
-                    onClose={() => {setOpenListDialog(false)}}
-                />
+                {openListDialog &&
+                    <ListExporter
+                        field={defaultListField}
+                        data={data}
+                        dataControl={dataControl}
+                        open={openListDialog}
+                        preprocessor={listPreprocessor}
+                        onClose={() => {setOpenListDialog(false)}}
+                    />
+                }
                 {React.Children.map(children, (child) => {
                     const props = {
                         data: data,

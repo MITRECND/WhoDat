@@ -1,108 +1,51 @@
-import React, {useState, useEffect} from 'react'
-import { useHistory } from 'react-router-dom';
-import DataTable from 'react-data-table-component'
+import React, {useState, useEffect, useMemo, useCallback} from 'react'
 
-import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
-import IconButton from '@material-ui/core/IconButton'
+import { makeStyles} from '@material-ui/core/styles';
+import Typography from '@material-ui/core/Typography'
+import FormControl from '@material-ui/core/FormControl'
 import Menu from '@material-ui/core/Menu';
 import MenuItem from '@material-ui/core/MenuItem'
 import Grid from '@material-ui/core/Grid'
 import Button from '@material-ui/core/Button';
 import Input from '@material-ui/core/Input'
 import Select from '@material-ui/core/Select'
+import Table from '@material-ui/core/Table'
+import TableBody from '@material-ui/core/TableBody'
+import TableCell from '@material-ui/core/TableCell'
+import TableHead from '@material-ui/core/TableHead'
+import TableRow from '@material-ui/core/TableRow'
+import TableSortLabel from '@material-ui/core/TableSortLabel'
+import TableFooter from '@material-ui/core/TableFooter'
+
+import {
+    useSortBy,
+    useFilters,
+    usePagination,
+    useTable,
+} from 'react-table'
 
 import SearchTools from '../../components/helpers/search_tools'
 import { BackdropLoader } from '../../components/helpers/loaders'
-import DropDownCell from '../../components/helpers/dropdown_cell'
-import { PluginManagers } from '../../components/plugins';
+import {Paginator} from './table_pagination'
+import {
+    RRNameCell,
+    RDataCell
+} from './table_cells'
+import { InputLabel } from '@material-ui/core';
+import { useUserPreferences } from '../../components/helpers/preferences';
 
 const convertTimestampToDate = (timestamp) => {
     let date = new Date(timestamp * 1000)
-    let year = date.getFullYear()
-    let month = `0${date.getMonth() + 1}`.slice(-2)
-    let day = `0${date.getDay() + 1}`.slice(-2)
+    let year = date.getUTCFullYear()
+    let month = `0${date.getUTCMonth() + 1}`.slice(-2)
+    let day = `0${date.getUTCDate() + 1}`.slice(-2)
+    let hours = `0${date.getUTCHours()}`.slice(-2)
+    let minutes = `0${date.getUTCMinutes()}`.slice(-2)
+    let seconds = `0${date.getUTCSeconds()}`.slice(-2)
 
-    let timestring = `${year}-${month}-${day}`
+    let timestring = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`
 
     return timestring
-}
-
-const cleanData = (data) => {
-    // Remove trailing '.'
-    if (data.slice(-1) === '.') {
-        return data.slice(0, -1)
-    } else {
-        return data
-    }
-}
-
-const cleanEntry = (entry) => {
-    // clean a record and return it
-}
-
-const DomainMenu = ({value}) => {
-    let menu_plugins = PluginManagers.menu.plugins.domain
-    const cleanValue = cleanData(value)
-
-    return (
-        <DropDownCell
-            friendly={"domain"}
-            value={cleanValue}
-        >
-        {Object.keys(menu_plugins).map((name, index) => {
-            let Component = menu_plugins[name]
-            return (<Component domainName={cleanValue} key={index} />)
-        })}
-        </DropDownCell>
-
-    )
-}
-
-const IPMenu = ({value}) => {
-    let menu_plugins = PluginManagers.menu.plugins.ip
-
-    return (
-        <DropDownCell
-            friendly={"ip"}
-            value={value}
-        >
-            {Object.keys(menu_plugins).map((name, index) => {
-            let Component = menu_plugins[name]
-            return (<Component ip={value} key={index} />)
-        })}
-        </DropDownCell>
-
-    )
-}
-
-const RRNameCell = ({row}) => {
-    return (
-        <Grid item xs={12}>
-            <DomainMenu row={row} value={row.rrname} />
-        </Grid>
-    )
-}
-
-
-const RDataCell = ({row}) => {
-    return (
-        <Grid container>
-            {row.rdata.map((value, index) => {
-                let data = cleanData(value)
-                if (['ns', 'cname', 'mx'].includes(row.rrtype.toLowerCase())) {
-                    data = (<DomainMenu row={row} value={data} />)
-                } else if (['a', 'aaaa'].includes(row.rrtype.toLowerCase())) {
-                    data = (<IPMenu row={row} value={data} />)
-                }
-
-                return (
-                    <Grid item xs={12} key={index}>
-                        {data}
-                    </Grid>
-                )
-            })}
-        </Grid>
-    )
 }
 
 // https://material-ui.com/components/selects/
@@ -118,155 +61,435 @@ const MenuProps = {
   getContentAnchorEl: null
 };
 
-const TableFilter = ({filterItems, onFilter, onClear}) => {
-    const RRTypesList = [
-        'a',
-        'aaaa',
-        'cname',
-        'mx',
-        'ns',
-        'ptr',
-        'soa',
-        'txt',
-        // DNSSEC Types
-        'ds',
-        'rrsig',
-        'nsec',
-        'dnskey',
-        'nsec3',
-        'nsec3param',
-        'dlv'
-    ]
+const useTypeFilterStyles = makeStyles((theme) => ({
+    formControl: {
+      margin: theme.spacing(1),
+      minWidth: 120,
+    },
+    selectEmpty: {
+      marginTop: theme.spacing(2),
+    },
+  }));
+
+const TypeColumnFilter = ({
+    column: {filterValue, setFilter, preFilteredRows, id}
+}) => {
+
+    const classes = useTypeFilterStyles()
+    // TODO XXX Validate RRTypes?
+    // const RRTypesList = [
+    //     'a',
+    //     'aaaa',
+    //     'cname',
+    //     'mx',
+    //     'ns',
+    //     'ptr',
+    //     'soa',
+    //     'txt',
+    //     // DNSSEC Types
+    //     'ds',
+    //     'rrsig',
+    //     'nsec',
+    //     'dnskey',
+    //     'nsec3',
+    //     'nsec3param',
+    //     'dlv'
+    // ]
+
+    const RRTypesList = useMemo(() => {
+        let tl = new Set()
+        preFilteredRows.forEach((row) => {
+            tl.add(row.original.rrtype.toLowerCase())
+        })
+        return Array.from(tl)
+    }, [preFilteredRows])
 
     return (
         <React.Fragment>
-            <Select
-                label="Types"
-                name="rrtypes"
-                multiple
-                displayEmpty
-                onChange={onFilter}
-                renderValue = {(selected) => {
-                    if (selected.length === 0) {
-                        return <em>Type Filter</em>
-                    }
+            <FormControl className={classes.formControl}>
+                <InputLabel>Filter</InputLabel>
+                <Select
+                    label="Types"
+                    name="rrtypes"
+                    // multiple
+                    displayEmpty
+                    onChange={e => {setFilter(e.target.value || undefined)}}
+                    // renderValue = {(selected) => {
+                    //     if (selected.length === 0) {
+                    //         return <em>Type Filter</em>
+                    //     }
 
-                    return selected.join(', ')
-                }}
-                value={filterItems}
-                input={<Input />}
-                MenuProps={MenuProps}
+                    //     return selected.join(', ')
+                    // }}
+                    value={filterValue || ''}
+                    input={<Input />}
+                    MenuProps={MenuProps}
+                >
+                    <MenuItem value="">&nbsp;</MenuItem>
+                    {RRTypesList.map((rrtype, index) => {
+                        return (
+                        <MenuItem key={index} value={rrtype}>{rrtype}</MenuItem>
+                        )
+                    })}
+                </Select>
+            </FormControl>
+            {/* <Button type="button" onClick={e => {setFilter(undefined)}}>X</Button> */}
+        </React.Fragment>
+    )
+}
+
+const typeColumnFilterFn = (rows, columnIds, filterValue) => {
+    let postFiltered = []
+
+    rows.forEach((row) => {
+        if (row.original.rrtype.toLowerCase() == filterValue){
+            postFiltered.push(row)
+        }
+    })
+
+    return postFiltered
+}
+
+const ToggleCopyMenuItem = ({copyFriendly, toggleCopyFriendly, handleClose}) => {
+    return (
+        <MenuItem
+            selected={copyFriendly}
+            onClick={() => {toggleCopyFriendly(); handleClose()}}
+        >
+            Copy Friendly
+        </MenuItem>
+    )
+}
+
+const csvPreprocessor = (data) => {
+    let dataout = []
+    data.forEach((row) => {
+        let newrow = {...row}
+        if (newrow.hasOwnProperty('rdata') && Array.isArray(newrow.rdata)) {
+            newrow.rdata = newrow.rdata.join(';')
+        }
+        dataout.push(newrow)
+    })
+    return dataout
+}
+
+const ExportDataControl = ({
+    exportSize,
+    setExportSize,
+    validPageSizes = [50, 100, 1000, 2500]
+}) => {
+    return (
+        <React.Fragment>
+            <Grid container spacing={2} style={{padding: '1rem'}}>
+                <Grid item>
+                    <FormControl>
+                        <InputLabel>Size</InputLabel>
+                        <Select
+                            label="Size"
+                            name="size"
+                            displayEmpty
+                            onChange={e => {setExportSize(e.target.value)}}
+                            value={exportSize}
+                        >
+                        {validPageSizes.map((value, index) => (
+                            <MenuItem key={index} value={value}>{value}</MenuItem>
+                        ))}
+                        </Select>
+                    </FormControl>
+                </Grid>
+            </Grid>
+        </React.Fragment>
+    )
+}
+
+const DNSDBTableContainer = ({
+    columns,
+    data,
+    rateInfo
+}) => {
+    const preferences = useUserPreferences('dnsdb')
+    const initialPageSize = preferences.getPref("remember_page_size") ? preferences.getPref('page_size') : 100
+    const validPageSizes = [50, 100, 500, 1000, 2500]
+    const [copyFriendly, setCopyFriendly] = useState(false)
+
+    const toggleCopyFriendly = useCallback(() => {
+        setCopyFriendly(!copyFriendly)
+    })
+
+    const {
+        getTableProps,
+        getTableBodyProps,
+        headerGroups,
+        prepareRow,
+        allColumns,
+        visibleColumns,
+        rows: filteredRows,
+        // Pagination
+        page,
+        canPreviousPage,
+        canNextPage,
+        pageOptions,
+        pageCount,
+        gotoPage,
+        nextPage,
+        previousPage,
+        setPageSize,
+        state: {pageIndex, pageSize}
+    } = useTable(
+        {
+            columns,
+            data,
+            initialState: {
+                pageSize: initialPageSize,
+                pageIndex: 0
+            },
+        },
+        useFilters,
+        useSortBy,
+        usePagination,
+    )
+
+    const filteredData = useMemo(() => {
+        let data = []
+        filteredRows.forEach((row) => {
+            data.push(row.original)
+        })
+        return data
+    }, [filteredRows])
+
+    const [exportSize, setExportSize] = useState(50)
+    const exporterData = useMemo(
+        () => (
+            filteredData.slice(0, exportSize)
+        ),[exportSize]
+    )
+
+    return (
+        <React.Fragment>
+            <div
+                // onKeyDown={handleKeyPressEvent}
+                // tabIndex={-1}
             >
-                {RRTypesList.map((rrtype, index) => {
-                    return (
-                    <MenuItem key={index} value={rrtype}>{rrtype}</MenuItem>
-                    )
-                })}
-            </Select>
-            <Button type="button" onClick={onClear}>X</Button>
+                <Table {...getTableProps()}>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell
+                                colSpan={2}
+                                padding='none'
+                            >
+                                {allColumns[0].render("Filter")}
+                            </TableCell>
+                            <TableCell
+                                colSpan={visibleColumns.length - 2}
+                                align='right'
+
+                            >
+                                <Typography>
+                                    Rate Limit: {rateInfo.remaining}/{rateInfo.limit}
+                                </Typography>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell colSpan={1}>
+                                <SearchTools
+                                    data={exporterData}
+                                    dataControl={
+                                        <ExportDataControl
+                                            exportSize={exportSize}
+                                            setExportSize={setExportSize}
+                                            validPageSizes={validPageSizes}
+                                        />
+                                    }
+                                    defaultListField={'rrname'}
+                                    csvPreprocessor={csvPreprocessor}
+                                >
+                                    <ToggleCopyMenuItem
+                                        copyFriendly={copyFriendly}
+                                        toggleCopyFriendly={toggleCopyFriendly}
+                                    />
+                                </SearchTools>
+                            </TableCell>
+                            <Paginator
+                                gotoPage={gotoPage}
+                                previousPage={previousPage}
+                                nextPage={nextPage}
+                                pageCount={pageCount}
+                                rowCount={filteredRows.length}
+                                pageOptions={pageOptions}
+                                setPageSize={setPageSize}
+                                pageIndex={pageIndex}
+                                pageSize={pageSize}
+                                canNextPage={canNextPage}
+                                canPreviousPage={canPreviousPage}
+                                columnLength={visibleColumns.length - 1}
+                                validPageSizes={validPageSizes}
+                            />
+                        </TableRow>
+                        {headerGroups.map(headerGroup => (
+                            <TableRow {...headerGroup.getHeaderGroupProps()}>
+                                {headerGroup.headers.map(column => (
+                                    <TableCell {
+                                        ...column.getHeaderProps(
+                                            column.getSortByToggleProps())
+                                    }>
+                                        {column.canSort
+                                        ?
+                                            <TableSortLabel
+                                                active={column.isSorted}
+                                                direction={
+                                                    column.isSortedDesc
+                                                    ?
+                                                        'desc'
+                                                    :
+                                                        'asc'
+                                                }
+                                                hideSortIcon={column.isSorted}
+                                            >
+                                                {column.render('Header')}
+                                            </TableSortLabel>
+                                        :
+                                            column.render('Header')
+                                        }
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHead>
+                    <TableBody {...getTableBodyProps()}>
+                        {page.map((row, i) => {
+                            prepareRow(row)
+                            return (
+                                <TableRow {...row.getRowProps([{key: `data${i}`}])}>
+                                    {row.cells.map(cell => {
+                                        return (
+                                            <TableCell {...cell.getCellProps([
+                                                {
+                                                    className: cell.column.className,
+                                                    style: cell.column.style
+                                                }
+
+                                            ])}>
+                                                {cell.render('Cell',
+                                                    {copyFriendly: copyFriendly})}
+                                            </TableCell>
+                                        )
+                                    })}
+                                </TableRow>
+                            )
+                        })}
+                    </TableBody>
+                    <TableFooter>
+                        <TableRow>
+                            <Paginator
+                                gotoPage={gotoPage}
+                                previousPage={previousPage}
+                                nextPage={nextPage}
+                                pageCount={pageCount}
+                                rowCount={filteredRows.length}
+                                pageOptions={pageOptions}
+                                setPageSize={setPageSize}
+                                pageIndex={pageIndex}
+                                pageSize={pageSize}
+                                canNextPage={canNextPage}
+                                canPreviousPage={canPreviousPage}
+                                columnLength={visibleColumns.length}
+                                validPageSizes={validPageSizes}
+                            />
+                        </TableRow>
+                    </TableFooter>
+                </Table>
+            </div>
         </React.Fragment>
     )
 }
 
 const DNSDBWebHandler = (props) => {
-    const [pageSize, setPageSize] = useState(100)
-    const [displayData, setDisplayData] = useState([])
-    const [displaySlice, setDisplaySlice] = useState([])
-    const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
-    const [filterItems, setFilterItems] = useState([])
+    const data = useMemo(
+        () => {
+            if (props.queryResults == null) {
+                return null
+            }
 
-    useEffect(() => {
-        if (props.queryResults == null) {
-            return
-        }
-
-        let data = []
-        Object.keys(props.queryResults.results).forEach((record_type) => {
-            if (filterItems.length === 0 || filterItems.includes(record_type.toLowerCase())) {
+            let data_out = []
+            Object.keys(props.queryResults.results).forEach((record_type) => {
                 props.queryResults.results[record_type].forEach((entry) => {
-                    data.push(entry)
+                    data_out.push(entry)
                 })
-            }
+            })
 
-        })
+            return data_out
+        },
+        [props.queryResults]
+    )
 
-        setDisplayData(data)
-        setDisplaySlice(data.slice(0, pageSize))
-    }, [props.queryResults, filterItems])
-
-    const columns = [
+    const columns = useMemo(() => ([
         {
-            name: 'Type',
-            selector: 'rrtype',
+            Header: 'Type',
+            accessor: 'rrtype',
             maxWidth: '5vw',
-            sortable: true
+            disableSortBy: true,
+            Filter: TypeColumnFilter,
+            filter: typeColumnFilterFn,
+            className: 'rrtype-cell',
+            style: {}
         },
         {
-            name: 'RRName',
-            selector: 'rrname',
+            Header: 'RRName',
+            accessor: 'rrname',
             maxWidth: '20vw',
-            cell: (row) => <RRNameCell row={row} />
-        },
-        {
-            name: 'RData',
-            selector: 'rdata',
-            allowOverflow: true,
-            cell: (row) => <RDataCell row={row} />
-        },
-        {
-            name: 'First Seen',
-            selector: 'time_first',
-            maxWidth: '10vw',
-            sortable: true,
-            cell: (row) => convertTimestampToDate(row.time_first)
-        },
-        {
-            name: 'Last Seen',
-            selector: 'time_last',
-            maxWidth: '10vw',
-            sortable: true,
-            cell: (row) => convertTimestampToDate(row.time_last)
-        },
-        {
-            name: 'Count',
-            selector: 'count',
-            maxWidth: '10vw',
-        },
-    ]
-
-    const handlePageChange = async (page) => {
-        let start = (page - 1) * pageSize
-        let end = start + pageSize
-        setDisplaySlice(displayData.slice(start, end))
-    }
-
-    const handleChunkChange = async (perPage, page) => {
-        setPageSize(perPage)
-        let start = (page - 1) * perPage
-        let end = start + perPage
-        setDisplaySlice(displayData.slice(start, end))
-    }
-
-    const subHeaderComponentMemo = React.useMemo(() => {
-        const handleClear = () => {
-            if (filterItems.length > 0) {
-                setResetPaginationToggle(!resetPaginationToggle)
-                setFilterItems([])
-            }
-        }
-
-        return (
-            <React.Fragment>
-                <TableFilter
-                    onFilter={e => setFilterItems(e.target.value)}
-                    onClear={handleClear}
-                    filterItems={filterItems}
+            Cell: (props) => (
+                <RRNameCell
+                    row={props.row.original}
+                    copyFriendly={props.copyFriendly}
                 />
-                <SearchTools data={displaySlice} defaultListField={'rrname'} />
-            </React.Fragment>
+            ),
+            className: 'rrname-cell',
+            style: {}
+        },
+        {
+            Header: 'RData',
+            accessor: 'rdata',
+            allowOverflow: true,
+            Cell: (props) => (
+                <RDataCell
+                    row={props.row.original}
+                    copyFriendly={props.copyFriendly}
+                />
+            ),
+            className: 'rdata-cell',
+            style: {}
+        },
+        {
+            Header: 'First Seen',
+            accessor: 'time_first',
+            maxWidth: '10vw',
+            Cell: (props) => (
+                convertTimestampToDate(props.value)
+            ),
+            className: 'fs-cell',
+            style: {}
+        },
+        {
+            Header: 'Last Seen',
+            accessor: 'time_last',
+            maxWidth: '10vw',
+            Cell: (props) => (
+                convertTimestampToDate(props.value)
+            ),
+            className: 'ls-cell',
+            style: {}
+        },
+        {
+            Header: 'Count',
+            accessor: 'count',
+            maxWidth: '10vw',
+            canFilter: false,
+            disableSortBy: true,
+            className: 'cnt-cell',
+            style: {}
+        },
+    ]))
 
-        )
-    }, [filterItems, resetPaginationToggle, displaySlice])
 
     if (props.queryResults === null) {
         return (<BackdropLoader />)
@@ -274,25 +497,12 @@ const DNSDBWebHandler = (props) => {
 
     return (
         <React.Fragment>
-            <DataTable
+            <DNSDBTableContainer
                 columns={columns}
-                data={displaySlice}
-                pagination
-                paginationServer
-                paginationDefaultPage={1}
-                paginationPerPage={pageSize}
-                paginationRowsPerPageOptions={[50, 100, 200, 500, 1000]}
-                paginationTotalRows={displayData.length}
-                paginationResetDefaultPage={resetPaginationToggle}
-                subHeader
-                subHeaderComponent={subHeaderComponentMemo}
-                // subHeaderAlign="right"
-                striped
-                highlightOnHover
-                noHeader
-                onChangeRowsPerPage={handleChunkChange}
-                onChangePage={handlePageChange}
+                data={data}
+                rateInfo={props.queryResults.rate}
             />
+
         </React.Fragment>
     )
 }

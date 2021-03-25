@@ -1,25 +1,8 @@
-import React, { createContext, forwardRef } from 'react'
-
-class RoutePlugin {
-    constructor(path, title, component, extra) {
-        this.path = path
-        this.title = title
-        this.component = component
-        this.extra = extra
-
-        if (this.extra === null) {
-            this.extra = {}
-        }
-    }
-}
-
-class ToolPlugin {
-    constructor(text, component) {
-        this.text = text
-        this.component = component
-    }
-}
-
+import {
+    RouteElement,
+    NavigationElement,
+    MenuElement
+} from '../layout'
 class PluginContainer {
     constructor() {
         this._plugins = {}
@@ -29,26 +12,6 @@ class PluginContainer {
         return this._plugins
     }
 }
-
-class DrawerPluginContainer extends PluginContainer {
-    addPlugin(name, component) {
-        this._plugins[name] = component
-    }
-}
-
-
-class MenuPlugin {
-    constructor(text, action, extra) {
-        this.text = text
-        this.action = action
-        this.extra = extra
-
-        if (this.extra === null) {
-            this.extra = {}
-        }
-    }
-}
-
 class MenuPluginContainer extends PluginContainer {
     constructor() {
         super()
@@ -56,44 +19,59 @@ class MenuPluginContainer extends PluginContainer {
             tld: {},
             domain: {},
             ip: {},
-            email: {}
+            email: {},
+            telephone: {},
+            registrant: {}
         }
     }
 
-    addPlugin(name, type, component) {
+    addPlugin(name, type, plugin) {
+        if (!(plugin instanceof MenuElement)){
+            throw new TypeError("Must provide object of type 'MenuElement'")
+        }
+
         const validKeys = [
             'tld',
             'domain',
             'ip',
-            'email'
+            'email',
+            'telephone',
+            'registrant'
         ]
+
         if (!validKeys.includes(type)) {
-            throw('type must be "tld", "domain", "ip", or "email"')
+            throw new TypeError(`type must be one of ${validKeys.join()}`)
         }
 
         if (!Object.keys(this._plugins).includes(type)) {
             this._plugins[type] = {}
         }
 
-        this._plugins[type][name] = component
+        this._plugins[type][name] = plugin
     }
 }
 
 class RoutePluginContainer extends PluginContainer {
-    addPlugin(name, path, component, extra = null) {
-        this._plugins[name] = new RoutePlugin(path, component, extra)
+    addPlugin(name, plugin) {
+        if (!(plugin instanceof RouteElement)){
+            throw new TypeError("Must provide object of type 'RouteElement'")
+        }
+
+        this._plugins[name] = plugin
     }
 }
 
-class ToolPluginContainer extends PluginContainer {
-    addPlugin(name, text, component) {
-        this._plugins[name] = new ToolPlugin(text, component)
+class NavigationPluginContainer extends PluginContainer {
+    addPlugin(name, plugin) {
+        if (!(plugin instanceof NavigationElement)){
+            throw new TypeError("Must provide object of type 'NavigationElement'")
+        }
+        this._plugins[name] = plugin
     }
 }
 
 export const PluginManagers = {
-    drawer: new DrawerPluginContainer(),
     routes: new RoutePluginContainer(),
     menu: new MenuPluginContainer(),
-    tool: new ToolPluginContainer(),
+    nav: new NavigationPluginContainer(),
 }

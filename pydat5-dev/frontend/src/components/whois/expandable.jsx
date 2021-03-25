@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react'
-
+import clsx from 'clsx';
 
 import Paper from '@material-ui/core/Paper'
 import Tab from '@material-ui/core/Tab'
@@ -19,10 +19,15 @@ import MuiDialogTitle from '@material-ui/core/DialogTitle';
 import { withStyles } from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
 import { Container, makeStyles } from '@material-ui/core'
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import FormControl from '@material-ui/core/FormControl';
+import CheckBox from '@material-ui/core/Checkbox'
+
+import {useSnackbar} from 'notistack'
 
 
 import {domainFetcher} from '../helpers/fetchers'
-import clsx from 'clsx';
+import { useUserPreferences } from '../helpers/preferences';
 
 const detailsDialogStyles = (theme) => ({
     root: {
@@ -52,7 +57,9 @@ const DialogTitle = withStyles(detailsDialogStyles)((props) => {
   });
 
 const FullDetailsDialog = ({data}) => {
+    const preferences = useUserPreferences('whois')
     const [open, setOpen] = useState(false)
+    const [addColon, setAddColon] = useState(preferences.getPref('details_colon'))
 
     const handleClickOpen = () => {
         setOpen(true)
@@ -60,6 +67,12 @@ const FullDetailsDialog = ({data}) => {
 
     const handleClose = () => {
         setOpen(false)
+    }
+
+    const toggleAddColon = () => {
+        let newvalue = !addColon
+        preferences.setPref('details_colon', newvalue)
+        setAddColon(newvalue)
     }
 
     return (
@@ -75,6 +88,23 @@ const FullDetailsDialog = ({data}) => {
             >
                 <DialogTitle onClose={handleClose}>{`Domain "${data.domainName}"`}</DialogTitle>
                 <DialogContent>
+                    <Grid container>
+                        <Grid item>
+                            <FormControl component="fieldset">
+                                <FormControlLabel
+                                    value="colon"
+                                    control={
+                                        <CheckBox
+                                            color="primary"
+                                            checked={addColon}
+                                            onClick={toggleAddColon}
+                                        />}
+                                    label="Add Colon to Names"
+                                    labelPlacement="end"
+                                />
+                            </FormControl>
+                        </Grid>
+                    </Grid>
                     <Table>
                         <TableHead>
                             <TableRow>
@@ -86,7 +116,7 @@ const FullDetailsDialog = ({data}) => {
                             {Object.keys(data).sort().map((name, index) => {
                                 return (
                                     <TableRow key={index}>
-                                        <TableCell>{`${name}`}</TableCell>
+                                        <TableCell>{`${name}${addColon ? ':' : ''}`}</TableCell>
                                         <TableCell>{data[name]}</TableCell>
                                     </TableRow>
                                 )
@@ -323,6 +353,7 @@ const RecordDetailsTab = (props) => {
 
 const HistoricalTab = (props) => {
     const [domainInfo, setDomainInfo] = useState(null)
+    const {enqueueSnackbar} = useSnackbar()
 
     useEffect(() => {
         if (props.index === props.value && domainInfo == null) {
@@ -340,6 +371,7 @@ const HistoricalTab = (props) => {
                 setDomainInfo(results.results)
 
             } catch (err) {
+                enqueueSnackbar("Unable to fetch history", {variant: "error"})
                 console.log(err)
             }
         }
@@ -365,7 +397,7 @@ const HistoricalTab = (props) => {
                 <TableRow key={index}>
                     <TableCell>{entry.Version}</TableCell>
                     <TableCell>{entry.registrant_name}</TableCell>
-                    <TableCell>{entry.registrant_email}</TableCell>
+                    <TableCell>{entry.contactEmail}</TableCell>
                     <TableCell>{entry.createdDate}</TableCell>
                     <TableCell>{entry.registrant_telephone}</TableCell>
                     <TableCell> <FullDetailsDialog data={entry} /> </TableCell>

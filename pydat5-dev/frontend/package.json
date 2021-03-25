@@ -13,14 +13,15 @@
     "fontsource-roboto": "^3.0.3",
     "immutability-helper": "^3.1.1",
     "json2csv": "^5.0.3",
-    "notistack": "^1.0.1",
+    "notistack": "^1.0.5",
     "qs": "^6.9.4",
     "react": "^16.13.1",
-    "react-data-table-component": "^6.11.5",
     "react-dom": "^16.13.1",
     "react-hook-form": "^6.7.0",
+    "react-markdown": "^5.0.3",
     "react-router-dom": "^5.2.0",
-    "react-scripts": "3.4.3",
+    "react-scripts": "4.0.3",
+    "react-table": "^7.6.3",
     "styled-components": "^5.2.0"
   },
   "scripts": {

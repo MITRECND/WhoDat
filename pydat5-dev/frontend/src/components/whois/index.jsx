@@ -11,25 +11,98 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
 import Container from '@material-ui/core/Container'
 import Paper from '@material-ui/core/Paper'
+import HelpIcon from '@material-ui/icons/Help';
+// import EqualizerIcon from '@material-ui/icons/Equalizer';
 
 import WhoisTable from './whois_table'
-import {UserPreferencesContext} from '../helpers/preferences'
+import {
+    useUserPreferences,
+    userPreferencesManager,
+    UserPreferenceNamespace,
+    UserPreference,
+} from '../helpers/preferences'
 import {SearchSettings} from '../layout/dialogs'
+import {
+    OptionElement,
+    RouteElement,
+    NavigationElement
+} from '../layout'
+import {OptionsContext} from '../layout'
+import HelpPage from './help'
+// import StatsPage from './stats'
+import ClusterStatus from './status'
+import { useSnackbar } from 'notistack'
 
-export const GeneralOptions = ({ formData, setFormData }) => {
-    const [fangStatus, setFangStatus] = useState(formData.fang)
-    const preferences = useContext(UserPreferencesContext)
+const whoisPreferencesNamespace = new UserPreferenceNamespace({
+    name: "whois",
+    title: "Whois Search Preferences",
+    description: "Preferences for Whois Search"
+})
+userPreferencesManager.registerNamespace(whoisPreferencesNamespace)
+userPreferencesManager.registerPrefs(
+    whoisPreferencesNamespace, [
+        new UserPreference({
+            name: 'fang',
+            type: "boolean",
+            title: "De-fang Queries",
+            description: "Automatically replace [.] with . in search queries",
+            default_value: true
+        }),
+        new UserPreference({
+            name: 'page_size',
+            type: "number",
+            title: "Results Page Size",
+            description: "Default Page Size to use for result pagination",
+            default_value: 50,
+        }),
+        new UserPreference({
+            name: "remember_page_size",
+            type: "boolean",
+            title: "Remember Results Page Size",
+            description: "Remember last used page size when displaying results",
+            default_value: true,
+        }),
+        new UserPreference({
+            name: 'details_colon',
+            type: "boolean",
+            title: "Full Details Colon Suffix",
+            description: "Append a colon (:) to the names in the Full Details dialog",
+            default_value: false
+        })
+    ]
+)
 
-    useEffect(() => {
-        setFangStatus(formData.fang)
-    }, [formData.fang])
+export const whoisRoute = new RouteElement({
+    path: "/whois",
+    title: "Whois",
+    component: null,
+    options: [
+    //   new OptionElement({
+    //     icon: <EqualizerIcon />,
+    //     text: "Stats",
+    //     childComponent: <StatsPage />
+    //   }),
+      new OptionElement({
+        icon: <HelpIcon />,
+        text: "Help",
+        childComponent: <HelpPage />
+      }),
+    ]
+  })
+
+export const whoisNavigation = new NavigationElement({
+    title: 'WhoIs',
+    path: '/whois',
+    text: "Whois Search"
+  })
+
+const GeneralOptions = ({}) => {
+    const preferences = useUserPreferences('whois')
+    const [fangStatus, setFangStatus] = useState(preferences.getPref('fang'))
 
     const toggleFangOption = () => {
+        preferences.setPref('fang', !fangStatus)
         setFangStatus(!fangStatus)
-        setFormData(update(formData, {
-            fang: {$set: !fangStatus}
-        }))
-        preferences.setPref('whois', 'fang', !fangStatus)
     }
 
     return (
@@ -51,72 +124,55 @@ export const GeneralOptions = ({ formData, setFormData }) => {
     )
 }
 
-const WhoisResults = (props) => {
-    const [queryResults, setQueryResults] = useState(
-        <React.Fragment> </React.Fragment>
-    )
-
-    useEffect(() => {
-        console.log(props)
-        setQueryResults(
-            <React.Fragment>
-                <WhoisTable
-                    queryData={props.queryData}
-                />
-            </React.Fragment>
-        )
-    }, [props.queryData])
-
-
-    return (
-        <Grid item xs={12}>
-                {queryResults}
-        </Grid>
-    )
-}
-
 const WhoisHandler = ({}) => {
-    const preferences = useContext(UserPreferencesContext)
-    const formPrefs = preferences.getPrefs('whois', {
-        fang: true,
-    })
+    const preferences = useUserPreferences('whois')
 
     const [formData, setFormData] = useState({
         query: "",
-        ...formPrefs
     })
 
     const [queryData, setQueryData] = useState({
         ...formData
     })
 
+    const {enqueueSnackbar} = useSnackbar()
     const location = useLocation()
     let history = useHistory()
 
     useEffect(() => {
         console.log(location)
-        let query_param = qs.parse(location.search, {
-            ignoreQueryPrefix: true
-        }).query
-
-        if (!!query_param) {
-            let updated = update(formData, {
-                query: {$set: query_param}
-            })
-
-            setFormData(updated)
-            setQueryData(updated)
+        let query_string
+        try {
+            query_string = qs.parse(location.search, {
+                ignoreQueryPrefix: true
+            }).query
+        } catch (err) {
+            enqueueSnackbar("Unable to parse query from params", {variant: "error"})
         }
+
+        let updated
+        if (!!query_string) {
+            updated = update(formData, {
+                query: {$set: query_string}
+            })
+        } else {
+            updated = update(formData, {
+                query: {$set: ""}
+            })
+        }
+
+        setFormData(updated)
+        setQueryData(updated)
     }, [location])
 
     const handleOnSubmit = (e) => {
         e.preventDefault()
 
-        let updated = formData
+        let updated = {...formData}
 
         console.log(formData)
 
-        if (formData.fang) {
+        if (preferences.getPref('fang')) {
             let refanged = formData.query.replace('[.]', '.')
             if (refanged !== formData.query) {
                 updated = update(formData, {
@@ -156,6 +212,7 @@ const WhoisHandler = ({}) => {
     return (
         <React.Fragment>
             <Container style={{paddingBottom: '1rem'}}>
+                <ClusterStatus />
                 <form onSubmit={handleOnSubmit}>
                     <Grid container spacing={1} justify="center" alignItems="flex-end">
                         <Grid container item xs={11} justify="center" alignItems="flex-end">

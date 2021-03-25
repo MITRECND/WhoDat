@@ -248,29 +248,40 @@ def query():
     except KeyError:
         raise ClientError("Query is required")
 
+    sort_map = {
+        "domainName": "domainName",
+        "registrant_name": "details.registrant_name",
+        "contactEmail": "details.contactEmail",
+        "standardRegCreatedDate": "details.standardRegCreatedDate",
+        "registrant_telephone": "details.registrant_telephone",
+        "Version": "dataVersion",
+        "score": "_score",
+    }
+
     chunk_size = json_data.get("chunk_size", 50)
     offset = json_data.get("offset", 0)
     valid_size_offset(chunk_size, offset)
     unique = json_data.get("unique", False)
-    sort_keys = json_data.get("sort_keys", {})
+    sort_keys = json_data.get("sort_keys", [])
 
     skip = offset * chunk_size
     # handle sort_key
     sort = []
     for sort_key in sort_keys:
-        if sort_key not in [
-                "domainName",
-                "details.registrant_name",
-                "details.contactEmail",
-                "details.standardRegCreatedDate",
-                "details.registrant_telephone",
-                "dataVersion",
-                "_score",
-        ]:
-            raise ClientError(f"Invalid sort key {sort_key} provided")
-        if not (sort_keys[sort_key] == "asc" or sort_keys[sort_key] == "desc"):
-            raise ClientError(f"Invalid sort direction {sort_keys[sort_key]}")
-        sort.append((sort_key, sort_keys[sort_key]))
+        if 'name' not in sort_key:
+            raise ClientError(
+                "Unable to find required 'name' field in sort_key")
+        elif sort_key['name'] not in sort_map.keys():
+            raise ClientError(f"Invalid sort key {sort_key['name']} provided")
+
+        if 'dir' not in sort_key:
+            raise ClientError(
+                "Unable to find required 'dir' field in sort_key")
+        elif sort_key['dir'] not in ['asc', 'desc']:
+            raise ClientError(
+                "Sort key 'dir' field must be 'asc' or desc'")
+
+        sort.append((sort_map[sort_key['name']], sort_key['dir']))
     if not sort:
         sort = None
 

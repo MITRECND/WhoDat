@@ -1,86 +1,114 @@
 import React from 'react'
-import {useHistory} from 'react-router-dom'
 import qs from 'qs'
 
-import MenuItem from '@material-ui/core/MenuItem'
-import ListItem from '@material-ui/core/ListItem';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import ListItemText from '@material-ui/core/ListItemText';
-import LanguageIcon from '@material-ui/icons/Language'
+import { PluginManagers } from '../../components/plugins'
 
-import {PluginManagers} from '../../components/plugins'
+import {
+    MenuElement,
+    RouteElement,
+    NavigationElement
+} from '../../components/layout'
+
+import {
+    userPreferencesManager,
+    UserPreferenceNamespace,
+    UserPreference,
+} from '../../components/helpers/preferences'
+
+import { appSettings } from '../../settings'
 
 const DNSDB = React.lazy(() => import ('./dnsdb'))
 
 export const DNSDBPATH = "/passive/dnsdb"
 
-export const DNSDBTLDDomainMenu = React.forwardRef(({domainName}, ref) => {
-    let history = useHistory()
+const DNSDBDomainMenu = new MenuElement({
+    type: "tld",
+    path: (domainName) => {
+            const search_string = '?' + qs.stringify({
+                type: 'domain',
+                value: domainName
+            })
 
-    return (
-        <MenuItem onClick={() => {
-            let domain = `*.${domainName}`
-            history.push({
-                pathname: DNSDBPATH,
-                search: '?' + qs.stringify({
-                    type: 'domain',
-                    value: domain
-                })
-            })}}
-        >
-            Search DNSDB
-        </MenuItem>
-    )
+            return `${DNSDBPATH}${search_string}`
+    },
+    text: "Search DNSDB"
 })
 
-export const DNSDBDomainMenu = React.forwardRef(({domainName}, ref) => {
-    let history = useHistory()
+const DNSDBIPMenu = new MenuElement({
+    type: "ip",
+    path: (ip) => {
+            const search_string = '?' + qs.stringify({
+                type: 'ip',
+                value: ip
+            })
 
-    return (
-        <MenuItem onClick={() => {
-            let domain = `*.${domainName}`
-            history.push({
-                pathname: DNSDBPATH,
-                search: '?' + qs.stringify({
-                    type: 'domain',
-                    value: domain
-                })
-            })}}
-        >
-            Search DNSDB
-        </MenuItem>
-    )
+            return `${DNSDBPATH}${search_string}`
+    },
+    text: "Search DNSDB"
 })
 
-export const DNSDBIPMenu = React.forwardRef(({ip}, ref) => {
-    let history = useHistory()
-
-    return (
-        <MenuItem onClick={() => {
-            history.push({
-                pathname: DNSDBPATH,
-                search: '?' + qs.stringify({
-                    type: 'ip',
-                    value: ip
-                })
-            })}}
-        >
-            Search DNSDB
-        </MenuItem>
-    )
+const dnsdbPreferencesNamespace = new UserPreferenceNamespace({
+    name: "dnsdb",
+    title: "DNSDB Search Preferences",
+    desription: "Preferences for DNSDB Search and Presentation"
 })
 
-const DNSDBDrawer = ({handleRedirect}) => {
-    return (
-        <ListItem button onClick={() => {handleRedirect(DNSDBPATH)}}>
-            <ListItemIcon> <LanguageIcon /> </ListItemIcon>
-            <ListItemText primary="DNSDB - Passive" />
-        </ListItem>
+const DNSDBENABLED = appSettings.hasOwnProperty('enable_plugin_dnsdb') && appSettings.enable_plugin_dnsdb ? true : false
+
+if (DNSDBENABLED){
+    userPreferencesManager.registerNamespace(dnsdbPreferencesNamespace)
+    userPreferencesManager.registerPrefs(
+        dnsdbPreferencesNamespace, [
+            new UserPreference({
+                name: "page_size",
+                type: "number",
+                title: "Results Page Size",
+                description: "Default Page Size to use for result pagination",
+                default_value: 100
+            }),
+            new UserPreference({
+                name: "remember_page_size",
+                type: "boolean",
+                title: "Remember Results Page Size",
+                description: "Remember last used page size when displaying results",
+                default_value: true,
+            }),
+            new UserPreference({
+                name: "domain_search_type",
+                type: "string",
+                title: "Domain Search Method",
+                description: "Search method to use when searching forward domains, (absolute, prefix-wildcard, suffix-wildcard)",
+                default_value: "prefix-wildcard"
+            }),
+            new UserPreference({
+                name: "remember_domain_search_type",
+                type: "boolean",
+                title: "Remember Domain Search Method",
+                description: "Remember last used Forward Domain Search Type (e.g., Prefix Wildcard)",
+                default_value: false
+            })
+
+        ]
+    )
+
+    PluginManagers.menu.addPlugin('dnsdb_tld', 'tld', DNSDBDomainMenu)
+    PluginManagers.menu.addPlugin('dnsdb_domain', 'domain', DNSDBDomainMenu)
+    PluginManagers.menu.addPlugin('dnsdb_ip', 'ip', DNSDBIPMenu)
+    PluginManagers.routes.addPlugin(
+        'dnsdb',
+        new RouteElement({
+            path: DNSDBPATH,
+            title: 'DNSDB Passive DNS',
+            component: <DNSDB />
+        })
+    )
+
+    PluginManagers.nav.addPlugin(
+        'dnsdb',
+        new NavigationElement({
+            title: 'DNSDB',
+            path: DNSDBPATH,
+            text: "Passive DNS"
+        })
     )
 }
-
-PluginManagers.menu.addPlugin('dnsdb_tld', 'tld', DNSDBTLDDomainMenu)
-PluginManagers.menu.addPlugin('dnsdb_domain', 'domain', DNSDBDomainMenu)
-PluginManagers.menu.addPlugin('dnsdb_ip', 'ip', DNSDBIPMenu)
-PluginManagers.routes.addPlugin('dnsdb', DNSDBPATH, 'DNSDB Passive DNS', <DNSDB />)
-PluginManagers.drawer.addPlugin('dnsdb', <DNSDBDrawer />)
