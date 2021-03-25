@@ -219,9 +219,8 @@ export class MenuElement {
     _getLinkComponent(data, key = null) {
         let link_props
 
-        //https://stackoverflow.com/questions/5999998/check-if-a-variable-is-of-function-type
         let cpath = this.path
-        if (this.path && {}.toString.call(this.path) === '[object Function]'){
+        if (this.path && typeof this.path === 'function'){
             cpath = this.path(data)
         }
 
