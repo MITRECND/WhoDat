@@ -34,20 +34,6 @@ def valid_size_offset(chunk_size, offset):
         raise ClientError(error)
 
 
-@whoisv2_bp.route("/config")
-def config():
-    """Retrieves and returns configuration information about the server
-    """
-
-    results = {
-        'plugins': current_app.config.get('PYDAT_PLUGINS', []),
-        'active_resolution': not (
-            current_app.config.get('DISABLERESOLVE', False))
-    }
-
-    return results
-
-
 # Metadata
 @whoisv2_bp.route("/metadata")
 @whoisv2_bp.route("/metadata/<version>")
