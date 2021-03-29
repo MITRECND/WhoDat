@@ -3,7 +3,7 @@ from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api import elasticsearch_handler as es_handler
 from pydat.core.es import ESConnectionError, ESQueryError
 from urllib import parse
-from pydat.api.shared import whois
+from pydat.api.controller import whois_shared
 
 
 whoisv1_bp = Blueprint("whoisv1", __name__)
@@ -149,7 +149,7 @@ def domain_diff(domainName, v1, v2):
     Returns:
         dict: Diff results from comparing keys and values of v1 and v2
     """
-    data = whois.diff(domainName, v1, v2)
+    data = whois_shared.diff(domainName, v1, v2)
     return {"success": True, "data": data}
 
 
@@ -166,7 +166,7 @@ def metadata(version=None):
     Returns:
         dict: Details for application metadata
     """
-    results = whois.metadata(version)
+    results = whois_shared.metadata(version)
     return {"success": True, "data": results}
 
 

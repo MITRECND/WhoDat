@@ -4,7 +4,7 @@ from pydat.api import elasticsearch_handler as es_handler
 from pydat.core.es import ESConnectionError, ESQueryError
 from urllib import parse
 import socket
-from pydat.api.shared import whois
+from pydat.api.controller import whois_shared
 
 whoisv2_bp = Blueprint("whoisv2", __name__)
 
@@ -47,7 +47,7 @@ def metadata(version=None):
     Returns:
         dict: Details for application metadata
     """
-    results = whois.metadata(version)
+    results = whois_shared.metadata(version)
     return {'metadata': results}
 
 
@@ -117,7 +117,7 @@ def domains_diff():
     except KeyError:
         raise ClientError("Two versions must be provided")
 
-    return whois.diff(domain, version1, version2)
+    return whois_shared.diff(domain, version1, version2)
 
 
 @whoisv2_bp.route("/domains/<search_key>", methods=["POST"])
