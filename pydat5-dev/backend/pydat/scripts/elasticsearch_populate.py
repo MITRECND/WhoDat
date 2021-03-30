@@ -26,8 +26,8 @@ VERSION_KEY = 'dataVersion'
 UPDATE_KEY = 'updateVersion'
 FIRST_SEEN = 'dataFirstSeen'
 
-DOC_TYPE = "doc"
-META_DOC_TYPE = "doc"
+DOC_TYPE = "_doc"
+META_DOC_TYPE = "_doc"
 
 
 class StatTracker:
@@ -160,13 +160,13 @@ class indexFormatter(object):
 
     def __init__(self, prefix):
         self.prefix = prefix
-        self.orig_write = "%s-write" % prefix
-        self.delta_write = "%s-delta-write" % prefix
-        self.orig_search = "%s-orig" % prefix
-        self.delta_search = "%s-delta" % prefix
-        self.search = "%s-search" % prefix
-        self.meta = ".%s-meta" % prefix
-        self.template_pattern = "%s-*" % prefix
+        self.orig_write = "%s-data-write" % prefix
+        self.delta_write = "%s-data-delta-write" % prefix
+        self.orig_search = "%s-data-orig" % prefix
+        self.delta_search = "%s-data-delta" % prefix
+        self.search = "%s-data-search" % prefix
+        self.meta = "%s-meta" % prefix
+        self.template_pattern = "%s-data-*" % prefix
         self.template_name = "%s-template" % prefix
 
 
@@ -1209,9 +1209,9 @@ def rolloverIndex(roll, es, options, pipelines):
             search_alias = options.indexNames.delta_search
 
         try:
-            orig_name = es.indices.get_alias(name=write_alias).keys()[0]
+            orig_name = list(es.indices.get_alias(name=write_alias).keys())[0]
         except Exception:
-            LOGGER.error("Unable to get/resolve index alias")
+            LOGGER.exception("Unable to get/resolve index alias")
 
         try:
             es.indices.rollover(alias=write_alias,
@@ -1540,13 +1540,13 @@ def main():
                   body=metadata)
 
         # Create the first whois rollover index
-        index_name = "%s-000001" % options.index_prefix
+        index_name = "%s-data-000001" % options.index_prefix
         es.indices.create(index=index_name,
                           body={"aliases": {indexNames.orig_write: {},
                                             indexNames.orig_search: {}}})
 
         # Create the first whois delta rollover index
-        delta_name = "%s-delta-000001" % options.index_prefix
+        delta_name = "%s-data-delta-000001" % options.index_prefix
         es.indices.create(index=delta_name,
                           body={"aliases": {indexNames.delta_write: {},
                                             indexNames.delta_search: {}}})
@@ -1554,7 +1554,10 @@ def main():
         options.firstImport = True
     else:  # Data exists in the cluster
         try:
-            result = es.get(index=indexNames.meta, doc_type=DOC_TYPE, id=0)
+            result = es.get(
+                index=indexNames.meta,
+                doc_type=DOC_TYPE,
+                id=0)
             if result['found']:
                 metadata = result['_source']
             else:
@@ -1682,7 +1685,8 @@ def main():
             meta_struct['included_keys'] = options.include
 
         es.create(index=indexNames.meta, id=options.identifier,
-                  doc_type=META_DOC_TYPE,  body=meta_struct)
+                  doc_type=META_DOC_TYPE,
+                  body=meta_struct)
 
         # Resolve the alias to get the raw index names
     index_list = es.indices.get_alias(name=indexNames.orig_search)
