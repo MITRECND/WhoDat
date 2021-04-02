@@ -139,14 +139,32 @@
           "analyzer": "all_analyzer",
           "term_vector": "with_positions_offsets_payloads"
         },
-        "dataFirstSeen" : {
-          "type" : "long"
-        },
-        "dataVersion" : {
-          "type" : "long"
-        },
-        "updateVersion" : {
-          "type" : "long"
+        "metadata": {
+          "properties": {
+            "historical": {
+              "type": "boolean"
+            },
+            "dataFirstSeen" : {
+              "type" : "long"
+            },
+            "dataVersion" : {
+              "type" : "long"
+            },
+            "dateFirstSeen": {
+              "type": "keyword"
+            },
+            "dateLastSeen": {
+              "type": "keyword"
+            },
+            "dateCreated": {
+              "type": "date",
+              "format": "yyyy-mm-dd"
+            },
+            "dateUpdated": {
+              "type": "date",
+              "format": "yyyy-mm-dd"
+            }
+          }
         },
         "tld": {
               "type": "keyword",

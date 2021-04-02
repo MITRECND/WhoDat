@@ -25,7 +25,8 @@ setup(
     python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "pydat-dev-server = pydat.scripts.api:main"
+            "pydat-dev-server = pydat.scripts.api:main",
+            "pydat-populator = pydat.scripts.elasticsearch_populate:main"
         ]
     },
 )
