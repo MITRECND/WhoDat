@@ -12,6 +12,8 @@ import queue
 
 from elasticsearch import helpers
 
+from pydat.core.elastic.ingest.debug_levels import DebugLevel
+
 VERSION_KEY = 'dataVersion'
 FIRST_SEEN = 'dataFirstSeen'
 DATE_FIRST_SEEN = 'dateFirstSeen'
@@ -24,6 +26,18 @@ HISTORICAL = 'historical'
 # Notes
 # 'track_total_hits' required on search to get accurate total hits
 # routing less helpful in low shard-count setups
+
+
+def _generateDocId(domainName):
+    try:
+        (domain, tld) = domainName.rsplit('.', 1)
+    except Exception:
+        raise RuntimeError(f"Unable to parse domain '{domainName}'")
+
+    if len(domain) > 200:
+        dhash = hashlib.sha1(bytes(domain, 'utf-8')).hexdigest()
+        domain = f"h.{dhash}"
+    return f"{tld}.{domain}"
 
 
 class DataReader(Thread):
@@ -40,7 +54,7 @@ class DataReader(Thread):
         file_queue,
         data_queue,
         eventTracker,
-        verbose=False,
+        process_options,
         logger=None
     ):
         super().__init__()
@@ -54,7 +68,8 @@ class DataReader(Thread):
         self.file_queue = file_queue
         self.data_queue = data_queue
         self.eventTracker = eventTracker
-        self.verbose = verbose
+        self.verbose = process_options.verbose
+        self.debug = process_options.debug
         self._shutdown = False
         self._pause = False
 
@@ -128,11 +143,13 @@ class DataReader(Thread):
             for row in dnsreader:
                 while self._pause:
                     if self._shutdown:
-                        self.logger.debug("Shutdown received while paused")
+                        if self.debug >= DebugLevel.VERBOSE:
+                            self.logger.debug("Shutdown received while paused")
                         break
                     time.sleep(.5)
                 if self._shutdown:
-                    self.logger.debug("Shutdown received")
+                    if self.debug >= DebugLevel.VERBOSE:
+                        self.logger.debug("Shutdown received")
                     break
                 if row is None or not row:
                     self.logger.warning(
@@ -163,19 +180,13 @@ class DataFetcher(Thread):
         self,
         pipelineid,
         fetcherid,
-        es,
         data_queue,
         work_queue,
         eventTracker,
-        bulk_fetch_size,
-        version,
-        ingest_day,
-        ingest_now,
-        ignore_field_prefixes,
+        es,
         index_list,
-        skip_fetch=False,
-        verbose=False,
-        debug=False,
+        skip_fetch,
+        process_options,
         logger=None
     ):
         super().__init__()
@@ -191,14 +202,14 @@ class DataFetcher(Thread):
         self.es = es
         self.fetcher_threads = []
         self.eventTracker = eventTracker
-        self.bulk_fetch_size = bulk_fetch_size
+        self.bulk_fetch_size = process_options.bulk_fetch_size
         self.skip_fetch = skip_fetch
-        self.ignore_field_prefixes = ignore_field_prefixes
-        self.verbose = verbose
-        self.debug = debug
-        self.version = version
-        self.ingest_day = ingest_day
-        self.ingest_now = ingest_now
+        self.ignore_field_prefixes = process_options.ignore_field_prefixes
+        self.verbose = process_options.verbose
+        self.debug = process_options.debug
+        self.version = process_options.version
+        self.ingest_day = process_options.ingest_day
+        self.ingest_now = process_options.ingest_now
         self.index_list = index_list
         self._shutdown = False
         self._finish = False
@@ -208,17 +219,6 @@ class DataFetcher(Thread):
 
     def finish(self):
         self._finish = True
-
-    def _generateDocId(self, domainName):
-        try:
-            (domain, tld) = domainName.rsplit('.', 1)
-        except Exception:
-            # TODO FIXME
-            self.logger.exception("Unable to parse domain '%s'" % domainName)
-            raise
-
-        domain = hashlib.sha1(bytes(domain, 'utf-8')).hexdigest()
-        return f"{tld}.{domain}"
 
     def run(self):
         try:
@@ -250,7 +250,7 @@ class DataFetcher(Thread):
                         self.work_queue.put((entry, None))
                         continue
 
-                    doc_id = self._generateDocId(entry['domainName'])
+                    doc_id = _generateDocId(entry['domainName'])
                     fetch.append((doc_id, entry))
 
                     if len(fetch) >= self.bulk_fetch_size:
@@ -279,8 +279,8 @@ class DataFetcher(Thread):
                     for s in self.ignore_field_prefixes):
                 continue
             if header[i] == 'domainName':
-                if self.verbose and self.debug:
-                    self.logger.info("Processing domain: %s" % item)
+                if self.debug >= DebugLevel.NOISY:
+                    self.logger.debug("Processing domain: %s" % item)
                 domainName = item
                 continue
             if item == "":
@@ -309,7 +309,7 @@ class DataFetcher(Thread):
         try:
             docs = list()
             for (doc_id, entry) in fetch_list:
-                for index_name in self.self.index_list:
+                for index_name in self.index_list:
                     getdoc = {
                         '_index': index_name,
                         '_id': doc_id,
@@ -328,10 +328,10 @@ class DataFetcher(Thread):
         try:
             for (doc_count, index) in \
                     enumerate(range(0, len(result['docs']),
-                              len(self.self.index_list))):
+                              len(self.index_list))):
                 found = None
                 doc_results = \
-                    result['docs'][index:index + len(self.self.index_list)]
+                    result['docs'][index:index + len(self.index_list)]
 
                 for res in doc_results:
                     if res['found']:
@@ -359,19 +359,12 @@ class DataWorker(Thread):
     def __init__(
         self,
         pipelineid,
-        version,
-        include_fields,
-        exclude_fields,
-        ingest_day,
-        ingest_now,
         work_queue,
         insert_queue,
         statTracker,
         eventTracker,
         es,
-        reingest=False,
-        verbose=False,
-        debug=False,
+        process_options,
         logger=None,
     ):
         super().__init__()
@@ -389,14 +382,14 @@ class DataWorker(Thread):
         self.eventTracker = eventTracker
         self._shutdown = False
         self._finish = False
-        self.version = version
-        self.reingest = reingest
-        self.include_fields = include_fields
-        self.exclude_fields = exclude_fields
-        self.ingest_day = ingest_day
-        self.ingest_now = ingest_now
-        self.verbose = verbose
-        self.debug = debug
+        self.version = process_options.version
+        self.reingest = process_options.reingest
+        self.include_fields = process_options.include_fields
+        self.exclude_fields = process_options.exclude_fields
+        self.ingest_day = process_options.ingest_day
+        self.ingest_now = process_options.ingest_now
+        self.verbose = process_options.verbose
+        self.debug = process_options.debug
 
     def shutdown(self):
         self._shutdown = True
@@ -443,119 +436,134 @@ class DataWorker(Thread):
         else:
             return True
 
-    def process_entry(self, entry, current_entry_raw):
+    def _process_update(self, entry, current_entry_raw):
+        api_commands = []
         domainName = entry['domainName']
         details = entry['details']
-        api_commands = []
 
-        if current_entry_raw is not None:
-            current_index = current_entry_raw['_index']
-            current_id = current_entry_raw['_id']
-            current_entry = current_entry_raw['_source']
+        current_index = current_entry_raw['_index']
+        current_id = current_entry_raw['_id']
+        current_entry = current_entry_raw['_source']
 
-            if ((current_entry[
-                        'metadata'][VERSION_KEY] == self.version)):
-                # Duplicate entry in source csv's?
-                if self.verbose and self.debug:
-                    self.logger.info('%s: Duplicate' % domainName)
-                self.statTracker.incr('duplicates')
-                return
+        if ((current_entry[
+                    'metadata'][VERSION_KEY] == self.version)):
+            # Duplicate entry in source csv's?
+            if self.debug >= DebugLevel.VERBOSE:
+                self.logger.debug('%s: Duplicate' % domainName)
+            self.statTracker.incr('duplicates')
+            return api_commands
 
-            if self.exclude_fields is not None:
-                details_copy = details.copy()
-                for exclude in self.exclude_fields:
-                    del details_copy[exclude]
+        if self.exclude_fields is not None:
+            details_copy = details.copy()
+            for exclude in self.exclude_fields:
+                del details_copy[exclude]
 
-                changed = (set(details_copy.items()) -
-                           set(current_entry['details'].items()))
+            changed = (
+                set(details_copy.items()) -
+                set(current_entry['details'].items()))
 
-            elif self.include_fields is not None:
-                details_copy = {}
-                for include in self.include_fields:
-                    try:  # TODO
-                        details_copy[include] = details[include]
-                    except Exception:
-                        pass
+        elif self.include_fields is not None:
+            details_copy = {}
+            for include in self.include_fields:
+                try:  # TODO
+                    details_copy[include] = details[include]
+                except Exception:
+                    pass
 
-                changed = (set(details_copy.items()) -
-                           set(current_entry['details'].items()))
+            changed = (
+                set(details_copy.items()) -
+                set(current_entry['details'].items()))
 
-            else:
-                changed = set(details.items()) \
-                            - set(current_entry['details'].items())
-
-                # The above diff doesn't consider keys that are only in the
-                # latest in es, so if a key is just removed, this diff will
-                # indicate there is no difference even though a key had been
-                # removed. I don't forsee keys just being wholesale removed,
-                # so this shouldn't be a problem
-
-            for ch in changed:
-                self.statTracker.addChanged(ch[0])
-
-            if len(changed) > 0:
-                self.statTracker.incr('updated')
-                if self.self.vverbose:
-                    self.logger.info("%s: Updated" % domainName)
-
-                # Copy old entry into different document
-                current_entry['metadata']['historical'] = True
-                doc_id = (
-                    f"{current_id}#{current_entry['metadata'][VERSION_KEY]}")
-                if self.verbose and self.debug:
-                    self.logger.info("doc_id: %s" % doc_id)
-                api_commands.append(
-                    self.process_command(
-                        'create',
-                        self.es.indexNames.delta_write,
-                        doc_id,
-                        current_entry))
-
-                # Update latest/orig entry
-                entry['metadata'][FIRST_SEEN] = current_entry[
-                    'metadata'][FIRST_SEEN]
-                entry['metadata'][DATE_FIRST_SEEN] = current_entry[
-                    'metadata'][DATE_FIRST_SEEN]
-                entry['metadata'][DATE_CREATED] = current_entry[
-                    'metadata'][DATE_CREATED]
-                api_commands.append(self.process_command(
-                    'index',
-                    current_index,
-                    current_id,
-                    entry))
-            else:
-                self.statTracker.incr('unchanged')
-                if self.verbose and self.debug:
-                    self.logger.info("%s: Unchanged" % domainName)
-                doc_diff = {'doc': {
-                    'metadata': {
-                        VERSION_KEY: self.version,
-                        DATE_LAST_SEEN: self.ingest_day,
-                        DATE_UPDATED: self.ingest_now,
-                    },
-                    'details': details
-                    }
-                }
-                api_commands.append(
-                    self.process_command(
-                        'update',
-                        current_index,
-                        current_id,
-                        doc_diff))
         else:
-            self.statTracker.incr('new')
-            if self.verbose and self.debug:
-                self.logger.info("%s: New" % domainName)
-            (domain_name_only, tld) = parse_domain(domainName)
-            doc_id = "%s.%s" % (
-                tld,
-                hashlib.sha1(bytes(domain_name_only, 'utf-8')).hexdigest())
+            changed = set(details.items()) \
+                        - set(current_entry['details'].items())
+
+            # The above diff doesn't consider keys that are only in the
+            # latest in es, so if a key is just removed, this diff will
+            # indicate there is no difference even though a key had been
+            # removed. I don't forsee keys just being wholesale removed,
+            # so this shouldn't be a problem
+
+        for ch in changed:
+            self.statTracker.addChanged(ch[0])
+
+        if len(changed) > 0:
+            self.statTracker.incr('updated')
+            if self.debug >= DebugLevel.NOISY:
+                self.logger.info("%s: Updated" % domainName)
+
+            # Copy old entry into different document
+            current_entry['metadata']['historical'] = True
+            doc_id = (
+                f"{current_id}#{current_entry['metadata'][VERSION_KEY]}")
+            if self.debug >= DebugLevel.NOISY:
+                self.logger.debug("doc_id: %s" % doc_id)
             api_commands.append(
                 self.process_command(
                     'create',
-                    self.es.indexNames.orig_write,
+                    self.es.indexNames.delta_write,
                     doc_id,
-                    entry))
+                    current_entry))
+
+            # Update latest/orig entry
+            entry['metadata'][FIRST_SEEN] = current_entry[
+                'metadata'][FIRST_SEEN]
+            entry['metadata'][DATE_FIRST_SEEN] = current_entry[
+                'metadata'][DATE_FIRST_SEEN]
+            entry['metadata'][DATE_CREATED] = current_entry[
+                'metadata'][DATE_CREATED]
+            api_commands.append(self.process_command(
+                'index',
+                current_index,
+                current_id,
+                entry))
+        else:
+            self.statTracker.incr('unchanged')
+            if self.debug >= DebugLevel.NOISY:
+                self.logger.info("%s: Unchanged" % domainName)
+            doc_diff = {'doc': {
+                'metadata': {
+                    VERSION_KEY: self.version,
+                    DATE_LAST_SEEN: self.ingest_day,
+                    DATE_UPDATED: self.ingest_now,
+                },
+                'details': details
+                }
+            }
+            api_commands.append(
+                self.process_command(
+                    'update',
+                    current_index,
+                    current_id,
+                    doc_diff))
+
+        return api_commands
+
+    def _process_new(self, entry):
+        domainName = entry['domainName']
+        api_commands = []
+
+        self.statTracker.incr('new')
+        if self.debug >= DebugLevel.NOISY:
+            self.logger.debug("%s: New" % domainName)
+        doc_id = _generateDocId(domainName)
+        api_commands.append(
+            self.process_command(
+                'create',
+                self.es.indexNames.orig_write,
+                doc_id,
+                entry))
+
+        return api_commands
+
+    def process_entry(self, entry, current_entry_raw):
+        api_commands = []
+
+        if current_entry_raw is not None:
+            api_commands.extend(self._process_update(entry, current_entry_raw))
+        else:
+            api_commands.extend(self._process_new(entry))
+
         for command in api_commands:
             self.insert_queue.put(command)
 
@@ -608,7 +616,7 @@ class DataShipper(Thread):
         es,
         insert_queue,
         eventTracker,
-        bulk_ship_size=1000,
+        process_options,
         logger=None
     ):
         super().__init__()
@@ -620,7 +628,7 @@ class DataShipper(Thread):
             self.logger = logging.getLogger(f'shipper.{self.myid}')
 
         self.insert_queue = insert_queue
-        self.bulk_ship_size = bulk_ship_size
+        self.bulk_ship_size = process_options.bulk_ship_size
         self.eventTracker = eventTracker
         self.es = es
         self._finish = False

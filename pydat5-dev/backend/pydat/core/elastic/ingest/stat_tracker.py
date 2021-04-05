@@ -64,6 +64,10 @@ class StatTracker(Thread):
         return self._stats['duplicates']
 
     @property
+    def stats(self):
+        return self._stats
+
+    @property
     def changed_stats(self):
         return self._changed
 

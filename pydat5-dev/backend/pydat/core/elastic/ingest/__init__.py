@@ -16,7 +16,10 @@ from pydat.core.elastic.ingest.ingest_handler import (
     IngestHandler,
     RolloverRequired
 )
-from pydat.core.elastic.ingest.process_wrapper import DataProcessorPool
+from pydat.core.elastic.ingest.process_wrapper import (
+    DataProcessorPool,
+    PopulatorOptions
+)
 from pydat.core.elastic.ingest.file_reader import FileReader
 
 
@@ -120,6 +123,9 @@ class DataPopulator:
         template = self._getTemplate()
         # TODO FIXME add confirmation output information
         self.elastic_handler.configTemplate(template)
+
+    def clearInterrupted(self):
+        self.elastic_handler.clearInterrupted()
 
     def _handleShutdown(self):
         try:
@@ -258,29 +264,34 @@ class DataPopulator:
         # Start up Reader Thread
         self.readerThread.start()
 
-        # Start processing
-        self.dataProcessorPool = DataProcessorPool(
-            procs=self.pipelines,
-            version=self.version,
-            file_queue=self.file_queue,
-            statTracker=self.statTracker,
-            eventTracker=self.eventTracker,
-            root_logger=self.root_logger,
-            elastic_args=self.elastic_args,
+        self.process_options = PopulatorOptions(
             first_import=first_import,
             reingest=reingest,
+            version=self.version,
             ingest_day=self.ingest_day,
             ingest_now=self.ingest_now,
             ignore_field_prefixes=self.ignore_field_prefixes,
             include_fields=self.include_fields,
             exclude_fields=self.exclude_fields,
+            elastic_args=self.elastic_args,
             bulk_fetch_size=self.bulk_fetch_size,
             bulk_ship_size=self.bulk_ship_size,
             num_fetcher_threads=self.num_fetcher_threads,
-            num_shipper_threads=self.num_shipper_threads
+            num_shipper_threads=self.num_shipper_threads,
+            verbose=self.verbose,
+            debug=self.debug,
         )
 
-        # sys.exit(0)
+        # Start processing
+        self.dataProcessorPool = DataProcessorPool(
+            procs=self.pipelines,
+            file_queue=self.file_queue,
+            statTracker=self.statTracker,
+            eventTracker=self.eventTracker,
+            root_logger=self.root_logger,
+            process_options=self.process_options,
+        )
+
         self.dataProcessorPool.start()
 
         try:
@@ -343,13 +354,17 @@ class DataPopulator:
             raise RuntimeError(
                 "Previous Import was interupted, please resolve")
 
-        self.elastic_handler.updateMetadata(0, {
-                'doc': {
-                    'importing': self.version,
-                    'lastVersion': self.version
-                }
+        updateDoc = {
+            'doc': {
+                'importing': self.version,
+                'lastVersion': self.version
             }
-        )
+        }
+
+        if metadata['lastVersion'] == 0:
+            updateDoc['doc']['firstVersion'] = 1
+
+        self.elastic_handler.updateMetadata(0, updateDoc)
 
         # Create the entry for this import
         meta_struct = {'metadata': self.version,
@@ -400,4 +415,4 @@ class DataPopulator:
 
     @property
     def stats(self):
-        return dict()
+        return self.statTracker

@@ -2,10 +2,10 @@ import os
 import time
 import logging
 import multiprocessing
+from argparse import Namespace
 from multiprocessing import (
     Process,
 )
-
 import queue
 
 from pydat.core.elastic.ingest.ingest_handler import (
@@ -20,6 +20,45 @@ from pydat.core.elastic.ingest.data_processors import (
     DataShipper,
 )
 
+from pydat.core.elastic.ingest.debug_levels import DebugLevel
+
+
+class PopulatorOptions(Namespace):
+    def __init__(
+        self,
+        **kwargs
+    ):
+        validOptions = [
+            'first_import',
+            'reingest',
+            'version',
+            'ingest_day',
+            'ingest_now',
+            'ignore_field_prefixes',
+            'include_fields',
+            'exclude_fields',
+            'elastic_args',
+            'bulk_fetch_size',
+            'bulk_ship_size',
+            'num_fetcher_threads',
+            'num_shipper_threads',
+            'verbose',
+            'debug',
+        ]
+        unexpected_options = []
+
+        for name in kwargs.keys():
+            if name not in validOptions:
+                unexpected_options.append(name)
+
+        if len(unexpected_options) > 0:
+            raise ValueError((
+                "Unexpected arguments: "
+                f"{','.join(list(unexpected_options.keys()))}"
+            ))
+
+        super().__init__(**kwargs)
+
 
 class DataProcessor(Process):
     """Main pipeline process which manages individual threads
@@ -30,22 +69,10 @@ class DataProcessor(Process):
         file_queue,
         statTracker,
         eventTracker,
-        reingest,
+        process_options,
         skip_fetch,
-        version,
-        ingest_day,
-        ingest_now,
-        ignore_field_prefixes,
-        include_fields,
-        exclude_fields,
-        elastic_args,
-        bulk_fetch_size,
-        bulk_ship_size,
-        num_fetcher_threads=2,
-        num_shipper_threads=2,
-        verbose=False,
-        debug=False,
         logger=None,
+
     ):
         super().__init__()
         self.myid = pipeline_id
@@ -57,6 +84,9 @@ class DataProcessor(Process):
 
         self.file_queue = file_queue
         self.statTracker = statTracker
+        self.eventTracker = eventTracker
+        self.process_options = process_options
+
         self.fetcher_threads = []
         self.worker_thread = None
         self.shipper_threads = []
@@ -64,21 +94,13 @@ class DataProcessor(Process):
         self.pause_request = multiprocessing.Value('b', False)
         self._paused = multiprocessing.Value('b', False)
         self._complete = multiprocessing.Value('b', False)
-        self.eventTracker = eventTracker
-        self.es = IngestHandler(**elastic_args)
-        self.myid = pipeline_id
+        self.es = IngestHandler(**self.process_options.elastic_args)
         self.skip_fetch = skip_fetch
-        self.version = version
-        self.ingest_day = ingest_day
-        self.ingest_now = ingest_now
-        self.include_fields = include_fields
-        self.exclude_fields = exclude_fields
-        self.bulk_fetch_size = bulk_fetch_size
-        self.bulk_ship_size = bulk_ship_size
-        self.ignore_field_prefixes = ignore_field_prefixes
-        self.reingest = reingest
-        self.num_fetcher_threads = num_fetcher_threads
-        self.num_shipper_threads = num_shipper_threads
+
+        self.num_fetcher_threads = self.process_options.num_fetcher_threads
+        self.num_shipper_threads = self.process_options.num_shipper_threads
+        self.verbose = self.process_options.verbose
+        self.debug = self.process_options.debug
         self.index_list = self.es.resolveAlias()
 
         # These are created when the process starts up
@@ -102,7 +124,6 @@ class DataProcessor(Process):
 
     def update_index_list(self):
         self.index_list = self.es.resolveAlias()
-        self.skip_fetch = False
 
     def _pause(self):
         if self.reader_thread.isAlive():
@@ -121,6 +142,8 @@ class DataProcessor(Process):
                 self.reader_thread.unpause()
             except Exception:
                 self.logger.exception("Unable to unpause reader thread")
+            # Disable skipping fetch phase
+            self.skip_fetch = False
             self.update_index_list()
             self.startup_rest()
             self._paused.value = False
@@ -204,18 +227,13 @@ class DataProcessor(Process):
         self.logger.debug("Starting Worker")
         self.worker_thread = DataWorker(
             pipelineid=self.myid,
-            version=self.version,
-            include_fields=self.include_fields,
-            exclude_fields=self.exclude_fields,
-            ingest_day=self.ingest_day,
-            ingest_now=self.ingest_now,
-            reingest=self.reingest,
-            es=self.es,
             work_queue=self.work_queue,
             insert_queue=self.insert_queue,
             statTracker=self.statTracker,
             eventTracker=self.eventTracker,
-            logger=self.logger
+            es=self.es,
+            process_options=self.process_options,
+            logger=self.logger,
         )
         self.worker_thread.daemon = True
         self.worker_thread.start()
@@ -229,13 +247,10 @@ class DataProcessor(Process):
                 data_queue=self.data_queue,
                 work_queue=self.work_queue,
                 eventTracker=self.eventTracker,
-                bulk_fetch_size=self.bulk_fetch_size,
-                version=self.version,
-                ingest_day=self.ingest_day,
-                ingest_now=self.ingest_now,
-                ignore_field_prefixes=self.ignore_field_prefixes,
                 index_list=self.index_list,
                 skip_fetch=self.skip_fetch,
+                process_options=self.process_options,
+                logger=self.logger,
             )
             fetcher_thread.start()
             self.fetcher_threads.append(fetcher_thread)
@@ -248,7 +263,7 @@ class DataProcessor(Process):
                 es=self.es,
                 insert_queue=self.insert_queue,
                 eventTracker=self.eventTracker,
-                bulk_ship_size=self.bulk_ship_size,
+                process_options=self.process_options,
             )
             shipper_thread.start()
             self.shipper_threads.append(shipper_thread)
@@ -273,7 +288,8 @@ class DataProcessor(Process):
             file_queue=self.file_queue,
             data_queue=self.data_queue,
             eventTracker=self.eventTracker,
-            logger=self.logger
+            process_options=self.process_options,
+            logger=self.logger,
         )
         self.reader_thread.start()
 
@@ -305,75 +321,45 @@ class DataProcessorPool:
     def __init__(
         self,
         procs,
-        first_import,
-        elastic_args,
-        version,
-        ingest_day,
-        ingest_now,
-        ignore_field_prefixes,
-        include_fields,
-        exclude_fields,
-        bulk_fetch_size,
-        bulk_ship_size,
-        num_fetcher_threads,
-        num_shipper_threads,
-        reingest,
         file_queue,
         statTracker,
         eventTracker,
         root_logger,
-        verbose=False,
-        debug=False,
+        process_options,
     ):
+
         self.proc_count = procs
-        self.first_import = first_import
         self.file_queue = file_queue
         self.statTracker = statTracker
-        self.root_logger = root_logger
-        self.elastic_args = elastic_args
         self.eventTracker = eventTracker
-        self.version = version
-        self.ingest_day = ingest_day
-        self.ingest_now = ingest_now
-        self.ignore_field_prefixes = ignore_field_prefixes
-        self.include_fields = include_fields
-        self.exclude_fields = exclude_fields
-        self.bulk_fetch_size = bulk_fetch_size
-        self.bulk_ship_size = bulk_ship_size
-        self.num_fetcher_threads = num_fetcher_threads
-        self.num_shipper_threads = num_shipper_threads
-        self.reingest = reingest
-        self.verbose = verbose
-        self.debug = debug
+        self.root_logger = root_logger
+        self.process_options = process_options
+
+        self.verbose = process_options.verbose
+        self.debug = process_options.debug
+
+        self.logger = self.root_logger.getLogger("data_processor_pool")
 
         self.pipelines = []
 
-        self.skip_fetch = self.first_import
+        skip_fetch = False
+        if (not self.process_options.reingest
+                and self.process_options.first_import):
+            skip_fetch = True
 
         self.elastic_handler = IngestHandler(
             logger=self.root_logger.getLogger("pool_ingest_handler"),
-            **elastic_args)
+            **self.process_options.elastic_args)
 
         for pipeline_id in range(self.proc_count):
             p = DataProcessor(
                 pipeline_id=pipeline_id,
                 file_queue=self.file_queue,
                 statTracker=self.statTracker.get_tracker(),
-                logger=self.root_logger.getLogger(name=f'{pipeline_id}'),
                 eventTracker=self.eventTracker,
-                reingest=self.reingest,
-                skip_fetch=self.skip_fetch,
-                version=self.version,
-                ingest_day=self.ingest_day,
-                ingest_now=self.ingest_now,
-                ignore_field_prefixes=self.ignore_field_prefixes,
-                include_fields=self.include_fields,
-                exclude_fields=self.exclude_fields,
-                elastic_args=self.elastic_args,
-                bulk_fetch_size=self.bulk_fetch_size,
-                bulk_ship_size=self.bulk_ship_size,
-                num_shipper_threads=self.num_shipper_threads,
-                num_fetcher_threads=self.num_fetcher_threads,
+                logger=self.root_logger.getLogger(name=f'{pipeline_id}'),
+                skip_fetch=skip_fetch,
+                process_options=self.process_options
             )
             self.pipelines.append(p)
 
@@ -403,9 +389,8 @@ class DataProcessorPool:
                                              "stopping processing"))
 
     def handleRollover(self, write_alias, search_alias):
-        self.skip_fetch = False
-        if self.verbose:
-            self.logger.info("Rolling over ElasticSearch Index")
+        if self.debug >= DebugLevel.VERBOSE:
+            self.logger.debug("Rolling over ElasticSearch Index")
 
         # Pause the pipelines
         for proc in self.pipelines:
@@ -431,8 +416,8 @@ class DataProcessorPool:
                 if not proc.complete:  # Only if process has data to process
                     proc.unpause()
 
-            if self.verbose:
-                self.logger.info("Roll over complete")
+            if self.debug >= DebugLevel.VERBOSE:
+                self.logger.debug("Roll over complete")
 
         except KeyboardInterrupt:
             self.logger.warning((

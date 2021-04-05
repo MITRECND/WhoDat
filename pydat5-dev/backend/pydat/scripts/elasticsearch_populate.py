@@ -7,12 +7,12 @@ import argparse
 import getpass
 
 
-from pydat.core.elastic.ingest import DataPopulator
+from pydat.core.elastic.ingest import (
+    DataPopulator,
+)
 
+from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
-# Notes
-# 'track_total_hits' required on search to get accurate total hits
-# routing less helpful in low shard-count setups
 
 def main():
     parser = argparse.ArgumentParser()
@@ -52,6 +52,12 @@ def main():
         "--config-template-only", action="store_true",
         default=False, dest="config_template_only",
         help=("Configure the ElasticSearch template and then exit")
+    )
+
+    mode.add_argument(
+        "--clear-interrupted-flag", action="store_true",
+        default=False, dest="clear_interrupted",
+        help=("Clear the interrupted flag, forcefully (NOT RECOMMENDED")
     )
 
     parser.add_argument(
@@ -201,8 +207,17 @@ def main():
         "--debug", action="store_true", default=False,
         help="Enables debug logging"
     )
+    parser.add_argument(
+        "--debug-level", dest="debug_level", action="store", type=int,
+        default=1, help="Debug logging level [1 (default) - 3]"
+    )
 
     options = parser.parse_args()
+
+    if options.debug:
+        options.debug = DebugLevel(options.debug_level)
+    else:
+        options.debug = DebugLevel.DISABLED
 
     if options.es_ask_pass:
         try:
@@ -248,7 +263,7 @@ def main():
         'cacert': options.es_cacert,
         'disable_sniffing': options.es_disable_sniffing,
         'indexPrefix': options.index_prefix,
-        'rolloverSize': options.rollover_docs
+        'rollover_size': options.rollover_docs
     }
 
     # Template location
@@ -275,6 +290,10 @@ def main():
 
     if options.config_template_only:
         dataPopulator.configTemplate()
+        sys.exit(0)
+
+    if options.clear_interrupted:
+        dataPopulator.clearInterrupted()
         sys.exit(0)
 
     if (options.file is None and options.directory is None):

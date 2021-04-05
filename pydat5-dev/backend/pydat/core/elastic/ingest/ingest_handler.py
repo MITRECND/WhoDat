@@ -33,7 +33,7 @@ METADATA_INDEX_BODY = {
 class RolloverRequired(Exception):
     def __init__(self, write_alias, search_alias, **kwargs):
         self.write_alias = write_alias
-        self.search_alias, search_alias
+        self.search_alias = search_alias
         super().__init__(**kwargs)
 
 
@@ -42,10 +42,10 @@ class IngestHandler(ElasticHandler):
 
     def __init__(
         self,
-        rolloverSize=50000000,
+        rollover_size=50000000,
         **kwargs
     ):
-        self.rolloverSize = rolloverSize
+        self.rollover_size = rollover_size
         super().__init__(**kwargs)
 
     @property
@@ -114,6 +114,12 @@ class IngestHandler(ElasticHandler):
         except Exception:
             raise
 
+    def clearInterrupted(self):
+        if not self.metaExists or self.metaRecord is None:
+            raise RuntimeError("Cannot find metadata records for cluster")
+
+        self.updateMetadata(0, {'doc': {'importing': 0}})
+
     def configTemplate(self, template):
         es = self.connect()
         template["index_patterns"] = [self.indexNames.template_pattern]
@@ -152,7 +158,7 @@ class IngestHandler(ElasticHandler):
                 )
             )
 
-            if doc_count > self.rolloverSize:
+            if doc_count > self.rollover_size:
                 return True
         except elasticsearch.exceptions.NotFoundError:
             self.logger.warning("Unable to find required index\n")
@@ -171,7 +177,7 @@ class IngestHandler(ElasticHandler):
                 )
             )
 
-            if doc_count > self.rolloverSize:
+            if doc_count > self.rollover_size:
                 return True
         except elasticsearch.exceptions.NotFoundError:
             self.logger.warning("Unable to find required index\n")
@@ -241,8 +247,8 @@ class IngestHandler(ElasticHandler):
         # Create the 0th metadata entry
         metadata = {
             "metadata": 0,
-            "firstVersion": 1,
-            "lastVersion": 1,
+            "firstVersion": 0,
+            "lastVersion": 0,
             "importing": 0,
         }
 
