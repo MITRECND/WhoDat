@@ -1,6 +1,7 @@
 # import sys
 # import json
 
+from types import SimpleNamespace
 import elasticsearch
 
 
@@ -26,9 +27,14 @@ class ElasticHandler:
         else:
             self.logger = logger
 
-        self.indexNames = type('IndexNames', tuple(), dict())()
+        self.indexNames = SimpleNamespace()
         self._indexFormatter(indexPrefix)
-        self.metaKeys = type('MetaKeys', tuple(), {
+        self.top_level_keys = [
+            'domainName',
+            'tld',
+            '_score'
+        ]
+        self.metadata_key_map = SimpleNamespace(**{
             'VERSION_KEY': 'dataVersion',
             'FIRST_SEEN': 'dataFirstSeen',
             'DATE_FIRST_SEEN': 'dateFirstSeen',
@@ -36,7 +42,8 @@ class ElasticHandler:
             'DATE_CREATED': 'dateCreated',
             'DATE_UPDATED': 'dateUpdated',
             'HISTORICAL': 'historical'
-        })()
+        })
+        self.metadata_keys = list(vars(self.metadata_key_map).values())
 
         self._es = None
         self._es_version = None
