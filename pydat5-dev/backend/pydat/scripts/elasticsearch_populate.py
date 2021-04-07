@@ -194,7 +194,7 @@ def main():
         dest="ignore_field_prefixes", type=str,
         default=[
             'zoneContact',
-            'billiSetupgContact',
+            'billingContact',
             'technicalContact'
         ],
         help=(
