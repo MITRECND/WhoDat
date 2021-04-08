@@ -13,7 +13,6 @@ class SearchHandler(ElasticHandler):
     def __init__(self, search_keys, **kwargs):
         super().__init__(**kwargs)
 
-    @property
     def record_count(self):
         es = self.connect()
         try:
@@ -24,7 +23,6 @@ class SearchHandler(ElasticHandler):
                 f"'count' call to ElasticSearch instance: {repr(e)}")
         return int(records)
 
-    @property
     def cluster_stats(self):
         es = self.connect()
         tstr = datetime.date.today().timetuple()
@@ -95,7 +93,6 @@ class SearchHandler(ElasticHandler):
 
         return stats
 
-    @property
     def cluster_health(self):
         es = self.connect()
         try:
@@ -106,7 +103,6 @@ class SearchHandler(ElasticHandler):
                 f"'health' call to ElasticSearch instance: {repr(e)}")
         return health["status"]
 
-    @property
     def last_version(self):
         es = self.connect()
         try:
@@ -121,7 +117,6 @@ class SearchHandler(ElasticHandler):
                 "The following exception occured while trying to execute "
                 f"'get' call to ElasticSearch instance: {repr(e)}")
 
-    @property
     def last_update(self):
         es = self.connect()
         try:

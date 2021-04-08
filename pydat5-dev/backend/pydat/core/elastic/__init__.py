@@ -1,6 +1,3 @@
-# import sys
-# import json
-
 from types import SimpleNamespace
 import elasticsearch
 
