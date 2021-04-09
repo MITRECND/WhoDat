@@ -233,15 +233,16 @@ def query():
     except KeyError:
         raise ClientError("Query is required")
 
-    sort_map = {
-        "domainName": "domainName",
-        "registrant_name": "details.registrant_name",
-        "contactEmail": "details.contactEmail",
-        "standardRegCreatedDate": "details.standardRegCreatedDate",
-        "registrant_telephone": "details.registrant_telephone",
-        "Version": "dataVersion",
-        "score": "_score",
-    }
+    # TODO FIXME Allow sorting based on any field
+    allowed_sort_keys = [
+        "domainName",
+        "registrant_name",
+        "contactEmail",
+        "standardRegCreatedDate",
+        "registrant_telephone",
+        "dataVersion",
+        "_score",
+    ]
 
     chunk_size = json_data.get("chunk_size", 50)
     offset = json_data.get("offset", 0)
@@ -256,7 +257,7 @@ def query():
         if 'name' not in sort_key:
             raise ClientError(
                 "Unable to find required 'name' field in sort_key")
-        elif sort_key['name'] not in sort_map.keys():
+        elif sort_key['name'] not in allowed_sort_keys:
             raise ClientError(f"Invalid sort key {sort_key['name']} provided")
 
         if 'dir' not in sort_key:
@@ -266,7 +267,7 @@ def query():
             raise ClientError(
                 "Sort key 'dir' field must be 'asc' or desc'")
 
-        sort.append((sort_map[sort_key['name']], sort_key['dir']))
+        sort.append((sort_key['name'], sort_key['dir']))
     if not sort:
         sort = None
 
@@ -331,6 +332,7 @@ def info():
         cluster_info['records'] = es_handler.record_count()
         cluster_info['health'] = es_handler.cluster_health()
         cluster_info['last'] = es_handler.last_version()
+        cluster_info['last_update'] = es_handler.last_update()
     except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
     except ESQueryError:

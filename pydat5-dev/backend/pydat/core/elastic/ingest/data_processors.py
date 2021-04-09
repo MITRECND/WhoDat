@@ -14,14 +14,6 @@ from elasticsearch import helpers
 
 from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
-VERSION_KEY = 'dataVersion'
-FIRST_SEEN = 'dataFirstSeen'
-DATE_FIRST_SEEN = 'dateFirstSeen'
-DATE_LAST_SEEN = 'dateLastSeen'
-DATE_CREATED = 'dateCreated'
-DATE_UPDATED = 'dateUpdated'
-HISTORICAL = 'historical'
-
 
 # Notes
 # 'track_total_hits' required on search to get accurate total hits
@@ -289,15 +281,13 @@ class DataFetcher(Thread):
                 details[header[i]] = htmlparser.unescape(item)
 
         entry = {
-            'metadata': {
-                VERSION_KEY: self.version,
-                FIRST_SEEN: self.version,
-                DATE_FIRST_SEEN: self.ingest_day,
-                DATE_LAST_SEEN: self.ingest_day,
-                DATE_CREATED: self.ingest_now,
-                DATE_UPDATED: self.ingest_now,
-                HISTORICAL: False,
-            },
+            self.es.metadata_key_map.VERSION_KEY: self.version,
+            self.es.metadata_key_map.FIRST_SEEN: self.version,
+            self.es.metadata_key_map.DATE_FIRST_SEEN: self.ingest_day,
+            self.es.metadata_key_map.DATE_LAST_SEEN: self.ingest_day,
+            self.es.metadata_key_map.DATE_CREATED: self.ingest_now,
+            self.es.metadata_key_map.DATE_UPDATED: self.ingest_now,
+            self.es.metadata_key_map.HISTORICAL: False,
             'tld': parse_domain(domainName)[1],
             'details': details,
             'domainName': domainName}
@@ -429,8 +419,8 @@ class DataWorker(Thread):
         if current_entry is None:
             return True
 
-        if current_entry[
-                '_source']['metadata'][VERSION_KEY] == self.version:
+        if current_entry['_source'][
+                self.es.metadata_key_map.VERSION_KEY] == self.version:
             # This record already up to date
             return False
         else:
@@ -446,7 +436,7 @@ class DataWorker(Thread):
         current_entry = current_entry_raw['_source']
 
         if ((current_entry[
-                    'metadata'][VERSION_KEY] == self.version)):
+                self.es.metadata_key_map.VERSION_KEY] == self.version)):
             # Duplicate entry in source csv's?
             if self.debug >= DebugLevel.VERBOSE:
                 self.logger.debug('%s: Duplicate' % domainName)
@@ -493,9 +483,11 @@ class DataWorker(Thread):
                 self.logger.info("%s: Updated" % domainName)
 
             # Copy old entry into different document
-            current_entry['metadata']['historical'] = True
+            current_entry['historical'] = True
             doc_id = (
-                f"{current_id}#{current_entry['metadata'][VERSION_KEY]}")
+                f"{current_id}#"
+                f"{current_entry[self.es.metadata_key_map.VERSION_KEY]}"
+            )
             if self.debug >= DebugLevel.NOISY:
                 self.logger.debug("doc_id: %s" % doc_id)
             api_commands.append(
@@ -506,12 +498,12 @@ class DataWorker(Thread):
                     current_entry))
 
             # Update latest/orig entry
-            entry['metadata'][FIRST_SEEN] = current_entry[
-                'metadata'][FIRST_SEEN]
-            entry['metadata'][DATE_FIRST_SEEN] = current_entry[
-                'metadata'][DATE_FIRST_SEEN]
-            entry['metadata'][DATE_CREATED] = current_entry[
-                'metadata'][DATE_CREATED]
+            entry[self.es.metadata_key_map.FIRST_SEEN] = current_entry[
+                self.es.metadata_key_map.FIRST_SEEN]
+            entry[self.es.metadata_key_map.DATE_FIRST_SEEN] = current_entry[
+                self.es.metadata_key_map.DATE_FIRST_SEEN]
+            entry[self.es.metadata_key_map.DATE_CREATED] = current_entry[
+                self.es.metadata_key_map.DATE_CREATED]
             api_commands.append(self.process_command(
                 'index',
                 current_index,
@@ -522,11 +514,9 @@ class DataWorker(Thread):
             if self.debug >= DebugLevel.NOISY:
                 self.logger.info("%s: Unchanged" % domainName)
             doc_diff = {'doc': {
-                'metadata': {
-                    VERSION_KEY: self.version,
-                    DATE_LAST_SEEN: self.ingest_day,
-                    DATE_UPDATED: self.ingest_now,
-                },
+                self.es.metadata_key_map.VERSION_KEY: self.version,
+                self.es.metadata_key_map.DATE_LAST_SEEN: self.ingest_day,
+                self.es.metadata_key_map.DATE_UPDATED: self.ingest_now,
                 'details': details
                 }
             }

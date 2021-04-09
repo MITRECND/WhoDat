@@ -170,7 +170,7 @@ const DiffDetailsDialog = ({previous, current}) => {
     return (
         <React.Fragment>
             <Button onClick={handleClickOpen} variant="outlined" color="primary">
-                {`${previous.Version} -> ${current.Version}`}
+                {`${previous.dataVersion} -> ${current.dataVersion}`}
             </Button>
             <Dialog
                 open={open}
@@ -179,15 +179,15 @@ const DiffDetailsDialog = ({previous, current}) => {
                 maxWidth={"md"}
             >
                 <DialogTitle onClose={handleClose}>
-                    {`Domain "${current.domainName}" ${previous.Version} -> ${current.Version}`}
+                    {`Domain "${current.domainName}" ${previous.dataVersion} -> ${current.dataVersion}`}
                 </DialogTitle>
                 <DialogContent>
                     <Table>
                         <TableHead>
                             <TableRow>
                                 <TableCell>Entry</TableCell>
-                                <TableCell>{`Version: ${previous.Version}`}</TableCell>
-                                <TableCell>{`Version: ${current.Version}`}</TableCell>
+                                <TableCell>{`Version: ${previous.dataVersion}`}</TableCell>
+                                <TableCell>{`Version: ${current.dataVersion}`}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -395,7 +395,7 @@ const HistoricalTab = (props) => {
 
             entry_rows.push(
                 <TableRow key={index}>
-                    <TableCell>{entry.Version}</TableCell>
+                    <TableCell>{entry.dataVersion}</TableCell>
                     <TableCell>{entry.registrant_name}</TableCell>
                     <TableCell>{entry.contactEmail}</TableCell>
                     <TableCell>{entry.createdDate}</TableCell>

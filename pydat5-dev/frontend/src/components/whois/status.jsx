@@ -44,6 +44,7 @@ const ClusterStatus = ({}) => {
                 let clusterstatus = {
                     last: results.last,
                     records: results.records,
+                    dateProcessed: results.last_update.dateProcessed
                 }
 
                 switch (results.health) {
@@ -111,7 +112,7 @@ const ClusterStatus = ({}) => {
                         </Tooltip>
 
                         <Typography display='inline'>
-                            &nbsp; Last Ingest: {clusterStatus.last}  Records: {clusterStatus.records}
+                            &nbsp; Last Ingest: {clusterStatus.dateProcessed}  Records: {clusterStatus.records}
                         </Typography>
                     </React.Fragment>
                 </Grid>

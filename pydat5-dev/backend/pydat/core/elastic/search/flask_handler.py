@@ -2,8 +2,12 @@ from pydat.core.elastic.search.search_handler import SearchHandler
 
 
 class FlaskElasticHandler(SearchHandler):
-    """Wrapper class around SearchHandler that adds support for flask,
-    including app initialization
+    """Wrapper class around SearchHandler that adds support for flask
+
+    This class wraps the SearchHandler class to enable usage by flask,
+    specifically deffering initialization of elastic capabilities with
+    an init_app function that can be called by code using the application
+    factories pattern
     """
     def __init__(self):
         pass
@@ -23,6 +27,11 @@ class FlaskElasticHandler(SearchHandler):
         }
 
     def init_app(self, app):
+        """Support flask deferred initialization
+
+        Args:
+            app (flask.Flask): An instance of a Flask object
+        """
         self._generate_config(app)
         self._search_keys = app.config['SEARCHKEYS']
 

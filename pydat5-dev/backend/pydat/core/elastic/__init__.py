@@ -3,6 +3,15 @@ import elasticsearch
 
 
 class ElasticHandler:
+    """Base Elasticsearch handler class
+
+        This class abstract interaction with Elasticsearch and enables
+        common usage of elasticsearch without needing direct knowledge of
+        things such as which metadata keys exist or how to check
+        the version of the cluster. It is meant to be used as a base
+        class for futher interactions with elastic
+    """
+
     def __init__(
         self,
         hosts,
@@ -41,6 +50,7 @@ class ElasticHandler:
             'HISTORICAL': 'historical'
         })
         self.metadata_keys = list(vars(self.metadata_key_map).values())
+        self.top_level_keys.extend(self.metadata_keys)
 
         self._es = None
         self._es_version = None
@@ -87,6 +97,21 @@ class ElasticHandler:
         self.indexNames.template_name = "%s-template" % prefix
 
     def connect(self):
+        """Return an instance of Elasticsearch connection object
+
+        This class will check if an existing instance exists and if not
+        will create one before returning said instance
+
+        Raises:
+            RuntimeError: If elasticsearch indicates it is
+                improperly configured
+            RuntimeError: If a generic elasticsearch exception occurrs
+
+        Returns:
+            elasticsearch.Elasticsearch(): An instance of the
+                Elasticsearch objet
+        """
+
         if self._es is None:
             try:
                 self._es = elasticsearch.Elasticsearch(**self.elastic_args)
@@ -101,6 +126,14 @@ class ElasticHandler:
         return self._es
 
     def getVersion(self):
+        """Get the version of the cluster
+
+        Raises:
+            ValueError: If the major version is less than 7
+
+        Returns:
+            int: The highest version of Elastic in the cluster
+        """
         if self._es_version is None:
             es = self.connect()
 
@@ -125,6 +158,12 @@ class ElasticHandler:
         return self._es_version
 
     def checkVersion(self):
+        """Check cluster version against library version
+
+        Raises:
+            RuntimeError: If installed python library version does
+                not match version of cluster
+        """
         library_version = elasticsearch.VERSION[0]
 
         if self.highest_version != library_version:

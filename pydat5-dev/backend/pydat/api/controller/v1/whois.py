@@ -14,6 +14,13 @@ from pydat.api.controller import whois_shared
 whoisv1_bp = Blueprint("whoisv1", __name__)
 
 
+def _adapt_v1(records):
+    # Convert output to be compliant with old API
+    for record in records:
+        record['Version'] = record['dataVersion']
+        record['UpdateVersion'] = 0
+
+
 # Domains
 @whoisv1_bp.route("/domains/<key>/<value>")
 @whoisv1_bp.route("/domains/<key>/<value>/<low>")
@@ -78,7 +85,8 @@ def domains(key, value, low=None, high=None):
     except RuntimeError:
         raise ServerError("Failed to process results")
 
-    print(results)
+    _adapt_v1(results['data'])
+
     results['avail'] = len(results['data'])
     results['success'] = True
     return results
@@ -250,5 +258,7 @@ def query():
 
     if skip > 0 and skip >= results["total"]:
         raise ClientError(f"Page number {page_num} is too high")
+
+    _adapt_v1(results['data'])
 
     return results

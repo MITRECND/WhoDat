@@ -11,10 +11,24 @@ from pydat.core.elastic.exceptions import (
 
 
 class SearchHandler(ElasticHandler):
+    """Class to abstract search related usage of Elasticsearch
+
+    This class inherits from ElasticHandler and provides functions that
+    facilitate searching of Elasticsearch. Ideally all direct calls to
+    elasticsearch are done through this class.
+    """
     def __init__(self, search_keys, **kwargs):
         super().__init__(**kwargs)
 
     def record_count(self):
+        """Return number of records in cluster
+
+        Raises:
+            ESQueryError: General error attempting to query record count
+
+        Returns:
+            int: Number of records in the cluster
+        """
         es = self.connect()
         try:
             records = es.cat.count(index=self.indexNames.search, h="count")
@@ -25,6 +39,14 @@ class SearchHandler(ElasticHandler):
         return int(records)
 
     def cluster_stats(self):
+        """Generate and return statistics on the domains in the cluster
+
+        Raises:
+            ESQueryError: General error attempting to query cluster stats
+
+        Returns:
+            dict: A dict containing the output of the computation of stats
+        """
         es = self.connect()
         tstr = datetime.date.today().timetuple()
         year = tstr[0] - 2
@@ -95,6 +117,15 @@ class SearchHandler(ElasticHandler):
         return stats
 
     def cluster_health(self):
+        """Return health status of cluster
+
+        Raises:
+            ESQueryError: General error attempting to query data from elastic
+
+        Returns:
+            str: A string representing status of cluster ("green", "yellow",
+                "red")
+        """
         es = self.connect()
         try:
             health = es.cluster.health()
@@ -105,6 +136,16 @@ class SearchHandler(ElasticHandler):
         return health["status"]
 
     def last_version(self):
+        """Get the version of the last metadata record in the cluster
+
+        Raises:
+            RuntimeError: Raised if no data was found in the cluster.
+                Potentiall indicative of elastic not having been initailized
+            ESQueryError: General error attempting to query elastic
+
+        Returns:
+            int: The last version that was imported
+        """
         es = self.connect()
         try:
             result = es.get(index=self.indexNames.meta, id=0)
@@ -119,6 +160,16 @@ class SearchHandler(ElasticHandler):
                 f"'get' call to ElasticSearch instance: {repr(e)}")
 
     def last_update(self):
+        """Get the most recent metadata record/entry from the cluster
+
+        Raises:
+            ESQueryError: General issue attempting to query cluser
+            RuntimeError: If no record is found. This is potentially
+                indicative of a cluster not being properly initialized
+
+        Returns:
+            dict: A dict representing the latest metadata record in the cluster
+        """
         es = self.connect()
         try:
             res = es.search(
@@ -139,12 +190,27 @@ class SearchHandler(ElasticHandler):
 
         if res["hits"]["total"]["value"] >= 1:
             data = res["hits"]["hits"][0]["_source"]
-            update = int(data["metadata"])
-            return update
+            return data
         else:
             raise RuntimeError("Unable to query cluster metadata")
 
     def metadata(self, version=None):
+        """Get all metadata or a specific metadata entry
+
+        Args:
+            version (int, optional): The specific version to query.
+                Defaults to None.
+
+        Raises:
+            ESQueryError: General error when attempting to query elastic
+            RuntimeError: Raised when no records are found in the cluster
+            ESQueryError: General error when attempting to query elastic
+            ESNotFoundError: Raised when a query for a specific version fails
+
+        Returns:
+            list(dict): A list of dicts representing the requested
+                metdata entries
+        """
         es = self.connect()
 
         if version is None:
@@ -184,9 +250,20 @@ class SearchHandler(ElasticHandler):
                     "Unable to find metadata record by that id")
 
     def getLatest(self, key, value):
-        if key in self.metadata_keys:
-            key = f"metadata.{key}"
-        elif key not in self.top_level_keys:
+        """Method to obtain the latest entries of domains by a given key
+
+        Args:
+            key (str): A valid field name in the domain records
+            value (str): The value of the field
+
+        Raises:
+            RuntimeError: Generic error raised if unable to process
+                response from elastic
+
+        Returns:
+            dict: A dict containing the records that match the given query
+        """
+        if key not in self.top_level_keys:
             key = f"details.{key}"
 
         value = value.lower()
@@ -195,7 +272,7 @@ class SearchHandler(ElasticHandler):
                 "bool": {
                     "filter": [
                         {"term": {key: value}},
-                        {"term": {"metadata.historical": False}},
+                        {"term": {"historical": False}},
                     ]
                 }
             },
@@ -212,25 +289,8 @@ class SearchHandler(ElasticHandler):
             "data": []
         }
 
-        try:
-            for domain in domains["hits"]["hits"]:
-                pdomain = domain["_source"]
-                # Take each key in details (if any) and stuff it in
-                # top level dict.
-                if "details" in pdomain:
-                    for k, v in pdomain["details"].items():
-                        pdomain[k] = v
-                    del pdomain["details"]
-                if "metadata" in pdomain:
-                    for (key, value) in pdomain['metadata'].items():
-                        pdomain[key] = value
-                    del pdomain['metadata']
-
-                results["data"].append(pdomain)
-        except Exception as e:
-            raise RuntimeError(
-                "The following error occured while processing results "
-                f"from Elasticsearch: {repr(e)}")
+        records = self._flatten_records(domains["hits"]["hits"])
+        results["data"] = records
 
         return results
 
@@ -260,9 +320,7 @@ class SearchHandler(ElasticHandler):
             ValueError - when 'low' and 'high' args are not integers
         """
 
-        if key in self.metadata_keys:
-            key = f"metadata.{key}"
-        elif key not in self.top_level_keys:
+        if key not in self.top_level_keys:
             key = f"details.{key}"
 
         value = value.lower()
@@ -275,30 +333,16 @@ class SearchHandler(ElasticHandler):
         except ESQueryError:
             raise
 
-        results = {
-            "total": domains["hits"]["total"]["value"],
-            "data": []
-        }
-
         try:
-            for domain in domains["hits"]["hits"]:
-                pdomain = domain["_source"]
-                # Take each key in details (if any) and stuff it in
-                # top level dict.
-                if "details" in pdomain:
-                    for k, v in pdomain["details"].items():
-                        pdomain[k] = v
-                    del pdomain["details"]
-                if "metadata" in pdomain:
-                    for (key, value) in pdomain['metadata'].items():
-                        pdomain[key] = value
-                    del pdomain['metadata']
-
-                results["data"].append(pdomain)
-        except Exception as e:
+            results = {"total": domains["hits"]["total"]["value"]}
+            records = self._flatten_records(domains["hits"]["hits"])
+            results["data"] = records
+        except KeyError:
             raise RuntimeError(
-                "The following error occured while processing results "
-                f"from Elasticsearch: {repr(e)}")
+                "Unable to find expected key in response from elastic"
+            )
+        except RuntimeError:
+            raise
 
         return results
 
@@ -328,8 +372,21 @@ class SearchHandler(ElasticHandler):
         except ESQueryError:
             raise
 
-        return self._process_advanced_search_results(
+        records = self._process_advanced_search_results(
             domains, skip, size, unique)
+
+        try:
+            results = {"total": domains["hits"]["total"]["value"]}
+            records = self._flatten_records(domains["hits"]["hits"])
+            results["data"] = records
+        except KeyError:
+            raise RuntimeError(
+                "Unable to find expected key in response from elastic"
+            )
+        except RuntimeError:
+            raise
+
+        return results
 
     def _search(self, query, search_type=None):
         es = self.connect()
@@ -345,6 +402,29 @@ class SearchHandler(ElasticHandler):
                 f"'get' call to ElasticSearch instance: {repr(e)}")
 
         return domains
+
+    def _flatten_records(self, records):
+        out_records = []
+
+        try:
+            for domain in records:
+                pdomain = domain["_source"]
+                # Take each key in details (if any) and stuff it in
+                # top level dict.
+                if "details" in pdomain:
+                    for k, v in pdomain["details"].items():
+                        pdomain[k] = v
+                    del pdomain["details"]
+                if "_score" in domain:
+                    pdomain["_score"] = domain["_score"]
+
+                out_records.append(pdomain)
+
+            return out_records
+        except Exception as e:
+            raise RuntimeError(
+                "The following error occured while processing results "
+                f"from Elasticsearch: {repr(e)}")
 
     def _create_search_query(
             self, key, value, filt, limit, low, high, versionSort):
@@ -367,7 +447,7 @@ class SearchHandler(ElasticHandler):
         if low is not None:
             if low == high or high is None:  # single version
                 try:
-                    version_filter = [{"term": {"metadata.dataVersion": low}}]
+                    version_filter = [{"term": {"dataVersion": low}}]
                 except Exception as e:  # TODO XXX
                     raise RuntimeError(
                         "The following unexepcted error ocurred while trying "
@@ -377,7 +457,7 @@ class SearchHandler(ElasticHandler):
                     version_filter = [
                         {
                             "range": {
-                                "metadata.dataVersion": {
+                                "dataVersion": {
                                     "gte": int(low),
                                     "lte": int(high)
                                 }
@@ -400,7 +480,7 @@ class SearchHandler(ElasticHandler):
         }
 
         if versionSort:
-            query["sort"] = [{"metadata.dataVersion": {"order": "asc"}}]
+            query["sort"] = [{"dataVersion": {"order": "asc"}}]
         if es_source:
             query["_source"] = es_source
 
@@ -440,9 +520,7 @@ class SearchHandler(ElasticHandler):
                     for (field, direction) in sort:
                         fields.add(field)
 
-                        if field in self.metadata_keys:
-                            field = f"metadata.{field}"
-                        elif field not in self.top_level_keys:
+                        if field not in self.top_level_keys:
                             field = f"details.{field}"
 
                         sortParams.append({field: {"order": direction}})
@@ -455,12 +533,12 @@ class SearchHandler(ElasticHandler):
 
                     if "dataVersion" not in fields:
                         sortParams.extend(
-                            [{"metadata.dataVersion": {"order": "desc"}}])
+                            [{"dataVersion": {"order": "desc"}}])
                 else:
                     sortParams = [
                         {"_score": {"order": "desc"}},
                         {"domainName": {"order": "asc"}},
-                        {"metadata.dataVersion": {"order": "desc"}},
+                        {"dataVersion": {"order": "desc"}},
                     ]
                 q["sort"] = sortParams
                 q["size"] = size
@@ -480,7 +558,7 @@ class SearchHandler(ElasticHandler):
                                     "size": 1,
                                     "sort": [
                                         {"_score": {"order": "desc"}},
-                                        {"metadata.dataVersion": {
+                                        {"dataVersion": {
                                             "order": "desc"
                                         }},
                                     ]}}}}}
@@ -500,23 +578,9 @@ class SearchHandler(ElasticHandler):
         try:
             if not unique:
                 results["total"] = domains["hits"]["total"]["value"]
-                results["data"] = []
 
-                for domain in domains["hits"]["hits"]:
-                    pdomain = domain["_source"]
-                    # Take each key in details (if any) and stuff it in top
-                    # level dict.
-                    if "details" in pdomain:
-                        for k, v in pdomain["details"].items():
-                            pdomain[k] = v
-                        del pdomain["details"]
-                    if "metadata" in pdomain:
-                        for (key, value) in pdomain["metadata"].items():
-                            pdomain[key] = value
-                    if "_score" in domain.keys():
-                        pdomain["score"] = domain["_score"]
-                    results["data"].append(pdomain)
-
+                records = self._flatten_records(domains["hits"]["hits"])
+                results["data"] = records
                 results["avail"] = len(results["data"])
                 results["skip"] = skip
                 results["page_size"] = size
@@ -527,23 +591,10 @@ class SearchHandler(ElasticHandler):
                 results["data"] = []
 
                 for bucket in buckets:
-                    domain = bucket["top_domains"]["hits"]["hits"][0]
-                    pdomain = domain["_source"]
-                    # Take each key in details (if any) and stuff it in top
-                    # level dict.
-                    if "details" in pdomain:
-                        for k, v in pdomain["details"].items():
-                            pdomain[k] = v
-                        del pdomain["details"]
-                    if "dataVersion" in pdomain:
-                        pdomain["Version"] = pdomain["dataVersion"]
-                        del pdomain["dataVersion"]
-                    if "updateVersion" in pdomain:
-                        pdomain["UpdateVersion"] = pdomain["updateVersion"]
-                        del pdomain["updateVersion"]
-                    if "_score" in domain.keys():
-                        pdomain["score"] = domain["_score"]
-                    results["data"].append(pdomain)
+                    records = self._flatten_records(
+                        bucket["top_domains"]["hits"]["hits"][0:]
+                    )
+                    results["data"].extend(records)
 
                 results["avail"] = len(buckets)
                 results["skip"] = 0
