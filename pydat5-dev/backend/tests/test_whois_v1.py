@@ -12,7 +12,10 @@ from pydat.core.elastic.exceptions import (
 def test_domains(monkeypatch, config_app, low, high, es_handler):
     client = config_app.test_client()
     # search is always valid
-    mock_search = MagicMock(return_value={"data": [{"test": "output"}]})
+    mock_search = MagicMock(return_value={"data": [{
+        "test": "output",
+        "dataVersion": 99
+    }]})
     monkeypatch.setattr(es_handler, 'search', mock_search)
 
     # test checking valid search keys
@@ -39,7 +42,10 @@ def test_domains(monkeypatch, config_app, low, high, es_handler):
 
 def test_latest(monkeypatch, config_app, es_handler):
     # search and lastVersion are always valid
-    mock_search = MagicMock(return_value={"data": [{"test": "output"}]})
+    mock_search = MagicMock(return_value={"data": [{
+        "test": "output",
+        "dataVersion": 99
+    }]})
     mock_last = MagicMock(return_value=1)
     monkeypatch.setattr(es_handler, 'search', mock_search)
     monkeypatch.setattr(es_handler, 'last_version', mock_last)
@@ -137,7 +143,7 @@ def test_query(monkeypatch, client, es_handler):
     assert response.status_code == 400
 
     # test page specification
-    mock_query = MagicMock(return_value={'total': 1000})
+    mock_query = MagicMock(return_value={'total': 1000, 'data': []})
     monkeypatch.setattr(es_handler, 'advanced_search', mock_query)
     response = client.get("/api/v1/query",
                           query_string={"query": "query", "size": 1000})

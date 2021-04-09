@@ -447,7 +447,8 @@ class SearchHandler(ElasticHandler):
         if low is not None:
             if low == high or high is None:  # single version
                 try:
-                    version_filter = [{"term": {"dataVersion": low}}]
+                    version_filter = [{
+                        "term": {self.metadata_key_map.VERSION_KEY: low}}]
                 except Exception as e:  # TODO XXX
                     raise RuntimeError(
                         "The following unexepcted error ocurred while trying "
@@ -457,7 +458,7 @@ class SearchHandler(ElasticHandler):
                     version_filter = [
                         {
                             "range": {
-                                "dataVersion": {
+                                self.metadata_key_map.VERSION_KEY: {
                                     "gte": int(low),
                                     "lte": int(high)
                                 }
@@ -480,7 +481,9 @@ class SearchHandler(ElasticHandler):
         }
 
         if versionSort:
-            query["sort"] = [{"dataVersion": {"order": "asc"}}]
+            query["sort"] = [{
+                self.metadata_key_map.VERSION_KEY: {"order": "asc"}
+            }]
         if es_source:
             query["_source"] = es_source
 
@@ -531,14 +534,17 @@ class SearchHandler(ElasticHandler):
                     if "domainName" not in fields:
                         sortParams.append({"domainName": {"order": "asc"}})
 
-                    if "dataVersion" not in fields:
-                        sortParams.extend(
-                            [{"dataVersion": {"order": "desc"}}])
+                    if self.metadata_key_map.VERSION_KEY not in fields:
+                        sortParams.extend([{
+                            self.metadata_key_map.VERSION_KEY: {
+                                "order": "desc"
+                            }
+                        }])
                 else:
                     sortParams = [
                         {"_score": {"order": "desc"}},
                         {"domainName": {"order": "asc"}},
-                        {"dataVersion": {"order": "desc"}},
+                        {self.metadata_key_map.VERSION_KEY: {"order": "desc"}},
                     ]
                 q["sort"] = sortParams
                 q["size"] = size
@@ -558,7 +564,7 @@ class SearchHandler(ElasticHandler):
                                     "size": 1,
                                     "sort": [
                                         {"_score": {"order": "desc"}},
-                                        {"dataVersion": {
+                                        {self.metadata_key_map.VERSION_KEY: {
                                             "order": "desc"
                                         }},
                                     ]}}}}}

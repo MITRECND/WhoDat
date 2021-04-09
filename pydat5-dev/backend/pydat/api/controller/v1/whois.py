@@ -17,7 +17,7 @@ whoisv1_bp = Blueprint("whoisv1", __name__)
 def _adapt_v1(records):
     # Convert output to be compliant with old API
     for record in records:
-        record['Version'] = record['dataVersion']
+        record['Version'] = record[es_handler.metadata_key_map.VERSION_KEY]
         record['UpdateVersion'] = 0
 
 
