@@ -13,9 +13,9 @@ class FlaskElasticHandler(SearchHandler):
         elastic_config = app.config['ELASTICSEARCH']
         self.elastic_arguments = {
             'hosts': elastic_config['uri'],
-            'username': elastic_config['user'],
-            'password': elastic_config['pass'],
-            'cacert': elastic_config['cacert'],
+            'username': elastic_config.get('user', None),
+            'password': elastic_config.get('pass', None),
+            'cacert': elastic_config.get('cacert', None),
             'disable_sniffing': False,
             'indexPrefix':  elastic_config['indexPrefix'],
             'max_retries': 100,

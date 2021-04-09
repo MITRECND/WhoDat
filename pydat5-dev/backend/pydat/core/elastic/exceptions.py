@@ -11,3 +11,9 @@ class ESQueryError(Exception):
     to ElasticSearch instance
     """
     pass
+
+
+class ESNotFoundError(Exception):
+    """Custom error that denotes no records could be found that match a search
+    """
+    pass

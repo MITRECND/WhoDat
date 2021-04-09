@@ -5,7 +5,8 @@ import elasticsearch
 from pydat.core.query_parser import parseQuery
 from pydat.core.elastic import ElasticHandler
 from pydat.core.elastic.exceptions import (
-    ESQueryError
+    ESQueryError,
+    ESNotFoundError,
 )
 
 
@@ -166,7 +167,7 @@ class SearchHandler(ElasticHandler):
             if res["hits"]["total"]["value"] > 0:
                 return [r["_source"] for r in res['hits']['hits']]
             else:
-                raise RuntimeError("Unable to fine any metadata records")
+                raise RuntimeError("Unable to find any metadata records")
         else:
 
             try:
@@ -179,7 +180,8 @@ class SearchHandler(ElasticHandler):
             if res["found"]:
                 return [res["_source"]]
             else:
-                raise RuntimeError("Unable to fine metadata record by that id")
+                raise ESNotFoundError(
+                    "Unable to find metadata record by that id")
 
     def getLatest(self, key, value):
         if key in self.metadata_keys:
