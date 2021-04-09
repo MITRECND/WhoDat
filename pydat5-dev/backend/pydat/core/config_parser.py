@@ -12,10 +12,10 @@ DEFAULT_CONFIG = type('config', (), {
     'DEBUG': False,
     'SSLVERIFY': True,
     'SEARCHKEYS': [
-        ('domainName', 'Domain'),
-        ('registrant_name', 'Registrant Name'),
-        ('contactEmail', 'Contact Email'),
-        ('registrant_telephone', 'Telephone')
+        'domainName',
+        'registrant_name',
+        'contactEmail',
+        'registrant_telephone',
     ],
     'PROXIES': {
     },
@@ -66,8 +66,7 @@ BASE_SCHEMA = {
     'SEARCHKEYS': {
         'type': 'list',
         'schema': {
-            'type': 'list',
-            'items': [{'type': 'string'}, {'type': 'string'}]
+            'type': 'string',
         }
     },
     'PDNSSOURCES': {
@@ -113,8 +112,8 @@ class ConfigParser:
 
                     self.app.config.from_mapping(**{tlkey: value})
                 elif tlkey == 'SEARCHKEYS':
-                    raise AttributeError(
-                        "SEARCHKEYS cannot be updated via env variable")
+                    elements = value.split(',')
+                    self.app.config.from_mapping({tlkey: elements})
                 else:
                     if len(fields[1:]) == 0:
                         self.app.config.from_mapping({tlkey: value})

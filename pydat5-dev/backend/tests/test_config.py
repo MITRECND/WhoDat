@@ -21,15 +21,19 @@ def test_config_parser_env_invalid(monkeypatch):
         with pytest.raises(ValueError):
             ConfigParser(app)
 
+
+def test_config_parser_env_searchkeys(monkeypatch):
     app = create_app()
+    search_keys = ['domainName', 'registrant_name']
     fake_environ = mock.MagicMock(return_value=[
-        ('PYDAT_SEARCHKEYS', 'test')
+        ('PYDAT_SEARCHKEYS', ','.join(search_keys))
     ])
 
     with monkeypatch.context() as monkey:
         monkey.setattr('os.environ.items', fake_environ)
-        with pytest.raises(AttributeError):
-            ConfigParser(app)
+        ConfigParser(app)
+        assert app.config['SEARCHKEYS']
+        assert app.config['SEARCHKEYS'] == search_keys
 
 
 def test_config_parser_envvar(monkeypatch):

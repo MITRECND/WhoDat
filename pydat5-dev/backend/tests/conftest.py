@@ -13,15 +13,13 @@ def config_app():
         {
             "TESTING": True,
             "SEARCHKEYS": [
-                        ('domainName', 'Domain'),
-                        ('registrant_name', 'Registrant Name'),
-                        ('contactEmail', 'Contact Email'),
-                        ('registrant_telephone', 'Telephone')
-                        ],
+                'domainName',
+                'registrant_name',
+                'contactEmail',
+                'registrant_telephone',
+            ],
             "PDNSSOURCES": {
-                "TestPassive": {
-
-                }
+                "TestPassive": {}
             }
         }
     )

@@ -20,7 +20,7 @@ def test_domains(monkeypatch, config_app, low, high, es_handler):
 
     # test checking valid search keys
     for key in config_app.config['SEARCHKEYS']:
-        response = client.get(f"/api/v1/domains/{key[0]}/fake")
+        response = client.get(f"/api/v1/domains/{key}/fake")
         assert response.status_code == 200
     assert client.get("/api/v1/domains/fake_key/fake").status_code == 400
     assert client.get("/api/v1/domains/fake_key").status_code == 404
@@ -52,7 +52,7 @@ def test_latest(monkeypatch, config_app, es_handler):
 
     client = config_app.test_client()
     for key in config_app.config['SEARCHKEYS']:
-        response = client.get(f"/api/v1/domains/{key[0]}/fake/latest")
+        response = client.get(f"/api/v1/domains/{key}/fake/latest")
         assert response.status_code == 200
         response = client.get("/api/v1/domain/fake/latest")
         assert response.status_code == 200
@@ -61,7 +61,7 @@ def test_latest(monkeypatch, config_app, es_handler):
     mock_last.side_effect = ESQueryError
     response = client.get("/api/v1/domain/fake/latest")
     assert response.status_code == 500
-    response = client.get(f"/api/v1/domains/{key[0]}/fake/latest")
+    response = client.get(f"/api/v1/domains/{key}/fake/latest")
     assert response.status_code == 500
 
 

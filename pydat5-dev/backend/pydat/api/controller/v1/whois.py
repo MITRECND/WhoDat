@@ -47,11 +47,7 @@ def domains(key, value, low=None, high=None):
     Returns:
         dict: All domain hits that matched search with their details
     """
-    valid_key = False
-    for search_config in current_app.config["SEARCHKEYS"]:
-        if search_config[0] == key:
-            valid_key = True
-    if not valid_key:
+    if key not in current_app.config["SEARCHKEYS"]:
         raise ClientError(f"Invalid key {key}")
     try:
         if low:
