@@ -268,7 +268,7 @@ def main():
 
     # Template location
     base_path = os.path.dirname(os.path.realpath(__file__))
-    template_path = os.path.join(base_path, "..", "configuration")
+    template_path = os.path.join(base_path, "../core/elastic/templates")
 
     dataPopulator = DataPopulator(
         elastic_args=elastic_arguments,
