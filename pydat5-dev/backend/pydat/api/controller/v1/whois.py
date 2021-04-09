@@ -1,7 +1,12 @@
 from flask import Blueprint, current_app, request
 from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api import elasticsearch_handler as es_handler
-from pydat.core.es import ESConnectionError, ESQueryError
+from pydat.api import flask_cache
+from pydat.core.elastic.exceptions import (
+    ESConnectionError,
+    ESQueryError,
+    ESNotFoundError,
+)
 from urllib import parse
 from pydat.api.controller import whois_shared
 
@@ -73,6 +78,9 @@ def domains(key, value, low=None, high=None):
     except RuntimeError:
         raise ServerError("Failed to process results")
 
+    print(results)
+    results['avail'] = len(results['data'])
+    results['success'] = True
     return results
 
 
@@ -94,13 +102,15 @@ def domains_latest(key, value):
     """
     try:
         low = es_handler.last_version()
+        results = domains(key, value, low)
     except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
     except ESQueryError:
         raise ServerError("Unexpected issue when requesting latest version")
     except RuntimeError:
         raise ServerError("Failed to process results")
-    return domains(key, value, low)
+
+    return results
 
 
 # Domain
@@ -156,6 +166,7 @@ def domain_diff(domainName, v1, v2):
 # Metadata
 @whoisv1_bp.route("/metadata")
 @whoisv1_bp.route("/metadata/<version>")
+@flask_cache.cached()
 def metadata(version=None):
     """Retrieves metadata for all or a specific versions
 
@@ -166,7 +177,17 @@ def metadata(version=None):
     Returns:
         dict: Details for application metadata
     """
-    results = whois_shared.metadata(version)
+    try:
+        results = whois_shared.metadata(version)
+    except RuntimeError as e:
+        raise ServerError(e)
+    except ESQueryError:
+        raise ServerError("Unable to query Elasticsearch backend")
+    except ESNotFoundError:
+        raise ClientError(
+            "Unable to find metadata with that version", status_code=404
+        )
+
     return {"success": True, "data": results}
 
 

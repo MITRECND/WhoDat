@@ -1,14 +1,18 @@
 import pytest
 from unittest.mock import MagicMock
-from pydat.core.es import ESConnectionError, ESQueryError
+from pydat.core.elastic.exceptions import (
+    ESConnectionError,
+    ESQueryError,
+    ESNotFoundError
+)
 
 
-@pytest.mark.parametrize("low", ("low", -1, 3, 100, 1.2, -.1))
-@pytest.mark.parametrize("high", ("high", -1.2, 4.6, 2, 200))
+@pytest.mark.parametrize("low", ("low", -1, 3, 100, 1, -21))
+@pytest.mark.parametrize("high", ("high", -1, 4, 2, 200))
 def test_domains(monkeypatch, config_app, low, high, es_handler):
     client = config_app.test_client()
     # search is always valid
-    mock_search = MagicMock(return_value="success")
+    mock_search = MagicMock(return_value={"data": [{"test": "output"}]})
     monkeypatch.setattr(es_handler, 'search', mock_search)
 
     # test checking valid search keys
@@ -35,7 +39,7 @@ def test_domains(monkeypatch, config_app, low, high, es_handler):
 
 def test_latest(monkeypatch, config_app, es_handler):
     # search and lastVersion are always valid
-    mock_search = MagicMock(return_value="success")
+    mock_search = MagicMock(return_value={"data": [{"test": "output"}]})
     mock_last = MagicMock(return_value=1)
     monkeypatch.setattr(es_handler, 'search', mock_search)
     monkeypatch.setattr(es_handler, 'last_version', mock_last)
@@ -91,23 +95,25 @@ def test_domain_diff(monkeypatch, client, es_handler):
     assert v2_data['si'] == ["yes", ""]
 
 
-@pytest.mark.parametrize("version", ("version", -1, 1, 1.2))
+@pytest.mark.parametrize("version", ("version", -1, 1, 2))
 def test_metadata(monkeypatch, client, version, es_handler):
     # metadata is always valid
-    mock_meta = MagicMock(return_value={"data": "success"})
+    mock_meta = MagicMock(return_value=[{"test": "record"}])
     monkeypatch.setattr(es_handler, 'metadata', mock_meta)
 
     # type checking
     response = client.get(f'/api/v1/metadata/{version}')
-    if (
-        isinstance(version, int) or isinstance(version, float)
-    ) and version > 0:
+    if isinstance(version, int) and version > 0:
         assert response.status_code == 200
     else:
         assert response.status_code == 400
 
+
+def test_metadata_notfound(monkeypatch, client, es_handler):
     # error: version doesn't exist
-    mock_meta.return_value = {"data": []}
+    mock_meta = MagicMock(side_effect=ESNotFoundError)
+    monkeypatch.setattr(es_handler, 'metadata', mock_meta)
+
     assert client.get('/api/v1/metadata/1').status_code == 404
 
 

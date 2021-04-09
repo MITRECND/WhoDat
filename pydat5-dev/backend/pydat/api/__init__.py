@@ -2,11 +2,16 @@ import os
 import sys
 import logging
 from flask import Flask, send_from_directory
+from flask_caching import Cache
 from pydat.core.config_parser import ConfigParser, DEFAULT_CONFIG
-from pydat.core.es import ElasticsearchHandler
+from pydat.core.elastic.search.flask_handler import FlaskElasticHandler
 
 
-elasticsearch_handler = ElasticsearchHandler()
+CACHE_TIMEOUT = 300  # Flask cache timeout
+
+
+elasticsearch_handler = FlaskElasticHandler()
+flask_cache = Cache()
 
 
 def create_app(config=None):
@@ -21,6 +26,12 @@ def create_app(config=None):
 
     config_parser = ConfigParser(app)
     config_parser.parse()
+
+    # Setup cache configuration
+    app.config["CACHE_TYPE"] = "SimpleCache"
+    app.config["CACHE_DEFAULT_TIMEOUT"] = CACHE_TIMEOUT
+
+    flask_cache.init_app(app)
 
     if app.config['DEBUG']:
         app.logger.setLevel(logging.DEBUG)
