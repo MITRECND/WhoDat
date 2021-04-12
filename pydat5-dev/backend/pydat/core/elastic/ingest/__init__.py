@@ -223,7 +223,7 @@ class DataPopulator:
         try:
             self.logger.info("Finalizing metadata")
             self.elastic_handler.updateMetadata(
-                id=self.version,
+                version=self.version,
                 body={
                     'doc': {
                         'total': self.statTracker.total,
@@ -260,6 +260,10 @@ class DataPopulator:
     ):
         # Start the stats tracker thread
         self.statTracker.start()
+
+        if statsSeed is not None:
+            self.statTracker.seed(statsSeed['stats'])
+            self.statTracker.seedChanged(statsSeed['changed'])
 
         # Start up Reader Thread
         self.readerThread.start()
@@ -412,6 +416,21 @@ class DataPopulator:
             self.include_fields = previous_metadata['included_keys']
         if 'excluded_keys' in previous_metadata:
             self.exclude_fields = previous_metadata['excluded_keys']
+
+        self._handleIngest(
+            reingest=True,
+            statsSeed={
+                'stats': {
+                    'total': previous_metadata['total'],
+                    'new': previous_metadata['new'],
+                    'updated': previous_metadata['updated'],
+                    'unchanged': previous_metadata['unchanged'],
+                    'duplicates': previous_metadata['duplicates'],
+
+                },
+                'changed': previous_metadata['changed_stats']
+            }
+        )
 
     @property
     def stats(self):
