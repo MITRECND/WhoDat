@@ -8,8 +8,13 @@ from flask import Blueprint
 
 
 @pytest.fixture
-def config_app():
-    app = create_app(
+def fake_create_app(monkeypatch):
+    return create_app
+
+
+@pytest.fixture
+def config_app(fake_create_app):
+    app = fake_create_app(
         {
             "TESTING": True,
             "SEARCHKEYS": [
@@ -27,8 +32,15 @@ def config_app():
 
 
 @pytest.fixture
-def client():
-    app = create_app({"TESTING": True, })
+def fake_app(fake_create_app):
+    app = fake_create_app()
+
+    return app
+
+
+@pytest.fixture
+def client(fake_create_app):
+    app = fake_create_app({"TESTING": True, })
     return app.test_client()
 
 

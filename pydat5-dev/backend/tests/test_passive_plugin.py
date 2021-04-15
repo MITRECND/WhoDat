@@ -4,7 +4,6 @@ from pydat.core.plugins import (
     PassivePluginBase,
     register_passive_plugin,
 )
-from pydat.api import create_app
 import pytest
 from flask import Blueprint, Flask
 
@@ -46,7 +45,7 @@ def test_registration(sample_passive_plugin):
         assert isinstance(loaded[0], sample_passive_plugin)
 
 
-def test_registration_bp(sample_passive_plugin):
+def test_registration_bp(sample_passive_plugin, fake_create_app):
     # Reset the PLUGINS Set
     plugins.PLUGINS = set()
 
@@ -54,7 +53,9 @@ def test_registration_bp(sample_passive_plugin):
     register_passive_plugin(sample_passive_plugin)
     plugin_name = 'passive_plugin'
 
-    app = create_app({"TESTING": True, "PDNSSOURCES": {"passive_plugin": {}}})
+    app = fake_create_app(
+        {"TESTING": True, "PDNSSOURCES": {"passive_plugin": {}}}
+    )
     routes = [str(p) for p in app.url_map.iter_rules()]
     assert f'/api/plugin/passive/{plugin_name}/hello' in routes
 

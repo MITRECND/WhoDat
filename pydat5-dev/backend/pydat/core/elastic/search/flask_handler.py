@@ -39,7 +39,6 @@ class FlaskElasticHandler(SearchHandler):
             super().__init__(
                 search_keys=self._search_keys,
                 **self.elastic_arguments)
-            self.connect()
         except RuntimeError:
             raise
         except Exception:
