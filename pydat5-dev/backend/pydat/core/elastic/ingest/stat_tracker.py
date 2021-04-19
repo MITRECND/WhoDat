@@ -72,7 +72,7 @@ class StatTracker(Thread):
         return self._changed
 
     def seed(self, stats):
-        self._stats = stats
+        self._stats.update(stats)
 
     def seedChanged(self, changed):
         for (name, value) in changed.items():
@@ -93,8 +93,8 @@ class StatTracker(Thread):
             if typ == 'stat':
                 if field not in self._stats:
                     self.logger.error("Unknown field %s" % field)
-
-                self._stats[field] += 1
+                else:
+                    self._stats[field] += 1
             elif typ == 'chn':
                 if field not in self._changed:
                     self._changed[field] = 0

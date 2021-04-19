@@ -97,23 +97,7 @@ class DataReader(Thread):
 
         return False
 
-    def parse_csv(self, filename):
-        if self._shutdown:
-            return
-
-        try:
-            csvfile = open(filename, newline='')
-            s = os.stat(filename)
-            if s.st_size == 0:
-                self.logger.warning("File %s empty" % filename)
-                return
-        except Exception:
-            self.logger.warning("Unable to stat file %s, skiping" % filename)
-            return
-
-        if self.verbose:
-            self.logger.info("Processing file: %s" % filename)
-
+    def _parse_csv(self, filename, csvfile):
         try:
             dnsreader = csv.reader(csvfile, strict=True, skipinitialspace=True)
         except Exception:
@@ -158,6 +142,29 @@ class DataReader(Thread):
         except Exception:
             self.logger.exception(
                 f"Unable to process file {filename}")
+
+    def parse_csv(self, filename):
+        if self._shutdown:
+            return
+
+        try:
+            file_stats = os.stat(filename)
+            if file_stats.st_size == 0:
+                self.logger.warning("File %s empty" % filename)
+                return
+        except Exception:
+            self.logger.warning("Unable to stat file %s, skipping" % filename)
+            return
+
+        try:
+            with open(filename, newline='') as csvfile:
+                if self.verbose:
+                    self.logger.info("Processing file: %s" % filename)
+                self._parse_csv(filename, csvfile)
+        except FileNotFoundError:
+            self.logger.warning(
+                f"File {filename} could not be found or opened")
+            return
 
 
 class DataFetcher(Thread):

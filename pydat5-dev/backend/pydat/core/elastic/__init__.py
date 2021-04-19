@@ -166,7 +166,7 @@ class ElasticHandler:
         """
         library_version = elasticsearch.VERSION[0]
 
-        if self.highest_version != library_version:
+        if self.getVersion() != library_version:
             raise RuntimeError(
                 "Python library installed does not "
                 "match with greatest (major) version in cluster")
