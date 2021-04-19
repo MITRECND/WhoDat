@@ -5,12 +5,12 @@ import os
 import datetime
 import argparse
 import getpass
-
+import logging
+from logging import StreamHandler
 
 from pydat.core.elastic.ingest import (
     DataPopulator,
 )
-
 from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
 
@@ -269,6 +269,37 @@ def main():
     # Template location
     base_path = os.path.dirname(os.path.realpath(__file__))
     template_path = os.path.join(base_path, "../core/elastic/templates")
+
+    # Setup Logging
+    root_debug_level = logging.WARNING
+    root_default_level = logging.WARNING
+
+    try:
+        logHandler = StreamHandler(sys.stdout)
+    except Exception as e:
+        print(f"Unable to setup logger to stdout\nError Message: {str(e)}\n")
+        sys.exit(1)
+
+    if options.debug:
+        log_format = (
+            "%(levelname) -10s %(asctime)s %(funcName) "
+            "-20s %(lineno) -5d: %(message)s"
+        )
+    else:
+        log_format = "%(message)s"
+
+    logFormatter = logging.Formatter(log_format)
+
+    # Set defaults for all loggers
+    root_logger = logging.getLogger()
+    root_logger.handlers = []
+    logHandler.setFormatter(logFormatter)
+    root_logger.addHandler(logHandler)
+
+    if options.debug:
+        root_logger.setLevel(root_debug_level)
+    else:
+        root_logger.setLevel(root_default_level)
 
     dataPopulator = DataPopulator(
         elastic_args=elastic_arguments,

@@ -7,8 +7,6 @@ from multiprocessing import (
 )
 import traceback
 import logging
-from logging import StreamHandler
-
 import queue
 
 
@@ -115,34 +113,7 @@ class mpLogger(Thread):
 
     def run(self):
         default_level = logging.INFO
-        root_debug_level = logging.WARNING
         debug_level = logging.DEBUG
-        root_default_level = logging.WARNING
-
-        try:
-            logHandler = StreamHandler(sys.stdout)
-        except Exception as e:
-            raise Exception(("Unable to setup logger to stdout\n"
-                             "Error Message: %s\n") % str(e))
-
-        if self._debug:
-            log_format = ("%(levelname) -10s %(asctime)s %(funcName) "
-                          "-20s %(lineno) -5d: %(message)s")
-        else:
-            log_format = "%(message)s"
-
-        logFormatter = logging.Formatter(log_format)
-
-        # Set defaults for all loggers
-        root_logger = logging.getLogger()
-        root_logger.handlers = []
-        logHandler.setFormatter(logFormatter)
-        root_logger.addHandler(logHandler)
-
-        if self._debug:
-            root_logger.setLevel(root_debug_level)
-        else:
-            root_logger.setLevel(root_default_level)
 
         logger = logging.getLogger(self.name)
 
