@@ -277,7 +277,7 @@ def main():
 
     if options.debug:
         log_format = (
-            "%(levelname) -10s %(asctime)s %(funcName) "
+            "%(levelname) -10s %(asctime)s %(name) -15s %(funcName) "
             "-20s %(lineno) -5d: %(message)s"
         )
     else:

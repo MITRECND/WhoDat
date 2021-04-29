@@ -360,7 +360,7 @@ class DataProcessorPool:
                 file_queue=self.file_queue,
                 statTracker=self.statTracker.get_tracker(),
                 eventTracker=self.eventTracker,
-                logger=self.root_logger.getLogger(name=f'{pipeline_id}'),
+                logger=self.root_logger.getLogger(f"Pipeline {pipeline_id}"),
                 skip_fetch=skip_fetch,
                 process_options=self.process_options
             )
