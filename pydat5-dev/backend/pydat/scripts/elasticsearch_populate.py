@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-import os
 import datetime
 import argparse
 import getpass
@@ -266,10 +265,6 @@ def main():
         'rollover_size': options.rollover_docs
     }
 
-    # Template location
-    base_path = os.path.dirname(os.path.realpath(__file__))
-    template_path = os.path.join(base_path, "../core/elastic/templates")
-
     # Setup Logging
     root_debug_level = logging.WARNING
     root_default_level = logging.WARNING
@@ -306,7 +301,6 @@ def main():
         include_fields=options.include,
         exclude_fields=options.exclude,
         ingest_day=options.ingest_day,
-        template_path=template_path,
         ignore_field_prefixes=options.ignore_field_prefixes,
         pipelines=options.procs,
         ingest_directory=options.directory,

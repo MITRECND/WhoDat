@@ -30,9 +30,9 @@ class DataPopulator:
         include_fields,
         exclude_fields,
         ingest_day,
-        template_path,
         ignore_field_prefixes,
         pipelines=2,
+        template_path=None,
         ingest_directory=None,
         ingest_file=None,
         extension="csv",
@@ -51,7 +51,16 @@ class DataPopulator:
         self.version = -1
 
         self.pipelines = pipelines
-        self.template_path = template_path
+        if template_path is not None:
+            self.template_path = template_path
+        else:
+            # Template location
+            base_path = os.path.dirname(os.path.realpath(__file__))
+            self.template_path = os.path.join(
+                base_path,
+                "../templates"
+            )
+
         self.elastic_args = elastic_args
         self.include_fields = include_fields
         self.exclude_fields = exclude_fields
