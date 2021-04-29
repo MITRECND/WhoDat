@@ -94,7 +94,10 @@ class DataProcessor(Process):
         self.pause_request = multiprocessing.Value('b', False)
         self._paused = multiprocessing.Value('b', False)
         self._complete = multiprocessing.Value('b', False)
-        self.es = IngestHandler(**self.process_options.elastic_args)
+        self.es = IngestHandler(
+            **self.process_options.elastic_args,
+            logger=self.logger
+        )
         self.skip_fetch = skip_fetch
 
         self.num_fetcher_threads = self.process_options.num_fetcher_threads

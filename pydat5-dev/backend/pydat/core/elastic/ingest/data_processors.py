@@ -10,9 +10,11 @@ from threading import Thread
 from html.parser import HTMLParser
 import queue
 
-from elasticsearch import helpers
-
 from pydat.core.elastic.ingest.debug_levels import DebugLevel
+from pydat.core.elastic.ingest.ingest_handler import (
+    BulkFetchError,
+    BulkShipError,
+)
 
 
 # Notes
@@ -316,19 +318,25 @@ class DataFetcher(Thread):
             self.logger.exception("Unable to generate doc list")
             return results
 
+        fetched = None
         try:
-            result = self.es.connect().mget(body={"docs": docs})
+            fetched = self.es.fetchDocuments(docs)
+        except BulkFetchError as e:
+            self.logger.error(f"Unable to bulk fetch documents: {str(e)}")
+            self.eventTracker.setShipError()
         except Exception:
-            self.logger.exception("Unable to create mget request")
+            self.logger.exception("Unhandled exception bulk fetching docs")
+            self.eventTracker.setShipError()
+
+        if fetched is None:
+            self.logger.error("Unable to bulk fetch documents")
             return results
 
         try:
-            for (doc_count, index) in \
-                    enumerate(range(0, len(result['docs']),
-                              len(self.index_list))):
+            for (doc_count, index) in enumerate(
+                    range(0, len(fetched), len(self.index_list))):
                 found = None
-                doc_results = \
-                    result['docs'][index:index + len(self.index_list)]
+                doc_results = fetched[index:index + len(self.index_list)]
 
                 for res in doc_results:
                     if res['found']:
@@ -634,7 +642,7 @@ class DataShipper(Thread):
         self._finish = True
 
     def run(self):
-        def bulkIter():
+        def bulk_iter():
             while not (self._finish and self.insert_queue.empty()):
                 try:
                     req = self.insert_queue.get_nowait()
@@ -648,23 +656,13 @@ class DataShipper(Thread):
                     self.insert_queue.task_done()
 
         try:
-            for (ok, response) in \
-                    helpers.streaming_bulk(self.es.connect(), bulkIter(),
-                                           raise_on_error=False,
-                                           chunk_size=self.bulk_ship_size):
-                resp = response[list(response)[0]]
-                if not ok and resp['status'] not in [404, 409]:
-                    if not self.eventTracker.bulkError:
-                        self.eventTracker.setBulkError()
-                    self.logger.debug("Response: %s" % (str(resp)))
-                    self.logger.error((
-                        "Error making bulk request, received "
-                        "error reason: %s")
-                            % (resp['error']['reason']))
+            self.es.shipDocuments(bulk_iter(), self.bulk_ship_size)
+        except BulkShipError as e:
+            self.logger.error(f"Exception in bulk ship response: {str(e)}")
+            self.eventTracker.setShipError()
         except Exception:
-            self.logger.exception("Unexpected error processing bulk commands")
-            if not self.eventTracker.bulkError:
-                self.eventTracker.setBulkError
+            self.logger.exception("Unhandled exception in bulk ship")
+            self.eventTracker.setShipError()
 
 
 def parse_domain(domainName):

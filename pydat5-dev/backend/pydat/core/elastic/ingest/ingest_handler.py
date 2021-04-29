@@ -1,5 +1,6 @@
 import time
 import elasticsearch
+from elasticsearch import helpers
 
 from pydat.core.elastic import ElasticHandler
 
@@ -28,6 +29,14 @@ METADATA_INDEX_BODY = {
         }
     }
 }
+
+
+class BulkFetchError(Exception):
+    pass
+
+
+class BulkShipError(Exception):
+    pass
 
 
 class RolloverRequired(Exception):
@@ -234,6 +243,52 @@ class IngestHandler(ElasticHandler):
                 )
 
         return timer
+
+    def fetchDocuments(self, documents):
+        es = self.connect()
+
+        fetched = None
+        try:
+            response = es.mget(body={"docs": documents})
+            fetched = response['docs']
+        except elasticsearch.exceptions.TransportError as e:
+            if (e.status_code == 429 and "circuit_break" in e.error):
+                raise BulkFetchError((
+                    "fetch size too large! Reduce and try again"
+                )) from None
+            else:
+                raise RuntimeError("Unexpected elastic transport error")
+        except Exception:
+            raise
+
+        return fetched
+
+    def shipDocuments(self, documents_iter, bulk_size):
+        es = self.connect()
+
+        try:
+            for (ok, response) in helpers.streaming_bulk(
+                es, documents_iter,
+                raise_on_error=False,
+                chunk_size=bulk_size
+            ):
+                resp = response[list(response)[0]]
+                if not ok and resp['status'] not in [404, 409]:
+                    self.logger.debug("Response: %s" % (str(resp)))
+                    raise BulkShipError(
+                        "Error making bulk request, received "
+                        f"error reason: {resp['error']['reason']}"
+                    )
+        except elasticsearch.exceptions.TransportError as e:
+            if (e.status_code == 429 and "circuit_break" in e.error):
+                raise BulkShipError((
+                    "Bulk Ship too large! Reduce and try again"
+                )) from None
+            else:
+                raise RuntimeError(
+                    "Unhandled elasticsearch transport exception")
+        except Exception:
+            raise
 
     def initialize(self, template):
         es = self.connect()

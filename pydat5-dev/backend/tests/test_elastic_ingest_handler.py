@@ -68,3 +68,11 @@ def test_getmetadata_fn(mock_handler):
     mock_handler.connect.return_value.get.side_effect = Exception()
     with pytest.raises(RuntimeError):
         mock_handler.getMetadata(1)
+
+
+def test_fetchdocuments_fn(mock_handler):
+    mock_handler.connect.return_value.mget.return_value = {
+        'docs': ['test1', 'test2', 'test3']
+    }
+
+    assert mock_handler.fetchDocuments([])

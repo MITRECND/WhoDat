@@ -4,7 +4,8 @@ import multiprocessing
 class EventTracker:
     def __init__(self):
         self._shutdownEvent = multiprocessing.Event()
-        self._bulkErrorEvent = multiprocessing.Event()
+        self._bulkShipEvent = multiprocessing.Event()
+        self._bulkFetchEvent = multiprocessing.Event()
         self._fileReaderDoneEvent = multiprocessing.Event()
 
     @property
@@ -15,11 +16,22 @@ class EventTracker:
         self._shutdownEvent.set()
 
     @property
-    def bulkError(self):
-        return self._bulkErrorEvent.is_set()
+    def shipError(self):
+        return self._bulkShipEvent.is_set()
 
-    def setBulkError(self):
-        self._bulkErrorEvent.set()
+    def setShipError(self):
+        self._bulkShipEvent.set()
+
+    @property
+    def fetchError(self):
+        return self._bulkFetchEvent.is_set()
+
+    def setFetchError(self):
+        self._bulkFetchEvent.set()
+
+    @property
+    def bulkError(self):
+        return self.shipError or self.fetchError
 
     @property
     def fileReaderDone(self):
