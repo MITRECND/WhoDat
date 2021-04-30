@@ -9,6 +9,9 @@ from logging import StreamHandler
 
 from pydat.core.elastic.ingest import (
     DataPopulator,
+    InterruptedImportError,
+    NoDataError,
+    MetadataError,
 )
 from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
@@ -64,7 +67,7 @@ def main():
         default=None, help=(
             "Day to use for metadata, in the format 'YYYY-MM-dd', e.g.,"
             " '2021-01-01'. Defaults to todays date, use 'YYYY-MM-00' to "
-            "indicate a quarterly ingest"
+            "indicate a quarterly ingest, e.g., 2021-04-00"
         )
     )
 
@@ -218,55 +221,10 @@ def main():
     else:
         options.debug = DebugLevel.DISABLED
 
-    if options.es_ask_pass:
-        try:
-            options.es_pass = getpass.getpass("Enter ElasticSearch Password: ")
-        except Exception:
-            # TODO FIXME add better handling
-            print("Unable to get password", file=sys.stderr)
-            sys.exit(1)
-
-    if options.exclude != "":
-        options.exclude = options.exclude.split(',')
-    else:
-        options.exclude = None
-
-    if options.include != "":
-        options.include = options.include.split(',')
-    else:
-        options.include = None
-
-    if options.ingest_day is not None:
-        ingest_parts = options.ingest_day.strip().rstrip().split('-')
-        if len(ingest_parts) != 3:
-            print("D/ingest_day format is 'YYYY-MM-dd'", file=sys.stderr)
-            sys.exit(1)
-
-        if ingest_parts[2] == '00':
-            ingest_parts[2] = 1
-
-        try:
-            datetime.date(
-                int(ingest_parts[0]),
-                int(ingest_parts[1]),
-                int(ingest_parts[2])
-            )
-        except ValueError:
-            print("Unable to verify date provided", file=sys.stderr)
-            sys.exit(1)
-
-    elastic_arguments = {
-        'hosts': options.es_uri,
-        'username': options.es_user,
-        'password': options.es_pass,
-        'cacert': options.es_cacert,
-        'disable_sniffing': options.es_disable_sniffing,
-        'indexPrefix': options.index_prefix,
-        'rollover_size': options.rollover_docs
-    }
-
     # Setup Logging
+    debug_level = logging.DEBUG
     root_debug_level = logging.WARNING
+    default_level = logging.INFO
     root_default_level = logging.WARNING
 
     try:
@@ -290,11 +248,63 @@ def main():
     root_logger.handlers = []
     logHandler.setFormatter(logFormatter)
     root_logger.addHandler(logHandler)
+    logger = logging.getLogger(__name__)
 
     if options.debug:
         root_logger.setLevel(root_debug_level)
+        logger.setLevel(debug_level)
     else:
         root_logger.setLevel(root_default_level)
+        logger.setLevel(default_level)
+
+    if options.es_ask_pass:
+        try:
+            options.es_pass = getpass.getpass("Enter ElasticSearch Password: ")
+        except Exception:
+            # TODO FIXME add better handling
+            print("Unable to get password", file=sys.stderr)
+            sys.exit(1)
+
+    if options.exclude != "":
+        options.exclude = options.exclude.split(',')
+    else:
+        options.exclude = None
+
+    if options.include != "":
+        options.include = options.include.split(',')
+    else:
+        options.include = None
+
+    if options.ingest_day is not None:
+        ingest_parts = options.ingest_day.strip().rstrip().split('-')
+        if len(ingest_parts) != 3:
+            logger.error("D/ingest_day format is 'YYYY-MM-dd'")
+            sys.exit(1)
+
+        if ingest_parts[2] == '00':
+            ingest_parts[2] = 1
+
+        try:
+            datetime.date(
+                int(ingest_parts[0]),
+                int(ingest_parts[1]),
+                int(ingest_parts[2])
+            )
+        except ValueError:
+            logger.error("Unable to verify date provided")
+            sys.exit(1)
+    elif not options.redo:
+        logger.warning("Ingest Day was not provided, assuming today")
+
+    elastic_arguments = {
+        'hosts': options.es_uri,
+        'username': options.es_user,
+        'password': options.es_pass,
+        'cacert': options.es_cacert,
+        'disable_sniffing': options.es_disable_sniffing,
+        'indexPrefix': options.index_prefix,
+        'rollover_size': options.rollover_docs
+    }
 
     dataPopulator = DataPopulator(
         elastic_args=elastic_arguments,
@@ -322,13 +332,26 @@ def main():
         sys.exit(0)
 
     if (options.file is None and options.directory is None):
-        print("A File or Directory source is required", file=sys.stderr)
+        logger.error("A File or Directory source is required")
         parser.parse_args(["-h"])
 
-    if not options.redo:
-        dataPopulator.ingest()
-    else:
-        dataPopulator.reingest()
+    try:
+        if not options.redo:
+            dataPopulator.ingest()
+        else:
+            dataPopulator.reingest()
+    except InterruptedImportError as e:
+        logger.error(str(e))
+        sys.exit(1)
+    except NoDataError as e:
+        logger.error(str(e))
+        sys.exit(1)
+    except MetadataError:
+        logger.exception("")
+        sys.exit(1)
+    except Exception:
+        logger.exception("Unexpected/unhandled exception")
+        sys.exit(1)
 
     if options.stats:
         stats = dataPopulator.stats

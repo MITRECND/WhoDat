@@ -341,7 +341,7 @@ class DataProcessorPool:
         self.verbose = process_options.verbose
         self.debug = process_options.debug
 
-        self.logger = self.root_logger.getLogger("data_processor_pool")
+        self.logger = self.root_logger.getLogger("processor_pool")
 
         self.pipelines = []
 
@@ -351,7 +351,7 @@ class DataProcessorPool:
             skip_fetch = True
 
         self.elastic_handler = IngestHandler(
-            logger=self.root_logger.getLogger("pool_ingest_handler"),
+            logger=self.root_logger.getLogger("ingest_handler"),
             **self.process_options.elastic_args)
 
         for pipeline_id in range(self.proc_count):
@@ -360,7 +360,7 @@ class DataProcessorPool:
                 file_queue=self.file_queue,
                 statTracker=self.statTracker.get_tracker(),
                 eventTracker=self.eventTracker,
-                logger=self.root_logger.getLogger(f"Pipeline {pipeline_id}"),
+                logger=self.root_logger.getLogger(f"pipeline {pipeline_id}"),
                 skip_fetch=skip_fetch,
                 process_options=self.process_options
             )

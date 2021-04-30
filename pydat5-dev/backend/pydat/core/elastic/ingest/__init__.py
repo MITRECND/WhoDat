@@ -23,6 +23,27 @@ from pydat.core.elastic.ingest.process_wrapper import (
 from pydat.core.elastic.ingest.file_reader import FileReader
 
 
+class InterruptedImportError(Exception):
+    """Custom excpetion that represents an import was previously interrupted
+    and must be handled before more data can be ingested
+    """
+    pass
+
+
+class NoDataError(Exception):
+    """Custom exception that represents that data was not present in the
+    cluster when it was expected to be so
+    """
+    pass
+
+
+class MetadataError(Exception):
+    """Custom exception that indicates there was an issue processing a
+    metadata records
+    """
+    pass
+
+
 class DataPopulator:
     def __init__(
         self,
@@ -355,7 +376,7 @@ class DataPopulator:
 
         metadata = self.elastic_handler.metaRecord
         if metadata is None:
-            raise RuntimeError("Unable to get metadata from cluster")
+            raise MetadataError("Unable to get metadata from cluster")
 
         if not first_import:
             self.version = int(metadata['lastVersion']) + 1
@@ -364,7 +385,7 @@ class DataPopulator:
         import_interrupted = importing > 0
 
         if import_interrupted:
-            raise RuntimeError(
+            raise InterruptedImportError(
                 "Previous Import was interupted, please resolve")
 
         updateDoc = {
@@ -377,7 +398,10 @@ class DataPopulator:
         if metadata['lastVersion'] == 0:
             updateDoc['doc']['firstVersion'] = 1
 
-        self.elastic_handler.updateMetadata(0, updateDoc)
+        try:
+            self.elastic_handler.updateMetadata(0, updateDoc)
+        except Exception:
+            raise MetadataError("Unable to update metadata record")
 
         # Create the entry for this import
         meta_struct = {'metadata': self.version,
@@ -396,30 +420,37 @@ class DataPopulator:
         elif self.include_fields is not None:
             meta_struct['included_keys'] = self.include_fields
 
-        self.elastic_handler.createMetadata(self.version, meta_struct)
+        try:
+            self.elastic_handler.createMetadata(self.version, meta_struct)
+        except Exception:
+            raise MetadataError("Unable to create metadata record")
 
         self._handleIngest(first_import=first_import)
 
     def reingest(self):
         if not self.elastic_handler.metaExists:
-            raise RuntimeError(
+            raise NoDataError(
                 "Cannot reingest when no data exists in cluster")
 
-        metadata = self.elastic_handler.metaRecord
+        try:
+            metadata = self.elastic_handler.metaRecord
+        except Exception:
+            raise MetadataError("Unable to retreive metadata record")
+
         importing = int(metadata['importing'])
         import_interrupted = importing > 0
 
         if import_interrupted:
             self.version = importing
         else:
-            self.version = int(metadata['lastVersion']) + 1
+            self.version = int(metadata['lastVersion'])
 
         try:
             previous_metadata = self.elastic_handler.getMetadata(
                 metadata['lastVersion']
             )
         except Exception:
-            raise
+            raise MetadataError("Unable to get metadata record")
 
         if 'included_keys' in previous_metadata:
             self.include_fields = previous_metadata['included_keys']
