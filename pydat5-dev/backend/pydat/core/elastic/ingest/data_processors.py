@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import re
 import csv
 import time
 import hashlib
@@ -28,7 +29,9 @@ def _generateDocId(domainName):
     except Exception:
         raise RuntimeError(f"Unable to parse domain '{domainName}'")
 
-    if len(domain) > 200:
+    # If somehow a domain passes the length check, hash it instead of
+    # using it directly
+    if len(domain) > 255:
         dhash = hashlib.sha1(bytes(domain, 'utf-8')).hexdigest()
         domain = f"h.{dhash}"
     return f"{tld}.{domain}"
@@ -66,6 +69,8 @@ class DataReader(Thread):
         self.debug = process_options.debug
         self._shutdown = False
         self._pause = False
+        # This is a naive regex for domain name labels
+        self.label_regex = re.compile("^([A-Za-z0-9_-]{0,63})$")
 
     def shutdown(self):
         self._shutdown = True
@@ -134,7 +139,8 @@ class DataReader(Thread):
                         f"Skipping empty row in file {filename}"
                     )
                     continue
-                self.data_queue.put({'header': header, 'row': row})
+                if self.validate_row(header, row):
+                    self.data_queue.put({'header': header, 'row': row})
         except csv.Error:
             self.logger.exception(
                 "CSV Parse Error in file %s - line %i\n" % (
@@ -167,6 +173,49 @@ class DataReader(Thread):
             self.logger.warning(
                 f"File {filename} could not be found or opened")
             return
+
+    def validate_row(self, header, row):
+        try:
+            if len(header) != len(row):
+                self.logger.error((
+                    f"Number of items in row less than length of header: {row}"
+                ))
+                return False
+
+            domainName = row[0]
+
+            if len(domainName) == 0:
+                self.logger.error("Zero Length Domain Name")
+                return False
+
+            # Check if domainName follows basic <label>.<tld> pattern
+            parts = domainName.rsplit('.', 1)
+            if len(parts) != 2:
+                self.logger.error(f"Unable to parse domainName: {domainName}")
+                return False
+
+            # Domain Name Labels must be 63 characters or less and maximum
+            # domain length is supposed to be under 255 or 253 characters
+            # in different circumstances
+            if len(domainName) > 255:
+                self.logger.error(f"Long domainName: {domainName}")
+                return False
+
+            # Check each label to ensure they're using valid ascii characters
+            # and they're up to 63 characters
+            label_parts = parts[0].split('.')
+            for label_part in label_parts:
+                if not self.label_regex.match(label_part):
+                    self.logger.error((
+                        "Domain name label(s) does not match valid "
+                        f"pattern: {domainName}"
+                    ))
+                    return False
+
+            return True
+        except Exception:
+            self.logger.exception(f"Unable to validate row {row}")
+            return False
 
 
 class DataFetcher(Thread):
