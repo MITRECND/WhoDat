@@ -2,7 +2,7 @@ import os
 import time
 import logging
 import multiprocessing
-from argparse import Namespace
+from types import SimpleNamespace
 from multiprocessing import (
     Process,
 )
@@ -23,7 +23,7 @@ from pydat.core.elastic.ingest.data_processors import (
 from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
 
-class PopulatorOptions(Namespace):
+class PopulatorOptions(SimpleNamespace):
     def __init__(
         self,
         **kwargs
@@ -91,9 +91,9 @@ class DataProcessor(Process):
         self.worker_thread = None
         self.shipper_threads = []
         self.reader_thread = None
-        self.pause_request = multiprocessing.Value('b', False)
         self._paused = multiprocessing.Value('b', False)
         self._complete = multiprocessing.Value('b', False)
+        self._shuttered = multiprocessing.Value('b', False)
         self.es = IngestHandler(
             **self.process_options.elastic_args,
             logger=self.logger
@@ -119,11 +119,9 @@ class DataProcessor(Process):
     def complete(self):
         return self._complete.value
 
-    def pause(self):
-        self.pause_request.value = True
-
-    def unpause(self):
-        self.pause_request.value = False
+    @property
+    def shuttered(self):
+        return self._shuttered.value
 
     def update_index_list(self):
         self.index_list = self.es.resolveAlias()
@@ -132,7 +130,7 @@ class DataProcessor(Process):
         if self.reader_thread.isAlive():
             try:
                 self.reader_thread.pause()
-                self.finish()
+                self.cleanup()
                 self._paused.value = True
             except Exception:
                 self.logger.exception("Unable to pause reader thread")
@@ -140,6 +138,10 @@ class DataProcessor(Process):
             self.logger.debug("Pause requested when reader thread not alive")
 
     def _unpause(self):
+        if self.complete:
+            # Don't unpause if it's already complete
+            return
+
         if self.reader_thread.isAlive():
             try:
                 self.reader_thread.unpause()
@@ -153,29 +155,14 @@ class DataProcessor(Process):
         else:
             self.logger.debug("Pause requested when reader thread not alive")
 
-    def shutdown(self):
-        self.logger.debug("Shutting down reader")
-        self.reader_thread.shutdown()
-        while self.reader_thread.is_alive():
+    def _drain(self):
+        while not self.file_queue.empty():
             try:
                 self.file_queue.get_nowait()
                 self.file_queue.task_done()
             except queue.Empty:
                 break
 
-        self.logger.debug("Shutting down fetchers")
-        for fetcher in self.fetcher_threads:
-            fetcher.shutdown()
-            # Ensure put is not blocking shutdown
-            while fetcher.is_alive():
-                try:
-                    self.work_queue.get_nowait()
-                    self.work_queue.task_done()
-                except queue.Empty:
-                    break
-
-        self.logger.debug("Draining work queue")
-        # Drain the work queue
         while not self.work_queue.empty():
             try:
                 self.work_queue.get_nowait()
@@ -183,17 +170,6 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
-        self.logger.debug("Shutting down worker thread")
-        self.worker_thread.shutdown()
-        while self.worker_thread.is_alive():
-            try:
-                self.insert_queue.get_nowait()
-                self.insert_queue.task_done()
-            except queue.Empty:
-                break
-
-        self.logger.debug("Draining insert queue")
-        # Drain the insert queue
         while not self.insert_queue.empty():
             try:
                 self.insert_queue.get_nowait()
@@ -201,15 +177,32 @@ class DataProcessor(Process):
             except queue.Empty:
                 break
 
+    def shutdown(self):
+        self.logger.debug("Shutting down reader")
+        self.reader_thread.shutdown()
+
+        self.logger.debug("Shutting down fetchers")
+        [fetcher.shutdown() for fetcher in self.fetcher_threads]
+
+        self.logger.debug("Shutting down worker thread")
+        self.worker_thread.shutdown()
+
+        self.logger.debug("Shutting down shippers")
+        [shipper.shutdown() for shipper in self.shipper_threads]
+
+        # Drain queues
+        self._drain()
+
         self.logger.debug("Waiting for shippers to finish")
         # Shippers can't be forced to shutdown
         for shipper in self.shipper_threads:
-            shipper.finish()
+            shipper.shutdown()
             shipper.join()
 
         self.logger.debug("Shutdown Complete")
+        self._shuttered.value = True
 
-    def finish(self):
+    def cleanup(self):
         self.logger.debug("Waiting for fetchers to finish")
         for fetcher in self.fetcher_threads:
             fetcher.finish()
@@ -224,7 +217,11 @@ class DataProcessor(Process):
             shipper.finish()
             shipper.join()
 
-        self.logger.debug("Finish Complete")
+        self.logger.debug("Cleanup Complete")
+
+    def finish(self):
+        self.cleanup()
+        self._shuttered.value = True
 
     def startup_rest(self):
         self.logger.debug("Starting Worker")
@@ -303,9 +300,9 @@ class DataProcessor(Process):
                 self.shutdown()
                 break
 
-            if self.pause_request.value:
+            if self.eventTracker.paused:
                 self._pause()
-                while self.pause_request.value:
+                while self.eventTracker.paused:
                     time.sleep(.1)
                 self._unpause()
 
@@ -372,32 +369,39 @@ class DataProcessorPool:
 
     def join(self):
         timer = time.time()
-        for proc in self.pipelines:
-            while proc.is_alive():
-                try:
-                    timer = self.elastic_handler.rolloverTimer(timer)
-                except RolloverRequired as rollOver:
-                    # Reset Timer
-                    timer = time.time()
-                    self.handleRollover(
-                        write_alias=rollOver.write_alias,
-                        search_alias=rollOver.search_alias
-                    )
-                proc.join(.1)
+        while 1:
+            running = any([proc.complete for proc in self.pipelines])
+            if not running:
+                break
 
-                if self.eventTracker.bulkError:
-                    self.logger.critical((
-                        "Bulk API error -- forcing program shutdown"))
-                    raise KeyboardInterrupt(("Error response from ES worker, "
-                                             "stopping processing"))
+            try:
+                timer = self.elastic_handler.rolloverTimer(timer)
+            except RolloverRequired as rollOver:
+                # Reset Timer
+                timer = time.time()
+                self.handleRollover(
+                    write_alias=rollOver.write_alias,
+                    search_alias=rollOver.search_alias
+                )
+
+            if self.eventTracker.bulkError:
+                self.logger.critical((
+                    "Bulk API error -- forcing program shutdown"))
+                raise KeyboardInterrupt((
+                    "Error response from ES worker, stopping processing"))
+
+        for proc in self.pipelines:
+            self.logger.debug(f"Waiting for {proc.myid} to finish")
+            while 1:
+                if proc.shuttered:
+                    break
 
     def handleRollover(self, write_alias, search_alias):
         if self.debug >= DebugLevel.VERBOSE:
             self.logger.debug("Rolling over ElasticSearch Index")
 
         # Pause the pipelines
-        for proc in self.pipelines:
-            proc.pause()
+        self.eventTracker.pause()
 
         self.logger.debug("Waiting for pipelines to pause")
         # Ensure procs are paused
@@ -415,9 +419,7 @@ class DataProcessorPool:
             )
 
             # Index rolled over, restart processing
-            for proc in self.pipelines:
-                if not proc.complete:  # Only if process has data to process
-                    proc.unpause()
+            self.eventTracker.unpause()
 
             if self.debug >= DebugLevel.VERBOSE:
                 self.logger.debug("Roll over complete")

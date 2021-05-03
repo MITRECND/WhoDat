@@ -247,6 +247,7 @@ class DataFetcher(Thread):
         else:
             self.logger = logging.getLogger(f'fetcher.{self.myid}')
 
+        self.fetcherid = fetcherid
         self.data_queue = data_queue
         self.work_queue = work_queue
         self.es = es
@@ -312,7 +313,7 @@ class DataFetcher(Thread):
                     self.logger.exception("Unhandled Exception")
                 finally:
                     self.data_queue.task_done()
-
+            self.logger.debug(f"Data Fetcher {self.fetcherid} exiting")
         except Exception:
             self.logger.exception("Unhandled Exception")
 
@@ -686,13 +687,20 @@ class DataShipper(Thread):
         self.eventTracker = eventTracker
         self.es = es
         self._finish = False
+        self._shutdown = False
 
     def finish(self):
         self._finish = True
 
+    def shutdown(self):
+        self._shutdown = True
+
     def run(self):
         def bulk_iter():
             while not (self._finish and self.insert_queue.empty()):
+                if self._shutdown:
+                    break
+
                 try:
                     req = self.insert_queue.get_nowait()
                 except queue.Empty:

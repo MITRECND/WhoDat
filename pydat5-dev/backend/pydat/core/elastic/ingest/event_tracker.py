@@ -3,10 +3,21 @@ import multiprocessing
 
 class EventTracker:
     def __init__(self):
+        self._pauseEvent = multiprocessing.Event()
         self._shutdownEvent = multiprocessing.Event()
         self._bulkShipEvent = multiprocessing.Event()
         self._bulkFetchEvent = multiprocessing.Event()
         self._fileReaderDoneEvent = multiprocessing.Event()
+
+    @property
+    def paused(self):
+        return self._pauseEvent.is_set()
+
+    def pause(self):
+        self._pauseEvent.set()
+
+    def unpause(self):
+        self._pauseEvent.clear()
 
     @property
     def shutdown(self):

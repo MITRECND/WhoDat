@@ -231,6 +231,7 @@ class DataPopulator:
             except queue.Empty:
                 break
 
+        self.logger.debug("Joining Reader Thread")
         self.readerThread.join()
 
         # Signal the pipeline procs to shutdown
