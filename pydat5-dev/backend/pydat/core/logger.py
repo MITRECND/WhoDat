@@ -5,133 +5,81 @@ from threading import Thread
 from multiprocessing import (
     JoinableQueue as jmpQueue
 )
-import traceback
 import logging
+import logging.handlers
 import queue
 
+DEBUG_LEVEL = logging.DEBUG
+DEFAULT_LEVEL = logging.INFO
 
-class _mpLoggerClient:
-    """class returned by mpLogger.getLogger
 
-    This class mimics how logger should act by providing the same/similar
-    facilities
+def getLogger(name=None, debug=False, mpSafe=True, **kwargs):
+    """Convenience function to get a logger with configured level
+
+    Args:
+        name (str, optional): Name to use for logger. Defaults to None.
+        debug (bool, optional): Enable debug level. Defaults to False.
+
+    Returns:
+        Logger: Logger instance returned by logging
     """
+    if mpSafe:
+        # Remove existing handlers and use QueueHandler instead
+        queue_handler = logging.handlers.QueueHandler(mpLogger.logQueue)
+        root_logger = logging.getLogger()
+        root_logger.handlers = []
+        root_logger.addHandler(queue_handler)
 
-    def __init__(self, name, logQueue, debug):
-        self.name = name
-        self.logQueue = logQueue
-        self._logger = logging.getLogger()
-        self._debug = debug
-        self._prefix = None
+    logger = logging.getLogger(name, **kwargs)
+    logger.setLevel(
+        DEBUG_LEVEL if debug else DEFAULT_LEVEL
+    )
 
-    @property
-    def prefix(self):
-        return self._prefix
-
-    @prefix.setter
-    def prefix(self, value):
-        if not isinstance(value, str):
-            raise TypeError("Expected a string type")
-        self._prefix = value
-
-    def log(self, lvl, msg, *args, **kwargs):
-        if self.prefix is not None and self._debug:
-            msg = self.prefix + msg
-
-        if kwargs.get('exc_info', False) is not False:
-            if (not (isinstance(kwargs['exc_info'], tuple) and
-                     len(kwargs['exc_info']) == 3)):
-                kwargs['exc_info'] = sys.exc_info()
-            (etype, eclass, tb) = kwargs['exc_info']
-            exc_msg = ''.join(traceback.format_exception(etype,
-                                                         eclass,
-                                                         tb))
-            kwargs['_exception_'] = exc_msg
-
-        if kwargs.get('_exception_', None) is not None:
-            msg += "\n%s" % (kwargs['_exception_'])
-
-        (name, line, func, _) = self._logger.findCaller()
-        log_data = (self.name, lvl, name, line, msg, args, None,
-                    func, kwargs.get('extra', None))
-        self.logQueue.put(log_data)
-
-    def debug(self, msg, *args, **kwargs):
-        self.log(logging.DEBUG, msg, *args, **kwargs)
-
-    def info(self, msg, *args, **kwargs):
-        self.log(logging.INFO, msg, *args, **kwargs)
-
-    def warning(self, msg, *args, **kwargs):
-        self.log(logging.WARNING, msg, *args, **kwargs)
-
-    def error(self, msg, *args, **kwargs):
-        self.log(logging.ERROR, msg, *args, **kwargs)
-
-    def critical(self, msg, *args, **kwargs):
-        self.log(logging.CRITICAL, msg, *args, **kwargs)
-
-    def exception(self, msg, *args, **kwargs):
-        kwargs['_exception_'] = traceback.format_exc()
-        self.log(logging.ERROR, msg, *args, **kwargs)
+    return logger
 
 
 class mpLogger(Thread):
-    """Multiprocessing 'safe' logger implementation
+    """Multiprocessing 'safe' logger implementation/wrapper
 
-    This logger implementation should probably not be used by a main
-    thread since it relies on a queue for its data processing. So if things
-    need to be printed immediately, i.e,. on error, it should be done via
-    the regular logging instance
+    This class enabled a main thread to support a QueueHandler based logger
+    created by the 'getLogger' class in this file. It should be started
+    before starting child processes and then join'd after child processes
+    are finished
     """
+
+    logQueue = jmpQueue()
 
     def __init__(self, name=__name__, debug=False, **kwargs):
         Thread.__init__(self, **kwargs)
         self._debug = debug
         self.daemon = True
         self.name = name
-        self.logQueue = jmpQueue()
-        self._logger = None
         self._stop_processing = False
-
-    @property
-    def logger(self):
-        if self._logger is None:
-            self._logger = logging.getLogger(self.name)
-        return self._logger
-
-    def getLogger(self, name=__name__):
-        return _mpLoggerClient(name=name,
-                               logQueue=self.logQueue,
-                               debug=self._debug)
 
     def stop(self):
         self._stop_processing = True
 
     def join(self, **kwargs):
+        self._stop_processing = True
         self.logQueue.join()
 
     def run(self):
-        default_level = logging.INFO
-        debug_level = logging.DEBUG
-
-        logger = logging.getLogger(self.name)
-
-        if self._debug:
-            logger.setLevel(debug_level)
-        else:
-            logger.setLevel(default_level)
-
         while 1:
             try:
-                raw_record = self.logQueue.get(True, 0.2)
+                record = self.logQueue.get(True, 0.2)
                 try:
-                    if logger.isEnabledFor(raw_record[1]):
-                        logger.handle(logger.makeRecord(*raw_record))
+                    logger = logging.getLogger(record.name)
+                    logger.handle(record)
+                except EOFError:
+                    break
+                except BrokenPipeError:
+                    print(
+                        "Broken Pipe -- unable to output further logs",
+                        file=sys.stderr
+                    )
+                    break
                 finally:
                     self.logQueue.task_done()
-            except EOFError:
-                break
             except queue.Empty:
                 if self._stop_processing:
                     break

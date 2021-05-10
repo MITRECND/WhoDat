@@ -1,6 +1,5 @@
 import os
 import time
-import logging
 import multiprocessing
 from types import SimpleNamespace
 from multiprocessing import (
@@ -21,6 +20,7 @@ from pydat.core.elastic.ingest.data_processors import (
 )
 
 from pydat.core.elastic.ingest.debug_levels import DebugLevel
+from pydat.core.logger import getLogger
 
 
 class PopulatorOptions(SimpleNamespace):
@@ -71,16 +71,16 @@ class DataProcessor(Process):
         eventTracker,
         process_options,
         skip_fetch,
-        logger=None,
-
     ):
         super().__init__()
         self.myid = pipeline_id
 
-        if logger is not None:
-            self.logger = logger
-        else:
-            self.logger = logging.getLogger(f'processor.{self.myid}')
+        # Setup logger pre-process execution
+        self.logger = getLogger(
+            f'processor.{self.myid}',
+            debug=True,
+            mpSafe=False
+        )
 
         self.file_queue = file_queue
         self.statTracker = statTracker
@@ -270,8 +270,11 @@ class DataProcessor(Process):
 
     def run(self):
         os.setpgrp()
-        # self.logger = self.root_logger.getLogger(f"Pipeline {self.myid}")
-        # self.logger.prefix = "(Pipeline %d) " % self.myid
+        # Setup Logger post process execution
+        self.logger = getLogger(
+            f'processor.{self.myid}',
+            debug=True,
+        )
 
         # Queue for individual csv entries
         self.data_queue = queue.Queue(maxsize=10000)
@@ -324,7 +327,6 @@ class DataProcessorPool:
         file_queue,
         statTracker,
         eventTracker,
-        root_logger,
         process_options,
     ):
 
@@ -332,13 +334,12 @@ class DataProcessorPool:
         self.file_queue = file_queue
         self.statTracker = statTracker
         self.eventTracker = eventTracker
-        self.root_logger = root_logger
         self.process_options = process_options
 
         self.verbose = process_options.verbose
         self.debug = process_options.debug
 
-        self.logger = self.root_logger.getLogger("processor_pool")
+        self.logger = getLogger("processor_pool", debug=True, mpSafe=False)
 
         self.pipelines = []
 
@@ -348,8 +349,8 @@ class DataProcessorPool:
             skip_fetch = True
 
         self.elastic_handler = IngestHandler(
-            logger=self.root_logger.getLogger("ingest_handler"),
-            **self.process_options.elastic_args)
+            **self.process_options.elastic_args
+        )
 
         for pipeline_id in range(self.proc_count):
             p = DataProcessor(
@@ -357,7 +358,6 @@ class DataProcessorPool:
                 file_queue=self.file_queue,
                 statTracker=self.statTracker.get_tracker(),
                 eventTracker=self.eventTracker,
-                logger=self.root_logger.getLogger(f"pipeline {pipeline_id}"),
                 skip_fetch=skip_fetch,
                 process_options=self.process_options
             )

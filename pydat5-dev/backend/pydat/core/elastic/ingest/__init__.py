@@ -7,7 +7,7 @@ from multiprocessing import (
 import json
 
 import queue
-
+import logging
 
 from pydat.core.logger import mpLogger
 from pydat.core.elastic.ingest.event_tracker import EventTracker
@@ -100,24 +100,15 @@ class DataPopulator:
         self.num_shipper_threads = num_shipper_threads
         self.file_queue = jmpQueue(maxsize=10000)
 
-        # Setup logger
-        self.root_logger = mpLogger(name="populater", debug=debug)
-        self.root_logger.start()
+        self.mplogger = mpLogger(debug=debug)
+        self.mplogger.start()
 
-        # Local Logger instance since myLogger relies on a queue
-        # This can cause an issue if exiting since it doesn't give
-        # it enough time to run through the queue
-        self.logger = self.root_logger.logger
+        self.logger = logging.getLogger("DataPopulator")
 
-        self.elastic_handler = IngestHandler(
-                logger=self.root_logger.getLogger("main_ingest_handler"),
-                **self.elastic_args
-            )
+        self.elastic_handler = IngestHandler(**self.elastic_args)
 
         self.eventTracker = EventTracker()
-        self.statTracker = StatTracker(
-            logger=self.root_logger.getLogger('statTracker')
-        )
+        self.statTracker = StatTracker()
 
         self.readerThread = FileReader(
             self.file_queue,
@@ -280,9 +271,6 @@ class DataPopulator:
 
         self.logger.info("... Done")
 
-        # Ensure logger processes all messages
-        self.root_logger.join()
-
     def _handleIngest(
         self,
         first_import=False,
@@ -323,7 +311,6 @@ class DataPopulator:
             file_queue=self.file_queue,
             statTracker=self.statTracker,
             eventTracker=self.eventTracker,
-            root_logger=self.root_logger,
             process_options=self.process_options,
         )
 
@@ -366,6 +353,8 @@ class DataPopulator:
             self._handleShutdown()
         except KeyboardInterrupt:
             self._handleCancel()
+
+        self.mplogger.join()
 
     def ingest(self):
         first_import = False
