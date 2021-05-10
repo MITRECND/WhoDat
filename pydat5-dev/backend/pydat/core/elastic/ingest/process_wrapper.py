@@ -391,10 +391,13 @@ class DataProcessorPool:
                     "Error response from ES worker, stopping processing"))
 
         for proc in self.pipelines:
-            self.logger.debug(f"Waiting for {proc.myid} to finish")
+            if self.debug >= DebugLevel.VERBOSE:
+                self.logger.debug(f"Waiting for {proc.myid} to finish")
             while 1:
                 if proc.shuttered:
                     break
+
+        self.logger.debug("All processes finished, cleaning up")
 
     def handleRollover(self, write_alias, search_alias):
         if self.debug >= DebugLevel.VERBOSE:

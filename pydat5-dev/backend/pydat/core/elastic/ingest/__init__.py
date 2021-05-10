@@ -7,9 +7,8 @@ from multiprocessing import (
 import json
 
 import queue
-import logging
 
-from pydat.core.logger import mpLogger
+from pydat.core.logger import mpLogger, getLogger
 from pydat.core.elastic.ingest.event_tracker import EventTracker
 from pydat.core.elastic.ingest.stat_tracker import StatTracker
 from pydat.core.elastic.ingest.ingest_handler import (
@@ -21,6 +20,7 @@ from pydat.core.elastic.ingest.process_wrapper import (
     PopulatorOptions
 )
 from pydat.core.elastic.ingest.file_reader import FileReader
+from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
 
 class InterruptedImportError(Exception):
@@ -103,7 +103,11 @@ class DataPopulator:
         self.mplogger = mpLogger(debug=debug)
         self.mplogger.start()
 
-        self.logger = logging.getLogger("DataPopulator")
+        self.logger = getLogger(
+            "DataPopulator",
+            debug=self.debug,
+            mpSafe=False
+        )
 
         self.elastic_handler = IngestHandler(**self.elastic_args)
 
@@ -154,9 +158,13 @@ class DataPopulator:
             # especially since the interrupt code (below) does effectively
             # the same thing
 
+            if self.debug >= DebugLevel.VERBOSE:
+                self.logger.debug("Cleaning up StatTracker")
             self.statTracker.shutdown()
             self.statTracker.join()
 
+            if self.debug >= DebugLevel.VERBOSE:
+                self.logger.debug("Updating Stats")
             # Update the stats
             try:
                 self.elastic_handler.updateMetadata(
@@ -186,11 +194,15 @@ class DataPopulator:
         except KeyboardInterrupt:
             self.logger.info("Please wait for processing to complete ...")
 
+        if self.debug >= DebugLevel.VERBOSE:
+            self.logger.debug("Closing file queue")
         try:
             self.file_queue.close()
         except Exception:
             self.logger.debug("Exception closing queues", exc_info=True)
 
+        if self.debug >= DebugLevel.VERBOSE:
+            self.logger.debug("Refreshing Elastic Indices")
         try:
             self.elastic_handler.refreshIndices()
         except Exception:
@@ -350,6 +362,8 @@ class DataPopulator:
 
             # Wait on pipelines to finish up
             self.dataProcessorPool.join()
+            if self.debug >= DebugLevel.VERBOSE:
+                self.logger.debug("Beginning Shutdown sequence")
             self._handleShutdown()
         except KeyboardInterrupt:
             self._handleCancel()
