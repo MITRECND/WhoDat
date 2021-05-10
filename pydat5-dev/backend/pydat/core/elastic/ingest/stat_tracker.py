@@ -6,14 +6,31 @@ import queue
 
 
 class _StatTracker:
+    MAX_CHUNK_SIZE = 100
+
     def __init__(self, queue):
         self._queue = queue
+        self.chunk = []
+
+    def __del__(self):
+        try:
+            self.flush()
+        except Exception:
+            pass
+
+    def flush(self):
+        self._queue.put(self.chunk)
+        self.chunk = []
 
     def addChanged(self, field):
-        self._queue.put(('chn', field))
+        self.chunk.append(('chn', field))
+        if len(self.chunk) >= self.MAX_CHUNK_SIZE:
+            self.flush()
 
     def incr(self, field):
-        self._queue.put(('stat', field))
+        self.chunk.append(('stat', field))
+        if len(self.chunk) >= self.MAX_CHUNK_SIZE:
+            self.flush()
 
 
 class StatTracker(Thread):
@@ -84,23 +101,24 @@ class StatTracker(Thread):
     def run(self):
         while 1:
             try:
-                (typ, field) = self._stat_queue.get(True, 0.2)
+                chunk = self._stat_queue.get(True, 0.2)
             except queue.Empty:
                 if self._shutdown:
                     break
                 continue
 
-            if typ == 'stat':
-                if field not in self._stats:
-                    self.logger.error("Unknown field %s" % field)
+            for (typ, field) in chunk:
+                if typ == 'stat':
+                    if field not in self._stats:
+                        self.logger.error("Unknown field %s" % field)
+                    else:
+                        self._stats[field] += 1
+                elif typ == 'chn':
+                    if field not in self._changed:
+                        self._changed[field] = 0
+                    self._changed[field] += 1
                 else:
-                    self._stats[field] += 1
-            elif typ == 'chn':
-                if field not in self._changed:
-                    self._changed[field] = 0
-                self._changed[field] += 1
-            else:
-                self.logger.error("Unknown stat type")
+                    self.logger.error("Unknown stat type")
 
         self._stat_queue.close()
 

@@ -199,6 +199,7 @@ class DataProcessor(Process):
             shipper.shutdown()
             shipper.join()
 
+        self.statTracker.flush()
         self.logger.debug("Shutdown Complete")
         self._shuttered.value = True
 
@@ -221,6 +222,7 @@ class DataProcessor(Process):
 
     def finish(self):
         self.cleanup()
+        self.statTracker.flush()
         self._shuttered.value = True
 
     def startup_rest(self):
@@ -316,7 +318,7 @@ class DataProcessor(Process):
                 break
 
             time.sleep(.1)
-        self.logger.debug("Pipeline Shutdown")
+        self.logger.debug(f"Pipeline {self.myid} Shutdown")
         self._complete.value = True
 
 
@@ -370,7 +372,7 @@ class DataProcessorPool:
     def join(self):
         timer = time.time()
         while 1:
-            running = any([proc.complete for proc in self.pipelines])
+            running = any([not proc.complete for proc in self.pipelines])
             if not running:
                 break
 
@@ -390,12 +392,21 @@ class DataProcessorPool:
                 raise KeyboardInterrupt((
                     "Error response from ES worker, stopping processing"))
 
-        for proc in self.pipelines:
-            if self.debug >= DebugLevel.VERBOSE:
-                self.logger.debug(f"Waiting for {proc.myid} to finish")
-            while 1:
-                if proc.shuttered:
-                    break
+        timer = time.time()
+        while 1:
+            if all([not proc.is_alive() for proc in self.pipelines]):
+                break
+
+            if time.time() - timer > 5.0:  # Wait up to 5 seconds
+                for proc in self.pipelines:
+                    if proc.is_alive():
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+                break
+
+            time.sleep(.01)
 
         self.logger.debug("All processes finished, cleaning up")
 
