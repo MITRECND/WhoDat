@@ -10,7 +10,7 @@ class _StatTracker:
 
     def __init__(self, queue):
         self._queue = queue
-        self.chunk = []
+        self._chunk = []
 
     def __del__(self):
         try:
@@ -19,17 +19,17 @@ class _StatTracker:
             pass
 
     def flush(self):
-        self._queue.put(self.chunk)
-        self.chunk = []
+        self._queue.put(self._chunk)
+        self._chunk = []
 
     def addChanged(self, field):
-        self.chunk.append(('chn', field))
-        if len(self.chunk) >= self.MAX_CHUNK_SIZE:
+        self._chunk.append(('chn', field))
+        if len(self._chunk) >= self.MAX_CHUNK_SIZE:
             self.flush()
 
     def incr(self, field):
-        self.chunk.append(('stat', field))
-        if len(self.chunk) >= self.MAX_CHUNK_SIZE:
+        self._chunk.append(('stat', field))
+        if len(self._chunk) >= self.MAX_CHUNK_SIZE:
             self.flush()
 
 
@@ -123,7 +123,7 @@ class StatTracker(Thread):
         self._stat_queue.close()
 
     def addChanged(self, field):
-        self._stat_queue.put(('chn', field))
+        self._stat_queue.put([('chn', field)])
 
     def incr(self, field):
-        self._stat_queue.put(('stat', field))
+        self._stat_queue.put([('stat', field)])

@@ -77,7 +77,7 @@ def test_stat_tracker_run_failure(caplog):
     stat_tracker._stat_queue.join_thread()
 
 
-def test_stat_tracker_run_failure2(caplog):
+def test_stat_tracker_run_failure2():
     stat_tracker = StatTracker()
     stat_tracker.addChanged('registrant_name')
     stat_tracker.addChanged('registrant_name')
@@ -97,7 +97,9 @@ def test_stat_tracker_client():
     client.addChanged('total')
     client.incr('registrant_name')
 
-    assert stat_tracker._stat_queue.qsize() == 2
+    assert len(client._chunk) == 2
+    client.flush()
+    assert stat_tracker._stat_queue.qsize() == 1
     stat_tracker.shutdown()
     stat_tracker.run()
     stat_tracker._stat_queue.close()
