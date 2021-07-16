@@ -8,6 +8,7 @@ DEFAULT_CONFIG = type('config', (), {
     'ELASTICSEARCH': {
         'uri': 'localhost:9200',
         'indexPrefix': 'pydat',
+        'disable_sniffing': False,
     },
     'DEBUG': False,
     'SSLVERIFY': True,
@@ -60,6 +61,9 @@ BASE_SCHEMA = {
             'cacert': {
                 'type': 'string',
                 'nullable': True
+            },
+            'disable_sniffing': {
+                'type': 'boolean'
             }
         }
     },

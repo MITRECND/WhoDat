@@ -20,7 +20,7 @@ class FlaskElasticHandler(SearchHandler):
             'username': elastic_config.get('user', None),
             'password': elastic_config.get('pass', None),
             'cacert': elastic_config.get('cacert', None),
-            'disable_sniffing': False,
+            'disable_sniffing': elastic_config.get('disable_sniffing', False),
             'indexPrefix':  elastic_config['indexPrefix'],
             'max_retries': 100,
             'retry_on_timeout': True,
