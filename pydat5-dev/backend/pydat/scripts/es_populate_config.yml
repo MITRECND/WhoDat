@@ -1,0 +1,29 @@
+debug: false
+debug_level: 1
+#redo: false
+#config_template_only: false
+#clear_interrupted: false
+include: null
+#exclude: null
+ingest_day: null
+ignore_field_prefixes:
+  - zoneContact
+  - billingContact
+  - technicalContact
+pipelines: 2
+#ingest_directory: null
+ingest_file: input.csv
+extension: csv
+comment: null
+bulk_fetch_size: 50
+bulk_ship_size: 1000
+verbose: false
+es:
+  uri: localhost:9200
+  user: null
+  password: null
+  ask_password: false
+  ca_cert: null
+  disable_sniffing: false
+  index_prefix: pydat
+  rollover_docs: 50000000
