@@ -2,11 +2,11 @@
 
 import sys
 import yaml
-import json
 import datetime
 import argparse
 import getpass
 import logging
+from types import SimpleNamespace
 from logging import StreamHandler
 
 import cerberus
@@ -20,29 +20,12 @@ from pydat.core.elastic.ingest import (
 from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
 
-class Configuration(dict):
-    __getattr__ = dict.get
-    __delattr__ = dict.__delitem__
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for k, v in self.items():
-            if isinstance(v, dict):
-                self[k] = Configuration(v)
-
-    def __setattr__(self, key, value):
-        if type(value) is dict:
-            self[key] = Configuration(value)
-        else:
-            self[key] = value
-
-
 # ---------------- cerberus configuration schema objects -------------------
-ELASTIC_OPTIONS = {
-    'uri':                      {'type': 'string'},
-    'user':                     {'type': 'string',
-                                 'nullable': True
+ELASTIC_SCHEMA = {
+    'uri':                      {'type': 'list',
+                                 'schema': {'type': 'string'}
                                  },
+    'user':                     {'type': 'string'},
     'password':                 {'type': 'string',
                                  'nullable': True
                                  },
@@ -56,20 +39,25 @@ ELASTIC_OPTIONS = {
 }
 CONFIG_SCHEMA = {
     # general
-    'config':                   {'type': 'string'},
     'debug':                    {'type': 'boolean'},
     'debug_level':              {'type': 'integer',
                                  'min': 0,
                                  'max': 3
                                  },
     'redo':                     {'type': 'boolean',
-                                 'excludes': ['config_template_only', 'clear_interrupted']
+                                 'excludes': ['config_template_only',
+                                              'clear_interrupted'
+                                              ]
                                  },
     'config_template_only':     {'type': 'boolean',
-                                 'excludes': ['redo', 'clear_interrupted']
+                                 'excludes': ['redo',
+                                              'clear_interrupted'
+                                              ]
                                  },
     'clear_interrupted':        {'type': 'boolean',
-                                 'excludes': ['redo', 'config_template_only']
+                                 'excludes': ['redo',
+                                              'config_template_only'
+                                              ]
                                  },
     # data populator
     'include':                  {'type': 'list',
@@ -91,41 +79,57 @@ CONFIG_SCHEMA = {
                                  },
     'pipelines':                {'type': 'integer'},
     'ingest_directory':         {'type': 'string',
-                                 'nullable': True,
-                                 'excludes': 'ingest_file'
+                                 'excludes': 'ingest_file',
+                                 'required': True
                                  },
     'ingest_file':              {'type': 'string',
-                                 'nullable': True,
-                                 'excludes': 'ingest_directory'
+                                 'excludes': 'ingest_directory',
+                                 'required': True
                                  },
     'extension':                {'type': 'string'},
-    'comment':                  {'type': 'string',
-                                 'nullable': True
-                                 },
+    'comment':                  {'type': 'string'},
     'bulk_fetch_size':          {'type': 'integer'},
     'bulk_ship_size':           {'type': 'integer'},
     'verbose':                  {'type': 'boolean'},
     'es':                       {'type': 'dict',
-                                 'schema': ELASTIC_OPTIONS
+                                 'schema': ELASTIC_SCHEMA
                                  }
 }
 
-
-def merge_nested_dictionaries(d_a, d_b):
-    '''
-    take two dictionaries (dictionary a and dictionary b) and merge them
-    dictionary b (d_b) takes precedence when both have a shared key value
-    '''
-    for k, v in d_b.items():
-        if isinstance(v, (str, int, float)):  # values overwrite
-            d_a[k] = v
-        elif isinstance(v, list) and isinstance(d_a.setdefault(k, []), list):  # lists merge
-            d_a[k].extend([itm for itm in v if itm not in d_a[k]])
-        elif isinstance(v, dict) and isinstance(d_a.setdefault(k, {}), dict):  # dicts merge
-            d_a[k] = merge_nested_dictionaries(d_a[k], v)
-        else:
-            raise Exception('unsupported type to merge')
-    return d_a
+ELASTIC_DEFAULTS = {
+    'uri':                      {'default': ['localhost:9200']},
+    'user':                     {'default': None},
+    'password':                 {'default': None},
+    'ca_cert':                  {'default': None},
+    'ask_password':             {'default': False},
+    'disable_sniffing':         {'default': False},
+    'index_prefix':             {'default': 'pydat'},
+    'rollover_docs':            {'default': 50000000}
+}
+CONFIG_DEFAULTS = {
+    # general
+    'debug':                    {'default': False},
+    'debug_level':              {'default': 1},
+    'redo':                     {'default': False},
+    'config_template_only':     {'default': False},
+    'clear_interrupted':        {'default': False},
+    # data populator
+    'include':                  {'default': None},
+    'exclude':                  {'default': None},
+    'ingest_day':               {'default': None},
+    'ignore_field_prefixes':    {'default': None},
+    'pipelines':                {'default': 2},
+    'ingest_directory':         {'default': None},
+    'ingest_file':              {'default': None},
+    'extension':                {'default': 'csv'},
+    'comment':                  {'default': ''},
+    'bulk_fetch_size':          {'default': 50},
+    'bulk_ship_size':           {'default': 10},
+    'verbose':                  {'default': False},
+    'es':                       {'type': 'dict',
+                                 'schema': ELASTIC_DEFAULTS
+                                 }
+}
 
 
 def parse_args(input_args=None):
@@ -133,10 +137,9 @@ def parse_args(input_args=None):
 
     parser.add_argument(
         "-c", "--config", type=str, dest="config",
-        default="es_populate_config.yml",
         help=(
-            "location of configuration file for running without"
-            "commandline args"
+            "location of configuration file for environment"
+            "parameter configuration (example yaml file in /backend)"
         )
     )
     parser.add_argument(
@@ -146,35 +149,35 @@ def parse_args(input_args=None):
 
     parser.add_argument(
         "--debug-level", dest="debug_level", type=int,
-        help="Debug logging level [0-3, default=1]"
+        help="Debug logging level [0-3] (default: 1)"
     )
 
     parser.add_argument(
-        "-r", "--redo", action="store_const", dest="redo", const=False,
+        "-r", "--redo", action="store_const", dest="redo", const=True,
         help=(
             "Attempt to re-import a failed import or import more data, "
             "uses stored metadata from previous run"
         )
     )
     parser.add_argument(
-        "--config-template-only", action="store_const", dest="config_template_only",
-        const=False,
+        "--config-template-only", action="store_const",
+        dest="config_template_only", const=True,
         help="Configure the ElasticSearch template and then exit"
     )
 
     parser.add_argument(
-        "--clear-interrupted-flag", action="store_const", dest="clear_interrupted",
-        const=False,
+        "--clear-interrupted-flag", action="store_const",
+        dest="clear_interrupted", const=True,
         help="Clear the interrupted flag, forcefully (NOT RECOMMENDED)"
     )
 
     parser.add_argument(
-        "-x", "--exclude", action="extend", nargs="+", dest="exclude",
+        "-x", "--exclude", nargs="+", type=str, dest="exclude",
         help="list of keys to exclude if updating entry"
     )
 
     parser.add_argument(
-        "-n", "--include", action="extend", nargs="+", dest="include",
+        "-n", "--include", nargs="+", type=str, dest="include",
         help=(
             "list of keys to include if updating entry "
             "(mutually exclusive to -x)"
@@ -191,7 +194,8 @@ def parse_args(input_args=None):
     )
 
     parser.add_argument(
-        "--ignore-field-prefixes", nargs='*', type=str, dest="ignore_field_prefixes",
+        "--ignore-field-prefixes", nargs='*', type=str,
+        dest="ignore_field_prefixes",
         help=(
             "list of fields (in whois data) to ignore when "
             "extracting and inserting into ElasticSearch"
@@ -199,16 +203,17 @@ def parse_args(input_args=None):
     )
 
     parser.add_argument(
-        "--pipelines", action="store", type=int, metavar="PIPELINES", dest="procs",
-        help="Number of pipelines, defaults to 2"
+        "--pipelines", action="store", type=int,
+        metavar="PIPELINES", dest="pipelines",
+        help="Number of pipelines (default: 2)"
     )
 
     parser.add_argument(
-        "-f", "--file", dest="file", help="Input CSV file"
+        "-f", "--file", dest="ingest_file", help="Input CSV file"
     )
 
     parser.add_argument(
-        "-d", "--directory", dest="directory",
+        "-d", "--directory", dest="ingest_directory",
         help=(
             "Directory to recursively search for CSV files -- mutually"
             " exclusive to '-f' option"
@@ -219,23 +224,24 @@ def parse_args(input_args=None):
         "-e", "--extension", dest="extension",
         help=(
             "When scanning for CSV files only parse files with given "
-            "extension (default: 'csv')"
+            "extension (default: csv)"
         )
     )
 
     parser.add_argument(
-        "-o", "--comment", dest="comment", help="Comment to store with metadata"
+        "-o", "--comment", dest="comment",
+        help="Comment to store with metadata"
     )
 
     parser.add_argument(
         "-B", "--bulk-size", type=int, dest="bulk_ship_size",
-        help="Size of Bulk Elasticsearch Requests"
+        help="Size of Bulk Elasticsearch Requests (default: 10)"
     )
 
     parser.add_argument(
         "-b", "--bulk-fetch-size", type=int, dest="bulk_fetch_size",
         help=(
-            "Number of documents to search for at a time (default 50), "
+            "Number of documents to search for at a time (default: 50), "
             "note that this will be multiplied by the number of indices you "
             "have, e.g., if you have 10 pydat-<number> indices it results "
             "in a request for 500 documents"
@@ -243,7 +249,8 @@ def parse_args(input_args=None):
     )
 
     parser.add_argument(
-        "-v", "--verbose", action="store_true", dest="verbose", help="Be verbose"
+        "-v", "--verbose", action="store_true", dest="verbose",
+        help="Be verbose"
     )
 
     elastic_options = parser.add_argument_group('Elasticsearch Options')
@@ -276,7 +283,8 @@ def parse_args(input_args=None):
     )
 
     elastic_options.add_argument(
-        "--es-disable-sniffing", action="store_true", dest="es__disable_sniffing",
+        "--es-disable-sniffing", action="store_true",
+        dest="es__disable_sniffing",
         help=(
             "Disable ES sniffing, useful when ssl hostname"
             "verification is not working properly"
@@ -322,8 +330,12 @@ def validate_configuration(configuration):
     if not v.validate(configuration):
         raise ValueError(v.errors)
 
-    if configuration.get("ingest_file") is None and configuration.get("ingest_directory") is None:
+    if configuration.get("ingest_file") is None and \
+            configuration.get("ingest_directory") is None:
         raise ValueError("A File or Directory source is required")
+
+    n = cerberus.Validator(CONFIG_DEFAULTS)
+    return n.normalized(configuration)
 
 
 def setup_logging(configuration):
@@ -395,7 +407,8 @@ def process_additional_configuration(configuration, logger):
 
     if configuration.es.ask_password:
         try:
-            configuration.es.password = getpass.getpass("Enter ElasticSearch Password: ")
+            configuration.es.password = \
+                getpass.getpass("Enter ElasticSearch Password: ")
         except Exception:
             # TODO FIXME add better handling
             print("Unable to get password", file=sys.stderr)
@@ -403,15 +416,18 @@ def process_additional_configuration(configuration, logger):
 
 
 def main(args):
-    with open(args.get('config'), 'r') as c:
-        config_file = yaml.safe_load(c)
+    config = args
+    if 'config' in args:
+        with open(args.pop('config'), 'r') as c:
+            config_file = yaml.safe_load(c)
 
-    temp = merge_nested_dictionaries(config_file, args)
-    print(json.dumps(temp, indent=4))
+        config = {**config_file, **args}
+        config['es'] = {**config_file.get('es', {}), **args.get('es', {})}
 
     try:
-        validate_configuration(temp)
-        configuration = Configuration(temp)
+        config = validate_configuration(config)
+        configuration = SimpleNamespace(**config)
+        configuration.es = SimpleNamespace(**configuration.es)
     except ValueError as e:
         print(f'invalid configuration: {str(e)}')
         parse_args(["-h"])
@@ -470,7 +486,7 @@ def main(args):
         logger.exception("Error processing metadata records")
         sys.exit(1)
     except Exception:
-        logger.exception(f"Unexpected/unhandled exception")
+        logger.exception("Unexpected/unhandled exception")
         sys.exit(1)
 
     if configuration.stats:

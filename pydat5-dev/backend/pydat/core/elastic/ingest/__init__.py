@@ -93,7 +93,6 @@ class DataPopulator:
         self.bulk_ship_size = bulk_ship_size
         self.ingest_directory = ingest_directory
         self.ingest_file = ingest_file
-        self.comment = comment
         self.extension = extension
         self.ingest_day = ingest_day
         self.num_fetcher_threads = num_fetcher_threads
