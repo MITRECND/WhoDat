@@ -22,320 +22,463 @@ from pydat.core.elastic.ingest.debug_levels import DebugLevel
 
 # ---------------- cerberus configuration schema objects -------------------
 ELASTIC_SCHEMA = {
-    'uri':                      {'type': 'list',
-                                 'schema': {'type': 'string'}
-                                 },
-    'user':                     {'type': 'string'},
-    'password':                 {'type': 'string',
-                                 'nullable': True
-                                 },
-    'ask_password':             {'type': 'boolean'},
-    'ca_cert':                  {'type': 'string',
-                                 'nullable': True
-                                 },
-    'disable_sniffing':         {'type': 'boolean'},
-    'index_prefix':             {'type': 'string'},
-    'rollover_docs':            {'type': 'integer'}
+    "uri": {
+        "type": "list",
+        "schema": {"type": "string"},
+        "default": ["localhost:9200"],
+    },
+    "user": {
+        "type": "string",
+        "nullable": True,
+        "default": None
+    },
+    "password": {
+        "type": "string",
+        "nullable": True,
+        "default": None
+    },
+    "ca_cert": {
+        "type": "string",
+        "nullable": True,
+        "default": None
+    },
+    "disable_sniffing": {
+        "type": "boolean",
+        "default": False
+    },
+    "index_prefix": {
+        "type": "string",
+        "default": "pydat"
+    },
+    "rollover_docs": {
+        "type": "integer",
+        "default": 50000000
+    },
 }
+
 CONFIG_SCHEMA = {
     # general
-    'debug':                    {'type': 'boolean'},
-    'debug_level':              {'type': 'integer',
-                                 'min': 0,
-                                 'max': 3
-                                 },
-    'redo':                     {'type': 'boolean',
-                                 'excludes': ['config_template_only',
-                                              'clear_interrupted'
-                                              ]
-                                 },
-    'config_template_only':     {'type': 'boolean',
-                                 'excludes': ['redo',
-                                              'clear_interrupted'
-                                              ]
-                                 },
-    'clear_interrupted':        {'type': 'boolean',
-                                 'excludes': ['redo',
-                                              'config_template_only'
-                                              ]
-                                 },
+    "debug": {
+        "type": "boolean",
+        "default": False
+    },
+    "debug_level": {
+        "type": "integer",
+        "min": 0,
+        "max": 3,
+        "default": 1
+    },
+    "verbose": {
+        "type": "boolean",
+        "default": False
+    },
+    "stats": {
+        "type": "boolean",
+        "default": False
+    },
+    "extension": {
+        "type": "string",
+        "default": "csv"
+    },
     # data populator
-    'include':                  {'type': 'list',
-                                 'nullable': True,
-                                 'excludes': 'exclude',
-                                 'schema': {'type': 'string'}
-                                 },
-    'exclude':                  {'type': 'list',
-                                 'nullable': True,
-                                 'excludes': 'include',
-                                 'schema': {'type': 'string'}
-                                 },
-    'ingest_day':               {'type': 'string',
-                                 'nullable': True
-                                 },
-    'ignore_field_prefixes':    {'type': 'list',
-                                 'nullable': True,
-                                 'schema': {'type': 'string'}
-                                 },
-    'pipelines':                {'type': 'integer'},
-    'ingest_directory':         {'type': 'string',
-                                 'excludes': 'ingest_file',
-                                 'required': True
-                                 },
-    'ingest_file':              {'type': 'string',
-                                 'excludes': 'ingest_directory',
-                                 'required': True
-                                 },
-    'extension':                {'type': 'string'},
-    'comment':                  {'type': 'string'},
-    'bulk_fetch_size':          {'type': 'integer'},
-    'bulk_ship_size':           {'type': 'integer'},
-    'verbose':                  {'type': 'boolean'},
-    'es':                       {'type': 'dict',
-                                 'schema': ELASTIC_SCHEMA
-                                 }
-}
-
-ELASTIC_DEFAULTS = {
-    'uri':                      {'default': ['localhost:9200']},
-    'user':                     {'default': None},
-    'password':                 {'default': None},
-    'ca_cert':                  {'default': None},
-    'ask_password':             {'default': False},
-    'disable_sniffing':         {'default': False},
-    'index_prefix':             {'default': 'pydat'},
-    'rollover_docs':            {'default': 50000000}
-}
-CONFIG_DEFAULTS = {
-    # general
-    'debug':                    {'default': False},
-    'debug_level':              {'default': 1},
-    'redo':                     {'default': False},
-    'config_template_only':     {'default': False},
-    'clear_interrupted':        {'default': False},
-    # data populator
-    'include':                  {'default': None},
-    'exclude':                  {'default': None},
-    'ingest_day':               {'default': None},
-    'ignore_field_prefixes':    {'default': None},
-    'pipelines':                {'default': 2},
-    'ingest_directory':         {'default': None},
-    'ingest_file':              {'default': None},
-    'extension':                {'default': 'csv'},
-    'comment':                  {'default': ''},
-    'bulk_fetch_size':          {'default': 50},
-    'bulk_ship_size':           {'default': 10},
-    'verbose':                  {'default': False},
-    'es':                       {'type': 'dict',
-                                 'schema': ELASTIC_DEFAULTS
-                                 }
+    "include": {
+        "type": "list",
+        "nullable": True,
+        "default": None,
+        "schema": {"type": "string"},
+    },
+    "exclude": {
+        "type": "list",
+        "nullable": True,
+        "default": None,
+        "schema": {"type": "string"},
+    },
+    "ignore_field_prefixes": {
+        "type": "list",
+        "nullable": True,
+        "default": None,
+        "schema": {"type": "string"},
+    },
+    # performance
+    "pipelines": {
+        "type": "integer",
+        "default": 2
+    },
+    "shipper_threads": {
+        "type": "integer",
+        "default": 2
+    },
+    "fetcher_threads": {
+        "type": "integer",
+        "default": 2
+    },
+    "bulk_fetch_size": {
+        "type": "integer",
+        "default": 50
+    },
+    "bulk_ship_size": {
+        "type": "integer",
+        "default": 10
+    },
+    # elastic
+    "es": {
+        "type": "dict",
+        "schema": ELASTIC_SCHEMA
+    },
 }
 
 
-def parse_args(input_args=None):
+def generate_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-c", "--config", type=str, dest="config",
+        "-c",
+        "--config",
+        type=str,
+        dest="config",
+        default=argparse.SUPPRESS,
         help=(
             "location of configuration file for environment"
             "parameter configuration (example yaml file in /backend)"
-        )
+        ),
     )
+
+    # Config File Options
     parser.add_argument(
-        "--debug", action="store_true",
+        "--debug",
+        action="store_true",
+        default=argparse.SUPPRESS,
         help="Enables debug logging"
     )
 
     parser.add_argument(
-        "--debug-level", dest="debug_level", type=int,
-        help="Debug logging level [0-3] (default: 1)"
+        "--debug-level",
+        dest="debug_level",
+        default=argparse.SUPPRESS,
+        type=int,
+        help="Debug logging level [0-3] (default: 1)",
     )
 
     parser.add_argument(
-        "-r", "--redo", action="store_const", dest="redo", const=True,
-        help=(
-            "Attempt to re-import a failed import or import more data, "
-            "uses stored metadata from previous run"
-        )
-    )
-    parser.add_argument(
-        "--config-template-only", action="store_const",
-        dest="config_template_only", const=True,
-        help="Configure the ElasticSearch template and then exit"
+        "-x",
+        "--exclude",
+        nargs="+",
+        type=str,
+        default=argparse.SUPPRESS,
+        dest="exclude",
+        help="list of keys to exclude if updating entry",
     )
 
     parser.add_argument(
-        "--clear-interrupted-flag", action="store_const",
-        dest="clear_interrupted", const=True,
-        help="Clear the interrupted flag, forcefully (NOT RECOMMENDED)"
-    )
-
-    parser.add_argument(
-        "-x", "--exclude", nargs="+", type=str, dest="exclude",
-        help="list of keys to exclude if updating entry"
-    )
-
-    parser.add_argument(
-        "-n", "--include", nargs="+", type=str, dest="include",
+        "-n",
+        "--include",
+        nargs="+",
+        type=str,
+        default=argparse.SUPPRESS,
+        dest="include",
         help=(
             "list of keys to include if updating entry "
             "(mutually exclusive to -x)"
-        )
+        ),
     )
 
     parser.add_argument(
-        "-D", "--ingest-day", action="store", dest="ingest_day",
-        help=(
-            "Day to use for metadata, in the format 'YYYY-MM-dd', e.g.,"
-            " '2021-01-01'. Defaults to todays date, use 'YYYY-MM-00' to "
-            "indicate a quarterly ingest, e.g., 2021-04-00"
-        )
-    )
-
-    parser.add_argument(
-        "--ignore-field-prefixes", nargs='*', type=str,
+        "--ignore-field-prefixes",
+        nargs="*",
+        type=str,
+        default=argparse.SUPPRESS,
         dest="ignore_field_prefixes",
         help=(
             "list of fields (in whois data) to ignore when "
             "extracting and inserting into ElasticSearch"
-        )
+        ),
     )
 
     parser.add_argument(
-        "--pipelines", action="store", type=int,
-        metavar="PIPELINES", dest="pipelines",
-        help="Number of pipelines (default: 2)"
-    )
-
-    parser.add_argument(
-        "-f", "--file", dest="ingest_file", help="Input CSV file"
-    )
-
-    parser.add_argument(
-        "-d", "--directory", dest="ingest_directory",
-        help=(
-            "Directory to recursively search for CSV files -- mutually"
-            " exclusive to '-f' option"
-        )
-    )
-
-    parser.add_argument(
-        "-e", "--extension", dest="extension",
+        "-e",
+        "--extension",
+        default=argparse.SUPPRESS,
+        dest="extension",
         help=(
             "When scanning for CSV files only parse files with given "
             "extension (default: csv)"
-        )
+        ),
     )
 
     parser.add_argument(
-        "-o", "--comment", dest="comment",
-        help="Comment to store with metadata"
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        dest="verbose",
+        help="Be verbose",
     )
 
     parser.add_argument(
-        "-B", "--bulk-size", type=int, dest="bulk_ship_size",
+        "-s",
+        "--stats",
+        action="store_true",
+        dest="stats",
+        default=argparse.SUPPRESS,
+        help="Print out Stats after running"
+    )
+
+    # Performance Related Options
+    performance = parser.add_argument_group("Performance Options")
+
+    performance.add_argument(
+        "--pipelines",
+        action="store",
+        type=int,
+        default=argparse.SUPPRESS,
+        metavar="PIPELINES",
+        dest="pipelines",
+        help="Number of pipelines (default: 2)",
+    )
+
+    performance.add_argument(
+        "--shipper-threads",
+        action="store",
+        dest="shipper_threads",
+        type=int,
+        default=argparse.SUPPRESS,
+        help=(
+            "How many threads per pipeline to spawn to send bulk ES messages."
+            " The larger your cluster, the more you can increase this, "
+            "defaults to 1"
+        ),
+    )
+
+    performance.add_argument(
+        "--fetcher-threads",
+        action="store",
+        dest="fetcher_threads",
+        type=int,
+        default=argparse.SUPPRESS,
+        help=(
+            "How many threads to spawn to search ES. The larger your cluster,"
+            " the more you can increase this, defaults to 2"
+        ),
+    )
+
+    performance.add_argument(
+        "--bulk-ship-size",
+        type=int,
+        dest="bulk_ship_size",
+        default=argparse.SUPPRESS,
         help="Size of Bulk Elasticsearch Requests (default: 10)"
     )
 
-    parser.add_argument(
-        "-b", "--bulk-fetch-size", type=int, dest="bulk_fetch_size",
+    performance.add_argument(
+        "--bulk-fetch-size",
+        type=int,
+        dest="bulk_fetch_size",
+        default=argparse.SUPPRESS,
         help=(
             "Number of documents to search for at a time (default: 50), "
             "note that this will be multiplied by the number of indices you "
             "have, e.g., if you have 10 pydat-<number> indices it results "
             "in a request for 500 documents"
-        )
-    )
+         )
+     )
 
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", dest="verbose",
-        help="Be verbose"
-    )
+    # Elastic-related options
+    elastic_options = parser.add_argument_group("Elasticsearch Options")
 
-    elastic_options = parser.add_argument_group('Elasticsearch Options')
+    # Elastic Config File Options
     elastic_options.add_argument(
-        "-u", "--es-uri", nargs="*", dest="es__uri",
+        "-u",
+        "--es-uri",
+        nargs="*",
+        default=argparse.SUPPRESS,
+        dest="es_uri",
         help=(
             "Location(s) of ElasticSearch Server (e.g., foo.server.com:9200)"
             " Can take multiple endpoints"
-        )
+        ),
     )
 
     elastic_options.add_argument(
-        "--es-user", dest="es__user",
-        help="Username for ElasticSearch when Basic Auth is enabled"
+        "--es-user",
+        default=argparse.SUPPRESS,
+        dest="es_user",
+        help="Username for ElasticSearch when Basic Auth is enabled",
     )
 
     elastic_options.add_argument(
-        "--es-pass", dest="es__password",
-        help="Password for ElasticSearch when Basic Auth is enabled"
+        "--es-pass",
+        default=argparse.SUPPRESS,
+        dest="es_password",
+        help="Password for ElasticSearch when Basic Auth is enabled",
     )
 
     elastic_options.add_argument(
-        "--es-ask-pass", action="store_true", dest="es__ask_password",
-        help="Prompt for ElasticSearch password"
+        "--cacert",
+        dest="es_ca_cert",
+        default=argparse.SUPPRESS,
+        help="Path to a CA Certicate bundle to enable https support"
     )
 
     elastic_options.add_argument(
-        "--cacert", dest="es__ca_cert",
-        help=""
-    )
-
-    elastic_options.add_argument(
-        "--es-disable-sniffing", action="store_true",
-        dest="es__disable_sniffing",
+        "--es-disable-sniffing",
+        action="store_true",
+        dest="es_disable_sniffing",
+        default=argparse.SUPPRESS,
         help=(
             "Disable ES sniffing, useful when ssl hostname"
             "verification is not working properly"
-        )
+        ),
     )
 
     elastic_options.add_argument(
-        "-p", "--index-prefix", dest="es__index_prefix",
-        help="Index prefix to use in ElasticSearch (default: pydat)"
+        "-p",
+        "--index-prefix",
+        dest="es_index_prefix",
+        default=argparse.SUPPRESS,
+        help="Index prefix to use in ElasticSearch (default: pydat)",
     )
 
     elastic_options.add_argument(
-        "--rollover-size", type=int, dest="es__rollover_docs",
+        "--rollover-size",
+        type=int,
+        default=argparse.SUPPRESS,
+        dest="es_rollover_docs",
         help=(
             "Set the number of documents after which point a new index "
-            "should be created, defaults to 50 milllion, note that this "
+            "should be created, defaults to 50 million, note that this "
             "is fuzzy since the index count isn't continuously updated, "
             "so should be reasonably below 2 billion per ES shard and should"
             " take your ES configuration into consideration"
-        )
+        ),
     )
 
-    if input_args:
-        return parser.parse_args(input_args)
-    return parser.parse_args()
+    # Elastic Command Line Only Options
+    elastic_options.add_argument(
+        "--ask-pass",
+        action="store_true",
+        dest="ask_password",
+        help="Prompt for ElasticSearch password",
+        default=False
+    )
+
+    runmode = parser.add_mutually_exclusive_group()
+    # Command Line Only Options
+    runmode.add_argument(
+        "-r",
+        "--redo",
+        action="store_true",
+        dest="redo",
+        default=False,
+        help=(
+            "Attempt to re-import a failed import or import more data, "
+            "uses stored metadata from previous run"
+        ),
+    )
+
+    runmode.add_argument(
+        "--config-template-only",
+        action="store_true",
+        default=False,
+        dest="config_template_only",
+        help="Configure the ElasticSearch template and then exit",
+    )
+
+    runmode.add_argument(
+        "--clear-interrupted-flag",
+        action="store_true",
+        default=False,
+        dest="clear_interrupted",
+        help="Clear the interrupted flag, forcefully (NOT RECOMMENDED)",
+    )
+
+    input_source = parser.add_mutually_exclusive_group()
+
+    input_source.add_argument(
+        "-f",
+        "--file",
+        default=None,
+        dest="ingest_file",
+        help="Input CSV file"
+    )
+
+    input_source.add_argument(
+        "-d",
+        "--directory",
+        default=None,
+        dest="ingest_directory",
+        help=(
+            "Directory to recursively search for CSV files -- mutually"
+            " exclusive to '-f' option"
+        ),
+    )
+
+    parser.add_argument(
+        "-D",
+        "--ingest-day",
+        action="store",
+        default=None,
+        dest="ingest_day",
+        help=(
+            "Day to use for metadata, in the format 'YYYY-MM-dd', e.g.,"
+            " '2021-01-01'. Defaults to todays date, use 'YYYY-MM-00' to "
+            "indicate a quarterly ingest, e.g., 2021-04-00"
+        ),
+    )
+
+    parser.add_argument(
+        "-o",
+        "--comment",
+        default=None,
+        dest="comment",
+        help="Comment to store with metadata",
+    )
+
+    return parser
 
 
-def expand_argparse(args):
-    def set_key(dictionary, keys, value):
-        for key in keys[:-1]:
-            dictionary = dictionary.setdefault(key, {})
-        dictionary[keys[-1]] = value
+def process_elastic_args(args):
+    out_args = {}
+    elastic_args = {}
+    for (name, val) in args.items():
+        if name.startswith('es_'):
+            elastic_args[name[3:]] = val
+        else:
+            out_args[name] = val
 
-    nested = dict()
-    for arg, val in args.items():
-        if val is not None:
-            set_key(nested, arg.split('__'), val)
-    return nested
+    return (out_args, elastic_args)
 
 
-def validate_configuration(configuration):
-    v = cerberus.Validator(CONFIG_SCHEMA)
-    if not v.validate(configuration):
-        raise ValueError(v.errors)
+def process_config_file(config_filename):
+    with open(config_filename, "r") as c:
+        config = yaml.safe_load(c)
 
-    if configuration.get("ingest_file") is None and \
-            configuration.get("ingest_directory") is None:
-        raise ValueError("A File or Directory source is required")
+    validator = cerberus.Validator(CONFIG_SCHEMA)
+    if not validator.validate(config):
+        raise ValueError(validator.errors)
 
-    n = cerberus.Validator(CONFIG_DEFAULTS)
-    return n.normalized(configuration)
+    return validator.normalized(config)
+
+
+def process_config(args, elastic_args):
+    config = args
+    elastic_config = elastic_args
+
+    if "config" in args:
+        config_filename = args.pop("config")
+
+        try:
+            config_file = process_config_file(config_filename)
+        except ValueError as e:
+            print(f"unable to parse configuration file: {str(e)}")
+            exit(1)
+
+        elastic_config = {**config_file.pop("es", {}), **elastic_args}
+        config = {**config_file, **args}
+
+    configuration = SimpleNamespace(**config)
+    elastic_configuration = SimpleNamespace(**elastic_config)
+
+    return (configuration, elastic_configuration)
 
 
 def setup_logging(configuration):
@@ -383,21 +526,25 @@ def setup_logging(configuration):
     return logger
 
 
-def process_additional_configuration(configuration, logger):
+def process_additional_configuration(
+    configuration,
+    elastic_configuration,
+    logger
+):
     if configuration.ingest_day is not None:
-        ingest_parts = configuration.ingest_day.strip().rstrip().split('-')
+        ingest_parts = configuration.ingest_day.strip().rstrip().split("-")
         if len(ingest_parts) != 3:
             logger.error("D/ingest_day format is 'YYYY-MM-dd'")
             sys.exit(1)
 
-        if ingest_parts[2] == '00':
+        if ingest_parts[2] == "00":
             ingest_parts[2] = 1
 
         try:
             datetime.date(
                 int(ingest_parts[0]),
                 int(ingest_parts[1]),
-                int(ingest_parts[2])
+                int(ingest_parts[2]),
             )
         except ValueError:
             logger.error("Unable to verify date provided")
@@ -405,45 +552,48 @@ def process_additional_configuration(configuration, logger):
     elif not configuration.redo:
         logger.warning("Ingest Day was not provided, assuming today")
 
-    if configuration.es.ask_password:
+    if configuration.ask_password:
         try:
-            configuration.es.password = \
-                getpass.getpass("Enter ElasticSearch Password: ")
+            elastic_configuration.password = getpass.getpass(
+                "Enter ElasticSearch Password: "
+            )
         except Exception:
             # TODO FIXME add better handling
             print("Unable to get password", file=sys.stderr)
             sys.exit(1)
 
+    if not any([
+        configuration.redo,
+        configuration.config_template_only,
+        configuration.clear_interrupted
+    ]) and not any([
+        configuration.ingest_file,
+        configuration.ingest_directory
+    ]):
+        logger.error("Ingest File or Directory is required")
+        sys.exit(1)
 
-def main(args):
-    config = args
-    if 'config' in args:
-        with open(args.pop('config'), 'r') as c:
-            config_file = yaml.safe_load(c)
 
-        config = {**config_file, **args}
-        config['es'] = {**config_file.get('es', {}), **args.get('es', {})}
-
-    try:
-        config = validate_configuration(config)
-        configuration = SimpleNamespace(**config)
-        configuration.es = SimpleNamespace(**configuration.es)
-    except ValueError as e:
-        print(f'invalid configuration: {str(e)}')
-        parse_args(["-h"])
-        exit(1)
+def main():
+    parsed_args = generate_parser().parse_args()
+    (args, elastic_args) = process_elastic_args(vars(parsed_args))
+    (configuration, elastic_configuration) = process_config(args, elastic_args)
 
     logger = setup_logging(configuration)
-    process_additional_configuration(configuration, logger)
+    process_additional_configuration(
+        configuration,
+        elastic_configuration,
+        logger
+    )
 
     elastic_arguments = {
-        'hosts': configuration.es.uri,
-        'username': configuration.es.user,
-        'password': configuration.es.password,
-        'cacert': configuration.es.ca_cert,
-        'disable_sniffing': configuration.es.disable_sniffing,
-        'indexPrefix': configuration.es.index_prefix,
-        'rollover_size': configuration.es.rollover_docs
+        "hosts": elastic_configuration.uri,
+        "username": elastic_configuration.user,
+        "password": elastic_configuration.password,
+        "cacert": elastic_configuration.ca_cert,
+        "disable_sniffing": elastic_configuration.disable_sniffing,
+        "indexPrefix": elastic_configuration.index_prefix,
+        "rollover_size": elastic_configuration.rollover_docs,
     }
 
     data_populator = DataPopulator(
@@ -459,6 +609,8 @@ def main(args):
         comment=configuration.comment,
         bulk_fetch_size=configuration.bulk_fetch_size,
         bulk_ship_size=configuration.bulk_ship_size,
+        num_shipper_threads=configuration.shipper_threads,
+        num_fetcher_threads=configuration.fetcher_threads,
         verbose=configuration.verbose,
         debug=configuration.debug,
     )
@@ -502,4 +654,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    main(expand_argparse(vars(parse_args())))
+    main()

@@ -9,11 +9,11 @@ setup(
     install_requires=[
         "flask",
         "cerberus",
-        # Defaults to 7, but should allow for 6 if pre-installed
-        "elasticsearch>=6.0.0,<8.0.0",
+        "elasticsearch>=7.0.0,<8.0.0",
         "ply",
         "flask-caching",
-        "requests"
+        "requests",
+        "pyyaml"
         ],
     tests_require=[
         "pytest",

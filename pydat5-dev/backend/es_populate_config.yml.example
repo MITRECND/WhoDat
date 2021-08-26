@@ -1,15 +1,32 @@
-debug: true
-debug_level: 3
-ignore_field_prefixes:
-  - zoneContact
-  - billingContact
-  - technicalContact
-pipelines: 4
-comment: dev env
-verbose: false
+# Elastic Configuration Options
 es:
   uri:
     - localhost:9200
   user: test
   password: test_pass
   index_prefix: test_pydat
+  disable_sniffing: true
+  rollover_docs: 500000
+  # ca_cert: <path to ca certificate>
+
+# General ingest and processing options
+# extension: 'csv'
+# include: []
+# exclude: []
+ignore_field_prefixes:
+  - zoneContact
+  - billingContact
+  - technicalContact
+
+# Performance Tuning Options
+pipelines: 4
+shipper_threads: 2
+fetcher_threads: 2
+bulk_fetch_size: 50
+bulk_ship_size: 10
+
+# Output Options
+# verbose: false
+# debug: false
+# debug_level: 1
+# stats: false
