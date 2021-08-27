@@ -1,6 +1,10 @@
 import pytest
 from unittest.mock import MagicMock
-from pydat.core.es import ESConnectionError, ESQueryError
+from pydat.core.elastic.exceptions import (
+    ESConnectionError,
+    ESQueryError,
+    ESNotFoundError,
+)
 import socket
 
 
@@ -20,8 +24,11 @@ def test_metadata(monkeypatch, client, version, es_handler):
     else:
         assert response.status_code == 400
 
+
+def test_metadata_errors(monkeypatch, client, es_handler):
+    mock_meta = MagicMock(side_effect=ESNotFoundError)
+    monkeypatch.setattr(es_handler, "metadata", mock_meta)
     # error: version doesn't exist
-    mock_meta.return_value = {"data": []}
     assert client.get("/api/v2/metadata/1").status_code == 404
 
     # error: version doesn't exist
@@ -46,86 +53,6 @@ def test_resolve(monkeypatch, client, es_handler):
     mock_socket.side_effect = socket.timeout
     response = client.get("/api/v2/resolve/test")
     assert response.status_code == 504
-
-
-@pytest.mark.parametrize("version", ("version", -1, 3, 100, 1.2, -0.1))
-def test_domains(monkeypatch, config_app, version, es_handler):
-    client = config_app.test_client()
-    # search is always valid
-    mock_search = MagicMock(return_value={"total": 100, "data": [0] * 100})
-    monkeypatch.setattr(es_handler, "search", mock_search)
-
-    # test checking valid search keys
-    for key in config_app.config["SEARCHKEYS"]:
-        response = client.post(
-            f"/api/v2/domains/{key[0]}", json={"value": "value"}
-        )
-        assert response.status_code == 200
-    # required value not provided
-    assert client.post("/api/v2/domains/domainName").status_code == 400
-    # invalid search key
-    assert (
-        client.post(
-            "/api/v2/domains/fake_key", json={"value": "value"}
-        ).status_code
-        == 400
-    )
-
-    # test valid version
-    response = client.post(
-        "/api/v2/domains/domainName",
-        json={"value": "fake", "version": f"{version}"},
-    )
-    try:
-        version = float(version)
-        assert response.status_code == 200
-    except ValueError:
-        assert response.status_code == 400
-
-    # test offset/chunk_size
-    response = client.post(
-        "/api/v2/domains/domainName", json={"value": "value"}
-    )
-    assert response.is_json
-    json_data = response.get_json()
-    assert json_data["total"] == mock_search.return_value["total"]
-    assert json_data["results"] == mock_search.return_value["data"][:50]
-    response = client.post(
-        "/api/v2/domains/domainName",
-        json={
-            "value": "value",
-            "chunk_size": mock_search.return_value["total"] + 1,
-        },
-    )
-    json_data = response.get_json()
-    assert json_data["total"] == mock_search.return_value["total"]
-    response = client.post(
-        "/api/v2/domains/domainName",
-        json={
-            "value": "value",
-            "chunk_size": mock_search.return_value["total"] / 5,
-            "offset": 5,
-        },
-    )
-    assert response.status_code == 400
-
-    mock_search.return_value["total"] = 0
-    mock_search.return_value["data"] = []
-    response = client.post(
-        "/api/v2/domains/domainName", json={"value": "value", "chunk_size": 40}
-    )
-    assert response.status_code == 200
-    assert response.get_json()["results"] == []
-    response = client.post(
-        "/api/v2/domains/domainName", json={"value": "value", "chunk_size": 0}
-    )
-    assert response.status_code == 400
-
-    # error: failed to process
-    mock_search.side_effect = RuntimeError
-    assert client.post(
-            "/api/v2/domains/domainName", json={"value": "value"}
-        ).status_code == 500
 
 
 def test_domains_diff(monkeypatch, config_app, es_handler):
@@ -161,20 +88,49 @@ def test_query(monkeypatch, config_app, es_handler):
     assert response.status_code == 400
     response = client.post("/api/v2/query", json={"query": "query"})
     assert response.status_code == 200
-    # valid sort key
+
+    # test valid sort keys
+    # Invalid syntax
     response = client.post(
         "/api/v2/query",
         json={"query": "query", "sort_keys": {"domainName": "swirl"}},
     )
     assert response.status_code == 400
+    # Missing 'dir'
     response = client.post(
         "/api/v2/query",
-        json={"query": "query", "sort_keys": {"fake_key": "desc"}},
+        json={"query": "query", "sort_keys": [{"name": "domainName"}]},
     )
     assert response.status_code == 400
+    # Invalid key name
     response = client.post(
         "/api/v2/query",
-        json={"query": "query", "sort_keys": {"domainName": "asc"}},
+        json={"query": "query",
+              "sort_keys": [{"name": "fake_key", "dir": "desc"}]},
+    )
+    assert response.status_code == 400
+    # Invalid direction
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query",
+              "sort_keys": [{"name": "domainName", "dir": "down"}]},
+    )
+    assert response.status_code == 400
+    # Valid sort key
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query",
+              "sort_keys": [{"name": "domainName", "dir": "asc"}]},
+    )
+    assert response.status_code == 200
+    # Multiple keys
+    response = client.post(
+        "/api/v2/query",
+        json={"query": "query",
+              "sort_keys": [
+                  {"name": "domainName", "dir": "asc"},
+                  {"name": "registrant_name", "dir": "asc"}
+              ]},
     )
     assert response.status_code == 200
     response = client.post(
@@ -209,11 +165,6 @@ def test_connection_error(monkeypatch, config_app, es_handler):
     monkeypatch.setattr(es_handler, "search", mock_connection)
     with pytest.raises(ESConnectionError):
         assert es_handler.search()
-    # Domains
-    response = client.post(
-        "/api/v2/domains/domainName", json={"value": "value"}
-    )
-    assert response.status_code == 500
     response = client.post(
         "/api/v2/domains/diff",
         json={"domain": "value", "version1": 0, "version2": 1},

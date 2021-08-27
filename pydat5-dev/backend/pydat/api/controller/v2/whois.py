@@ -1,10 +1,16 @@
+import time
 from flask import Blueprint, request, current_app
 from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api import elasticsearch_handler as es_handler
-from pydat.core.es import ESConnectionError, ESQueryError
+from pydat.api import flask_cache
+from pydat.core.elastic.exceptions import (
+    ESConnectionError,
+    ESQueryError,
+    ESNotFoundError,
+)
 from urllib import parse
 import socket
-from pydat.api.shared import whois
+from pydat.api.controller import whois_shared
 
 whoisv2_bp = Blueprint("whoisv2", __name__)
 
@@ -34,23 +40,10 @@ def valid_size_offset(chunk_size, offset):
         raise ClientError(error)
 
 
-@whoisv2_bp.route("/config")
-def config():
-    """Retrieves and returns configuration information about the server
-    """
-
-    results = {
-        'plugins': current_app.config.get('PYDAT_PLUGINS', []),
-        'active_resolution': not (
-            current_app.config.get('DISABLERESOLVE', False))
-    }
-
-    return results
-
-
 # Metadata
 @whoisv2_bp.route("/metadata")
 @whoisv2_bp.route("/metadata/<version>")
+@flask_cache.cached()
 def metadata(version=None):
     """Retrieves metadata for all or a specific versions
 
@@ -61,7 +54,17 @@ def metadata(version=None):
     Returns:
         dict: Details for application metadata
     """
-    results = whois.metadata(version)
+    try:
+        results = whois_shared.metadata(version)
+    except RuntimeError as e:
+        raise ServerError(e)
+    except ESQueryError:
+        raise ServerError("Unable to query Elasticsearch backend")
+    except ESNotFoundError:
+        raise ClientError(
+            "Unable to find metadata with that version", status_code=404
+        )
+
     return {'metadata': results}
 
 
@@ -131,21 +134,17 @@ def domains_diff():
     except KeyError:
         raise ClientError("Two versions must be provided")
 
-    return whois.diff(domain, version1, version2)
+    return whois_shared.diff(domain, version1, version2)
 
 
-@whoisv2_bp.route("/domains/<search_key>", methods=["POST"])
-def domains(search_key):
+@whoisv2_bp.route("/domain", methods=["POST"])
+def domain():
     """Specific search on a valid search field. Requires a value
 
-    Args:
-        search_key (str): Valid search field
-
     Raises:
-        ClientError: Search key is not a valid key
         ClientError: Input provided in not in JSOn format
         ClientError: Value must be provided
-        ClientError: Version is not a float
+        ClientError: Version is not a int
         ClientError: Invalid search was provided
         ServerError: Unable to connect to search engine
         ServerError: Unexpected issue when requesting results
@@ -155,12 +154,6 @@ def domains(search_key):
     Returns:
         dict: Domain hits that match search following the offset and size
     """
-    valid_key = False
-    for search_config in current_app.config["SEARCHKEYS"]:
-        if search_config[0] == search_key:
-            valid_key = True
-    if not valid_key:
-        raise ClientError(f"Invalid key {search_key}")
     if not request.is_json:
         raise ClientError("Wrong format, JSON required")
 
@@ -173,29 +166,21 @@ def domains(search_key):
     version = json_data.get("version", None)
     try:
         if version:
-            version = float(version)
+            version = int(version)
     except ValueError:
         raise ClientError(f"Version {version} is not an integer")
     chunk_size = json_data.get("chunk_size", 50)
     offset = json_data.get("offset", 0)
     valid_size_offset(chunk_size, offset)
 
-    search_key = parse.unquote(search_key)
-    value = parse.unquote(value)
-
-    versionSort = False
-    if search_key == "domainName":
-        versionSort = True
-
-    search_key = parse.unquote(search_key)
     value = parse.unquote(value)
 
     try:
         search_results = es_handler.search(
-            search_key, value, filt=None, low=version, versionSort=versionSort
+            'domainName', value, filt=None, low=version, versionSort=True
         )
     except ValueError:
-        raise ClientError(f"Invalid search of {search_key}:{value}")
+        raise ClientError(f"Invalid domain name {value}")
     except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
     except ESQueryError:
@@ -248,15 +233,16 @@ def query():
     except KeyError:
         raise ClientError("Query is required")
 
-    sort_map = {
-        "domainName": "domainName",
-        "registrant_name": "details.registrant_name",
-        "contactEmail": "details.contactEmail",
-        "standardRegCreatedDate": "details.standardRegCreatedDate",
-        "registrant_telephone": "details.registrant_telephone",
-        "Version": "dataVersion",
-        "score": "_score",
-    }
+    # TODO FIXME Allow sorting based on any field
+    allowed_sort_keys = [
+        "domainName",
+        "registrant_name",
+        "contactEmail",
+        "standardRegCreatedDate",
+        "registrant_telephone",
+        "dataVersion",
+        "_score",
+    ]
 
     chunk_size = json_data.get("chunk_size", 50)
     offset = json_data.get("offset", 0)
@@ -271,7 +257,7 @@ def query():
         if 'name' not in sort_key:
             raise ClientError(
                 "Unable to find required 'name' field in sort_key")
-        elif sort_key['name'] not in sort_map.keys():
+        elif sort_key['name'] not in allowed_sort_keys:
             raise ClientError(f"Invalid sort key {sort_key['name']} provided")
 
         if 'dir' not in sort_key:
@@ -281,7 +267,7 @@ def query():
             raise ClientError(
                 "Sort key 'dir' field must be 'asc' or desc'")
 
-        sort.append((sort_map[sort_key['name']], sort_key['dir']))
+        sort.append((sort_key['name'], sort_key['dir']))
     if not sort:
         sort = None
 
@@ -316,6 +302,7 @@ def query():
 
 
 @whoisv2_bp.route("/stats", methods=["GET"])
+@flask_cache.cached(timeout=3600)
 def stats():
     """Get cluster stats
     """
@@ -328,11 +315,13 @@ def stats():
         raise ServerError("Unexpected issue when requesting search")
 
     return {
-        "stats": cstats
+        "stats": cstats,
+        "cache_time": time.time()
     }
 
 
 @whoisv2_bp.route('/info', methods=["GET"])
+@flask_cache.cached(timeout=60)
 def info():
     """Get cluster info
     """
@@ -343,6 +332,7 @@ def info():
         cluster_info['records'] = es_handler.record_count()
         cluster_info['health'] = es_handler.cluster_health()
         cluster_info['last'] = es_handler.last_version()
+        cluster_info['last_update'] = es_handler.last_update()
     except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
     except ESQueryError:

@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify, current_app
 
 
 class BaseError(Exception):
@@ -10,12 +10,13 @@ class BaseError(Exception):
         payload: Optional dict payload
     """
 
-    def __init__(self, message, status_code=None, payload=None):
+    def __init__(self, message, status_code=None, payload=None, nolog=False):
         Exception.__init__(self)
         self.message = message
         if status_code is not None:
             self.status_code = status_code
         self.payload = payload
+        self.nolog = nolog
 
     def to_dict(self):
         rv = dict(self.payload or ())
@@ -43,6 +44,8 @@ class ServerError(BaseError):
 
 
 def handle_error(error):
+    if isinstance(error, ServerError) and not error.nolog:
+        current_app.logger.exception(error.message)
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
     return response

@@ -44,7 +44,7 @@ export const domainFetcher = async ({
     }
 
     let response = await fetch (
-        '/api/v2/domains/domainName', {
+        '/api/v2/domain', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

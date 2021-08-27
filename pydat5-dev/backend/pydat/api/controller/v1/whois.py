@@ -1,12 +1,24 @@
 from flask import Blueprint, current_app, request
 from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api import elasticsearch_handler as es_handler
-from pydat.core.es import ESConnectionError, ESQueryError
+from pydat.api import flask_cache
+from pydat.core.elastic.exceptions import (
+    ESConnectionError,
+    ESQueryError,
+    ESNotFoundError,
+)
 from urllib import parse
-from pydat.api.shared import whois
+from pydat.api.controller import whois_shared
 
 
 whoisv1_bp = Blueprint("whoisv1", __name__)
+
+
+def _adapt_v1(records):
+    # Convert output to be compliant with old API
+    for record in records:
+        record['Version'] = record[es_handler.metadata_key_map.VERSION_KEY]
+        record['UpdateVersion'] = 0
 
 
 # Domains
@@ -35,11 +47,7 @@ def domains(key, value, low=None, high=None):
     Returns:
         dict: All domain hits that matched search with their details
     """
-    valid_key = False
-    for search_config in current_app.config["SEARCHKEYS"]:
-        if search_config[0] == key:
-            valid_key = True
-    if not valid_key:
+    if key not in current_app.config["SEARCHKEYS"]:
         raise ClientError(f"Invalid key {key}")
     try:
         if low:
@@ -73,6 +81,10 @@ def domains(key, value, low=None, high=None):
     except RuntimeError:
         raise ServerError("Failed to process results")
 
+    _adapt_v1(results['data'])
+
+    results['avail'] = len(results['data'])
+    results['success'] = True
     return results
 
 
@@ -94,13 +106,15 @@ def domains_latest(key, value):
     """
     try:
         low = es_handler.last_version()
+        results = domains(key, value, low)
     except ESConnectionError:
         raise ServerError("Unable to connect to search engine")
     except ESQueryError:
         raise ServerError("Unexpected issue when requesting latest version")
     except RuntimeError:
         raise ServerError("Failed to process results")
-    return domains(key, value, low)
+
+    return results
 
 
 # Domain
@@ -149,13 +163,14 @@ def domain_diff(domainName, v1, v2):
     Returns:
         dict: Diff results from comparing keys and values of v1 and v2
     """
-    data = whois.diff(domainName, v1, v2)
+    data = whois_shared.diff(domainName, v1, v2)
     return {"success": True, "data": data}
 
 
 # Metadata
 @whoisv1_bp.route("/metadata")
 @whoisv1_bp.route("/metadata/<version>")
+@flask_cache.cached()
 def metadata(version=None):
     """Retrieves metadata for all or a specific versions
 
@@ -166,7 +181,17 @@ def metadata(version=None):
     Returns:
         dict: Details for application metadata
     """
-    results = whois.metadata(version)
+    try:
+        results = whois_shared.metadata(version)
+    except RuntimeError as e:
+        raise ServerError(e)
+    except ESQueryError:
+        raise ServerError("Unable to query Elasticsearch backend")
+    except ESNotFoundError:
+        raise ClientError(
+            "Unable to find metadata with that version", status_code=404
+        )
+
     return {"success": True, "data": results}
 
 
@@ -229,5 +254,7 @@ def query():
 
     if skip > 0 and skip >= results["total"]:
         raise ClientError(f"Page number {page_num} is too high")
+
+    _adapt_v1(results['data'])
 
     return results

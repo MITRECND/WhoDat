@@ -1,6 +1,9 @@
 from pydat.api.controller.exceptions import ClientError, ServerError
 from pydat.api import elasticsearch_handler as es_handler
-from pydat.core.es import ESConnectionError, ESQueryError
+from pydat.core.elastic.exceptions import (
+    ESConnectionError,
+    ESQueryError
+)
 
 
 def metadata(version=None):
@@ -21,11 +24,11 @@ def metadata(version=None):
     """
     try:
         if version:
-            version = float(version)
+            version = int(version)
             if version < 0:
                 raise ValueError
     except ValueError:
-        raise ClientError(f"Version {version} must be a valid float")
+        raise ClientError(f"Version {version} must be a valid int")
 
     try:
         results = es_handler.metadata(version)
@@ -34,9 +37,10 @@ def metadata(version=None):
     except ESQueryError:
         raise ServerError("Unexpected issue when requesting search")
 
-    if not results["data"]:
-        raise ClientError(f"Version {version} does not exist", 404)
-    return results["data"]
+    if len(results) == 0:
+        raise ClientError("Cound not find metadata", 404)
+
+    return results
 
 
 def diff(domainName, v1, v2):
@@ -44,11 +48,11 @@ def diff(domainName, v1, v2):
 
     Args:
         domainName (str): Name of the domain to diff versions between
-        v1 (float): First version of the domainName
-        v2 (float): Second version to compare the first to
+        v1 (int): First version of the domainName
+        v2 (int): Second version to compare the first to
 
     Raises:
-        ClientError: Versions are not floats
+        ClientError: Versions are not ints
         ServerError: Search failed to connect
         ClientError: Parameters created an invalid query
         ServerError: Unexpected exception
@@ -59,8 +63,8 @@ def diff(domainName, v1, v2):
               the data is the same, different, or nonexistant between versions
     """
     try:
-        v1 = float(v1)
-        v2 = float(v2)
+        v1 = int(v1)
+        v2 = int(v2)
     except ValueError:
         raise ClientError("Input paramaters are of the wrong type")
 

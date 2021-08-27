@@ -113,7 +113,7 @@ const TableColumns = () => { return [
     },
     {
         Header: 'Version',
-        accessor: 'Version',
+        accessor: 'dataVersion',
         className: 'version-cell',
         style: {
             maxWidth: "5vh",
@@ -121,7 +121,7 @@ const TableColumns = () => { return [
     },
     {
         Header: 'Score',
-        accessor: 'score',
+        accessor: '_score',
         Cell: ({value}) => value.toFixed(3),
         className: 'score-cell',
         style: {

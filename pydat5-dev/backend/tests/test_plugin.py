@@ -1,7 +1,6 @@
 from pydat.core import plugins
 from pydat.core.plugins import PluginManager
 from flask import Flask, Blueprint
-from pydat.api import create_app
 from pydat.core.plugins import PluginBase, register_plugin
 import pytest
 # from pydat.core import preferences
@@ -26,14 +25,16 @@ def test_registration(sample_plugin):
         assert isinstance(loaded[0], sample_plugin)
 
 
-def test_registration_bp(sample_plugin):
+def test_registration_bp(sample_plugin, fake_create_app):
     # Reset the PLUGINS Set
     plugins.PLUGINS = set()
 
     # check bp properly registered
     register_plugin(sample_plugin)
 
-    app = create_app({"TESTING": True, "PLUGINS": {"test_plugin": {}}})
+    app = fake_create_app(
+        {"TESTING": True, "PLUGINS": {"test_plugin": {}}}
+    )
     routes = [str(p) for p in app.url_map.iter_rules()]
     assert '/api/plugin/test_plugin/hello' in routes
 

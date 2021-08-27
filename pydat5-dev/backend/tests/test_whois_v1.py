@@ -1,19 +1,26 @@
 import pytest
 from unittest.mock import MagicMock
-from pydat.core.es import ESConnectionError, ESQueryError
+from pydat.core.elastic.exceptions import (
+    ESConnectionError,
+    ESQueryError,
+    ESNotFoundError
+)
 
 
-@pytest.mark.parametrize("low", ("low", -1, 3, 100, 1.2, -.1))
-@pytest.mark.parametrize("high", ("high", -1.2, 4.6, 2, 200))
+@pytest.mark.parametrize("low", ("low", -1, 3, 100, 1, -21))
+@pytest.mark.parametrize("high", ("high", -1, 4, 2, 200))
 def test_domains(monkeypatch, config_app, low, high, es_handler):
     client = config_app.test_client()
     # search is always valid
-    mock_search = MagicMock(return_value="success")
+    mock_search = MagicMock(return_value={"data": [{
+        "test": "output",
+        "dataVersion": 99
+    }]})
     monkeypatch.setattr(es_handler, 'search', mock_search)
 
     # test checking valid search keys
     for key in config_app.config['SEARCHKEYS']:
-        response = client.get(f"/api/v1/domains/{key[0]}/fake")
+        response = client.get(f"/api/v1/domains/{key}/fake")
         assert response.status_code == 200
     assert client.get("/api/v1/domains/fake_key/fake").status_code == 400
     assert client.get("/api/v1/domains/fake_key").status_code == 404
@@ -35,14 +42,17 @@ def test_domains(monkeypatch, config_app, low, high, es_handler):
 
 def test_latest(monkeypatch, config_app, es_handler):
     # search and lastVersion are always valid
-    mock_search = MagicMock(return_value="success")
+    mock_search = MagicMock(return_value={"data": [{
+        "test": "output",
+        "dataVersion": 99
+    }]})
     mock_last = MagicMock(return_value=1)
     monkeypatch.setattr(es_handler, 'search', mock_search)
     monkeypatch.setattr(es_handler, 'last_version', mock_last)
 
     client = config_app.test_client()
     for key in config_app.config['SEARCHKEYS']:
-        response = client.get(f"/api/v1/domains/{key[0]}/fake/latest")
+        response = client.get(f"/api/v1/domains/{key}/fake/latest")
         assert response.status_code == 200
         response = client.get("/api/v1/domain/fake/latest")
         assert response.status_code == 200
@@ -51,7 +61,7 @@ def test_latest(monkeypatch, config_app, es_handler):
     mock_last.side_effect = ESQueryError
     response = client.get("/api/v1/domain/fake/latest")
     assert response.status_code == 500
-    response = client.get(f"/api/v1/domains/{key[0]}/fake/latest")
+    response = client.get(f"/api/v1/domains/{key}/fake/latest")
     assert response.status_code == 500
 
 
@@ -91,23 +101,25 @@ def test_domain_diff(monkeypatch, client, es_handler):
     assert v2_data['si'] == ["yes", ""]
 
 
-@pytest.mark.parametrize("version", ("version", -1, 1, 1.2))
+@pytest.mark.parametrize("version", ("version", -1, 1, 2))
 def test_metadata(monkeypatch, client, version, es_handler):
     # metadata is always valid
-    mock_meta = MagicMock(return_value={"data": "success"})
+    mock_meta = MagicMock(return_value=[{"test": "record"}])
     monkeypatch.setattr(es_handler, 'metadata', mock_meta)
 
     # type checking
     response = client.get(f'/api/v1/metadata/{version}')
-    if (
-        isinstance(version, int) or isinstance(version, float)
-    ) and version > 0:
+    if isinstance(version, int) and version > 0:
         assert response.status_code == 200
     else:
         assert response.status_code == 400
 
+
+def test_metadata_notfound(monkeypatch, client, es_handler):
     # error: version doesn't exist
-    mock_meta.return_value = {"data": []}
+    mock_meta = MagicMock(side_effect=ESNotFoundError)
+    monkeypatch.setattr(es_handler, 'metadata', mock_meta)
+
     assert client.get('/api/v1/metadata/1').status_code == 404
 
 
@@ -131,7 +143,7 @@ def test_query(monkeypatch, client, es_handler):
     assert response.status_code == 400
 
     # test page specification
-    mock_query = MagicMock(return_value={'total': 1000})
+    mock_query = MagicMock(return_value={'total': 1000, 'data': []})
     monkeypatch.setattr(es_handler, 'advanced_search', mock_query)
     response = client.get("/api/v1/query",
                           query_string={"query": "query", "size": 1000})

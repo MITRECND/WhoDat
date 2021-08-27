@@ -2,8 +2,6 @@ import pkgutil
 import importlib
 import pydat.plugins
 from flask import Blueprint, current_app
-from pydat.api import preferences_manager
-# from pydat.core import preferences
 
 # list of valid Plugin objects
 PLUGINS = set()
@@ -17,35 +15,14 @@ class PluginBase:
         blueprint: A Blueprint that defines the plugin.
     """
 
-    def __init__(self, name, blueprint, preferences=None):
+    def __init__(self, name, blueprint):
         self.name = name
         self.blueprint = blueprint
         self._prefix = '/api/plugin/'
-        self._preferences = None
-        if preferences is not None:
-            self._preferences = preferences
 
     @property
     def prefix(self):
         return self._prefix
-
-    @property
-    def preferences(self):
-        """Returns a dict of plugin's user preferences or None
-
-            Example:
-            {
-                'mynamespace': [
-                    UserPreference(<name>, <type>)
-                ]
-            }
-        """
-        return self._preferences
-
-    @property
-    def jsfiles(self):
-        """Returns a list of plugins' bundled ReactJS files"""
-        return []
 
     def setConfig(self, **kwargs):
         """Function to allow plugin to handle config
@@ -75,8 +52,8 @@ class PassivePluginBase(PluginBase):
         blueprint: A Blueprint that defines the plugin.
     """
 
-    def __init__(self, name, blueprint, preferences=None):
-        super().__init__(name, blueprint, preferences)
+    def __init__(self, name, blueprint):
+        super().__init__(name, blueprint)
         self._prefix += 'passive/'
 
     @property
@@ -162,14 +139,6 @@ class PluginManager:
                 raise ValueError(
                     f"Plugin '{plugin.name}' providing invalid blueprint")
 
-            # Check if there are preferences for the plugin
-            if plugin.preferences is not None:
-                for (namespace, preferences) in plugin.preferences.items():
-                    for preference in preferences:
-                        preferences_manager.add_preference(
-                            namespace, preference
-                        )
-
             self._plugins.append(plugin)
 
     @property
@@ -181,8 +150,7 @@ def register_plugin(plugin):
     """Decorator for registering plugins.
 
     If the plugin is a valid plugin, the plugin object will be added to
-    the global PLUGINS. If the plugin has preferences, they will be added
-    to the global USER_PREF with the plugin name as the key.
+    the global PLUGINS.
 
     Args:
         plugin: Expects a subclass of PluginBase
@@ -206,8 +174,7 @@ def register_passive_plugin(plugin):
     """Decorator for registering passive plugins.
 
     If the plugin is a valid passive plugin, the plugin object will be added to
-    the global PLUGINS. If the plugin has preferences, they will be added
-    to the global USER_PREF with the plugin name as the key.
+    the global PLUGINS.
 
     Args:
         plugin: Expects a subclass of PassivePluginBase

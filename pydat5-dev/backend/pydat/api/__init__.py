@@ -2,13 +2,16 @@ import os
 import sys
 import logging
 from flask import Flask, send_from_directory
+from flask_caching import Cache
 from pydat.core.config_parser import ConfigParser, DEFAULT_CONFIG
-from pydat.core.es import ElasticsearchHandler
-from pydat.core.preferences import UserPreferenceManager
+from pydat.core.elastic.search.flask_handler import FlaskElasticHandler
 
 
-elasticsearch_handler = ElasticsearchHandler()
-preferences_manager = UserPreferenceManager()
+CACHE_TIMEOUT = 300  # Flask cache timeout
+
+
+elasticsearch_handler = FlaskElasticHandler()
+flask_cache = Cache()
 
 
 def create_app(config=None):
@@ -24,6 +27,12 @@ def create_app(config=None):
     config_parser = ConfigParser(app)
     config_parser.parse()
 
+    # Setup cache configuration
+    app.config["CACHE_TYPE"] = "SimpleCache"
+    app.config["CACHE_DEFAULT_TIMEOUT"] = CACHE_TIMEOUT
+
+    flask_cache.init_app(app)
+
     if app.config['DEBUG']:
         app.logger.setLevel(logging.DEBUG)
     else:
@@ -36,19 +45,15 @@ def create_app(config=None):
     # Initialize Plugins
     elasticsearch_handler.init_app(app)
 
-    preferences_manager.init_app(app)
-
     # Register Error Handler
     from pydat.api.controller import exceptions
     exceptions.register_errors(app)
 
     # Register Framework Blueprints
-    from pydat.api.controller.session import session_bp
-    from pydat.api.controller.settings import settings_bp
     from pydat.api.controller.v1.whois import whoisv1_bp
     from pydat.api.controller.v2.whois import whoisv2_bp
+    from pydat.api.controller.v2.settings import settings_bp
     app.register_blueprint(settings_bp, url_prefix="/api/v2")
-    app.register_blueprint(session_bp, url_prefix="/api/v2")
     app.register_blueprint(whoisv2_bp, url_prefix="/api/v2")
 
     # version 1 backwards compatibility
@@ -59,7 +64,6 @@ def create_app(config=None):
 
     # Register Plugin Blueprints and JSfiles
     # add error handling
-    included_jsfiles = []
     installed_plugins = []
     with app.app_context():
         try:
@@ -72,7 +76,6 @@ def create_app(config=None):
             installed_plugins.append(plugin.name)
             url_prefix = os.path.join(plugin.prefix, plugin.name)
             app.register_blueprint(plugin.blueprint, url_prefix=url_prefix)
-            included_jsfiles.extend(plugin.jsfiles)
 
     app.config['PYDAT_PLUGINS'] = installed_plugins
 
