@@ -14,14 +14,12 @@ RUN \
 FROM python:3.6-alpine AS BACKEND
 COPY . /tmp/pydat/
 COPY entry.sh /
-ARG ESVERSION=7
 
 RUN \
     mkdir /opt/pydat && \
     cd /opt/pydat && \
     python3 -m venv pydat-env && \
     /opt/pydat/pydat-env/bin/pip install gunicorn && \
-    if [ "${ESVERSION}" = "6" ]; then /opt/pydat/pydat-env/bin/pip install 'elasticsearch>=6.0.0,<7.0.0'; fi && \
     cd /tmp/pydat && \
     /opt/pydat/pydat-env/bin/pip install ./backend && \
     touch /opt/pydat/config.py
