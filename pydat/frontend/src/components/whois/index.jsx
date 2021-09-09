@@ -214,8 +214,8 @@ const WhoisHandler = ({}) => {
             <Container style={{paddingBottom: '1rem'}}>
                 <ClusterStatus />
                 <form onSubmit={handleOnSubmit}>
-                    <Grid container spacing={1} justify="center" alignItems="flex-end">
-                        <Grid container item xs={11} justify="center" alignItems="flex-end">
+                    <Grid container spacing={1} justifyContent="center" alignItems="flex-end">
+                        <Grid container item xs={11} justifyContent="center" alignItems="flex-end">
                             <TextField
                                 label="Query"
                                 variant="outlined"

@@ -1,4 +1,4 @@
-import {createMuiTheme} from '@material-ui/core/styles'
+import {createTheme} from '@material-ui/core/styles'
 
 const _color_palette = {
     primary: {
@@ -23,5 +23,5 @@ const _darkTheme = {
 }
 
 
-export const defaultTheme = createMuiTheme(_defaultTheme)
-export const darkTheme = createMuiTheme(_darkTheme)
+export const defaultTheme = createTheme(_defaultTheme)
+export const darkTheme = createTheme(_darkTheme)

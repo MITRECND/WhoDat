@@ -86,7 +86,11 @@ const FullDetailsDialog = ({data}) => {
                 fullWidth
                 maxWidth={"md"}
             >
-                <DialogTitle onClose={handleClose}>{`Domain "${data.domainName}"`}</DialogTitle>
+                <DialogTitle onClose={handleClose}>
+                    <span>
+                        {`Domain "${data.domainName}"`}
+                    </span>
+                </DialogTitle>
                 <DialogContent>
                     <Grid container>
                         <Grid item>
@@ -154,12 +158,16 @@ const DiffDetailsDialog = ({previous, current}) => {
                 <TableCell
                     className={clsx(previousEntry !== currentEntry && classes.changed)}
                 >
-                    {previousEntry}
+                    <span>
+                        {previousEntry}
+                    </span>
                 </TableCell>
                 <TableCell
                     className={clsx(previousEntry !== currentEntry && classes.changed)}
                 >
-                    {currentEntry}
+                    <span>
+                        {currentEntry}
+                    </span>
                 </TableCell>
             </TableRow>
         )
@@ -179,7 +187,9 @@ const DiffDetailsDialog = ({previous, current}) => {
                 maxWidth={"md"}
             >
                 <DialogTitle onClose={handleClose}>
-                    {`Domain "${current.domainName}" ${previous.dataVersion} -> ${current.dataVersion}`}
+                    <span>
+                        {`Domain "${current.domainName}" ${previous.dataVersion} -> ${current.dataVersion}`}
+                    </span>
                 </DialogTitle>
                 <DialogContent>
                     <Table>

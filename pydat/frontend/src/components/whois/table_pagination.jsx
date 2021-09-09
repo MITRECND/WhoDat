@@ -102,8 +102,8 @@ export const Paginator = ({
                 inputProps: { 'aria-label': 'rows per page' },
                 native: true,
               }}
-              onChangePage={handleChangePage}
-              onChangeRowsPerPage={handleChangeRowsPerPage}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
               ActionsComponent={
                   (props) => (
                     <TablePaginationActions

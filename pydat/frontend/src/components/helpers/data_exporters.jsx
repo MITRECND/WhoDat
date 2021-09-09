@@ -164,7 +164,7 @@ function not(a, b) {
     );
 
     return (
-      <Grid container spacing={2} justify="center" alignItems="center" className={classes.root}>
+      <Grid container spacing={2} justifyContent="center" alignItems="center" className={classes.root}>
         <Grid item>{customList(left)}</Grid>
         <Grid item>
           <Grid container direction="column" alignItems="center">

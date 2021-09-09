@@ -20,12 +20,13 @@ const fetchSettings = async () => {
 
   if (response.status === 200) {
       let jresp = await response.json()
+      appSettings['loaded'] = true
       for (let key in jresp) {
           appSettings[key] = jresp[key]
       }
       return jresp
   } else {
-      throw response
+      console.log(response)
   }
 }
 

@@ -548,7 +548,7 @@ const DNSDB = () => {
             <Container className={classes.searchContainer} maxWidth="xl">
                 <Paper className={classes.searchPaper}>
                     <form onSubmit={handleOnSubmit}>
-                        <Grid container spacing={1} direction="row" justify="center" alignItems="flex-end">
+                        <Grid container spacing={1} direction="row" justifyContent="center" alignItems="flex-end">
                                 <Grid item xs={11}>
                                     <TextField
                                         label={`Search ${allQueryTypes[formData.type]} Records`}

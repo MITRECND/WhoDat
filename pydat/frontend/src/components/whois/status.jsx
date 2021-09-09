@@ -97,12 +97,12 @@ const ClusterStatus = ({}) => {
                 />
             }
             {loaded &&
-            <Grid container spacing={1} justify="flex-start">
+            <Grid container spacing={1} justifyContent="flex-start">
                 <Grid item xs={12}>
                     <React.Fragment>
                         <Tooltip title={`Cluster Status: ${clusterStatus.color_string}`} placement="left">
                             <Badge
-                                overlap="circle"
+                                overlap="circular"
                                 variant="dot"
                                 badgeContent=" "
                                 classes={{badge: clusterStatus.color}}

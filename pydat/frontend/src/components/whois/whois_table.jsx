@@ -235,7 +235,7 @@ const WhoisTableContainer = ({
     }, [queryData, pageIndex, pageSize, sortBy])
 
 
-    if (!Array.isArray(data) || !data.length) {
+    if (!Array.isArray(data)) {
         return (
             <BackdropLoader/>
         )
