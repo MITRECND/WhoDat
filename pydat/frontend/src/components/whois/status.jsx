@@ -73,6 +73,19 @@ const ClusterStatus = ({}) => {
             } catch (err) {
                 enqueueSnackbar("Unable to query Cluster Status", {variant: "warning"})
                 console.log(err)
+                let clusterstatus = {
+                    last: "?",
+                    records: "?",
+                    dateProcessed: "?",
+                    color: statusClasses.clusterUnknownStatusBadge,
+                    color_string: "Unknown"
+                }
+
+                setClusterStats({
+                    ...clusterstatus,
+                    timestamp: Date.now()
+                })
+                setLoaded(true)
             } finally {
                 setFetching(false)
             }
