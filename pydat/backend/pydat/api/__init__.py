@@ -95,9 +95,6 @@ def create_app(config=None):
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve(path):
-        if app.config.get('STATICFOLDER', None) is None:
-            raise exceptions.ClientError("No static assets/ui configured", 404)
-
         if path != "" and os.path.exists(app.static_folder + '/' + path):
             return send_from_directory(app.static_folder, path)
         else:

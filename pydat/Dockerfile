@@ -1,18 +1,17 @@
 # Stage 1 - Build Frontend
 FROM node:lts AS FRONTEND
 WORKDIR /opt/pydat
-COPY . /opt/pydat/
-
+COPY frontend /opt/pydat/frontend
+ENV GENERATE_SOURCEMAP=false
 RUN \
- echo "GENERATE_SOURCEMAP=false" > .env && \
- cd frontend && \
-   npm install && \
-   npm run build:isolated
+  cd frontend && \
+  npm install && \
+  npm run build:isolated
 
 
 # Stage 2 - Python Backend plus compiled frontend assets
-FROM python:3.6-alpine AS BACKEND
-COPY . /tmp/pydat/
+FROM python:3.8-alpine
+COPY backend /tmp/pydat/backend
 COPY entry.sh /
 
 RUN \

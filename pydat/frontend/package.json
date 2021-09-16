@@ -4,8 +4,8 @@
   "private": true,
   "proxy": "http://localhost:5000",
   "dependencies": {
-    "@material-ui/core": "^4.11.0",
-    "@material-ui/icons": "^4.9.1",
+    "@material-ui/core": "^4.12.3",
+    "@material-ui/icons": "^4.11.2",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
@@ -26,7 +26,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "npm run build:isolated && mv build/index.html ../backend/pydat/api/templates && mv -f build/static ../backend/pydat/api/static",
+    "build": "npm run build:isolated && mv -f build/static ../backend/pydat/api/static",
     "build:isolated": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
