@@ -1,0 +1,5 @@
+global-exclude *.py[cod]
+graft pydat/plugins
+graft pydat/api/static
+graft pydat/api/templates
+graft pydat/core/elastic/templates
